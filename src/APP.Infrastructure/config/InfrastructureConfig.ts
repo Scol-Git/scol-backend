@@ -9,7 +9,7 @@ import { envValidationSchema } from './config.schema';
       isGlobal: true,
       cache: true,
       validationSchema: envValidationSchema,
-      envFilePath: ['.env'],
+      envFilePath: ['.env.local', '.env'],
     }),
   ],
 })

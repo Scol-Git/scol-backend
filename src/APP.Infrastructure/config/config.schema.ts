@@ -12,13 +12,4 @@ export const envValidationSchema = Joi.object({
   DB_USER: Joi.string().default('postgres'),
   DB_PASS: Joi.string().default('postgres'),
   DB_NAME: Joi.string().default('worktrack'),
-
-  REDIS_URL: Joi.string().uri().required(),
-  RABBITMQ_URL: Joi.string().uri().required(),
-
-  JWT_SECRET: Joi.string().min(16).required(),
-
-  LOG_SHIPPER: Joi.string().valid('LOGTAIL', 'AXIOM').optional(),
-  LOGTAIL_TOKEN: Joi.string().allow('').optional(),
-  AXIOM_TOKEN: Joi.string().allow('').optional(),
 });

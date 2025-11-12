@@ -41,7 +41,7 @@ export default new DataSource({
   type: 'postgres',
   url,
   entities: [Organization, User, Project, Todo, TodoDependency, AuditEvent],
-  migrations: ['migrations/*{.ts,.js}'],
+  migrations: ['src/migrations/*{.ts,.js}'],
   synchronize: false,
   logging: false,
   // ssl: true, // usually not needed if ?sslmode=require is in the URL
