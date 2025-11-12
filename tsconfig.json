@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@api/*": ["src/APP.API/*"],
+      "@bll/*": ["src/APP.BLL/*"],
+      "@infra/*": ["src/APP.Infrastructure/*"],
+      "@entity/*": ["src/APP.Entity/*"],
+      "@shared/*": ["src/APP.Shared/*"]
+    },
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}
