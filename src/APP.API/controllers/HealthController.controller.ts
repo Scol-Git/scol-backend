@@ -1,14 +1,13 @@
-// controller example
 import { Controller, Get } from '@nestjs/common';
-import { AppLogger } from '@infra/logging/AppLogger.service';
+import { Logger } from '@infra/logging/Logger.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly logger: AppLogger) {}
+  constructor(private readonly _logger: Logger) {}
 
   @Get()
   ping() {
-    this.logger.LogInfo('Health check hit');
+    this._logger.LogInfo('Health check hit');
     return { ok: true, now: new Date().toISOString() };
   }
 }

@@ -1,4 +1,5 @@
 import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { AutoMap } from '@automapper/classes';
 
 import { BaseEntity } from './BaseEntity.template';
 import { Organization } from './Organization.entity';

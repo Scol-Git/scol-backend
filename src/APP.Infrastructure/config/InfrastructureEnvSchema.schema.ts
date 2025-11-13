@@ -1,0 +1,19 @@
+import * as Joi from 'joi';
+
+export const InfrastructureEnvSchema = Joi.object({
+  NODE_ENV: Joi.string()
+    .valid('development', 'test', 'production')
+    .default('development'),
+  PORT: Joi.number().default(3000),
+
+  DATABASE_URL: Joi.string().uri().required(), // prefer URL in cloud
+
+  // Optional individual parts if you ever need local connection pieces:
+  DB_HOST: Joi.string().optional(),
+  DB_PORT: Joi.number().optional(),
+  DB_USER: Joi.string().optional(),
+  DB_PASS: Joi.string().optional(),
+  DB_NAME: Joi.string().optional(),
+
+  // add later: REDIS_URL, RABBITMQ_URL, JWT_SECRET, etc.
+});

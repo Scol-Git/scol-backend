@@ -1,48 +1,40 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
-
-import { AppLogger } from '@infra/logging/AppLogger.service';
-import { OrganizationService } from '@bll/services/OrganizationService.service';
 import {
-  CreateOrganizationRequestDto,
-  CreateOrganizationResponseDto,
-} from '@api/dtos/organizations/createOrganizations.dto';
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+
+import { Logger } from '@infra/logging/Logger.service';
+import { OrganizationsService } from '@bll/services/OrganizationService.service';
+import { CreateOrganizationRequestDto } from '@shared/dtos/organizations/CreateOrganizationRequestDto.dto';
+import { OrganizationResponseDto } from '@shared/dtos/organizations/OrganizationResponseDto.dto';
 
 @ApiTags('organizations')
 @Controller('organizations')
 export class OrganizationController {
   constructor(
-    private readonly orgs: OrganizationService,
-    private readonly logger: AppLogger,
-  ) {
-    this.logger.LogInfo('OrgsController initialized');
-  }
+    private readonly _service: OrganizationsService,
+    private readonly _logger: Logger,
+  ) {}
 
   @Get()
-  async list(): Promise<CreateOrganizationResponseDto[]> {
-    const items = await this.orgs.list();
-
-    this.logger.LogInfo('List organizations success', { count: items.length });
-
-    return items.map((o) => ({
-      id: o.id,
-      name: o.name,
-      createdAt: o.createdAt,
-      updatedAt: o.updatedAt,
-    }));
+  @ApiOkResponse({ type: OrganizationResponseDto, isArray: true })
+  async list(): Promise<OrganizationResponseDto[]> {
+    const items = await this._service.list();
+    this._logger.LogInfo('List organizations success', { count: items.length });
+    return items;
   }
 
   @Post()
+  @ApiBody({ type: CreateOrganizationRequestDto })
+  @ApiCreatedResponse({ type: OrganizationResponseDto })
   async create(
     @Body() dto: CreateOrganizationRequestDto,
-  ): Promise<CreateOrganizationResponseDto> {
-    const org = await this.orgs.create(dto.name);
-    this.logger.LogInfo('Create organization success', { orgId: org.id });
-    return {
-      id: org.id,
-      name: org.name,
-      createdAt: org.createdAt,
-      updatedAt: org.updatedAt,
-    };
+  ): Promise<OrganizationResponseDto> {
+    const org = await this._service.create(dto);
+    this._logger.LogInfo('Create organization success', { orgId: org.id });
+    return org;
   }
 }

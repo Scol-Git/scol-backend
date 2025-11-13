@@ -1,9 +1,8 @@
 import { Global, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule as NestTypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
 
-// Entities
 import { Organization } from '@entity/entities/Organization.entity';
 import { User } from '@entity/entities/User.entity';
 import { Project } from '@entity/entities/Project.entity';
@@ -11,13 +10,10 @@ import { Todo } from '@entity/entities/Todo.entity';
 import { TodoDependency } from '@entity/entities/TodoDependency.entity';
 import { AuditEvent } from '@entity/entities/AuditEvent.entity';
 
-// Optional snake_case naming
-// import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
-
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forRootAsync({
+    NestTypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (cfg: ConfigService): DataSourceOptions => {
         const url = cfg.get<string>('DATABASE_URL');
@@ -34,7 +30,6 @@ import { AuditEvent } from '@entity/entities/AuditEvent.entity';
 
         return {
           ...base,
-          // Entities explicitly listed (good for libs/monorepos)
           entities: [
             Organization,
             User,
@@ -43,27 +38,16 @@ import { AuditEvent } from '@entity/entities/AuditEvent.entity';
             TodoDependency,
             AuditEvent,
           ],
-          // namingStrategy: new SnakeNamingStrategy(),
-
-          // Keep off in prod — use migrations
           synchronize: false,
-
-          // Reasonable defaults
           logging:
             cfg.get('NODE_ENV') === 'development'
               ? ['error', 'warn']
               : ['error'],
-          // TypeORM pool via PG defaults; tune via env if needed:
-          // extra: { max: 10, statement_timeout: 15000, idle_in_transaction_session_timeout: 15000 },
-
-          // Optional SSL for managed Postgres
-          // ssl: cfg.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
         };
       },
     }),
 
-    // If you ever want DI repositories; otherwise inject DataSource/EntityManager directly
-    TypeOrmModule.forFeature([
+    NestTypeOrmModule.forFeature([
       Organization,
       User,
       Project,
@@ -72,6 +56,6 @@ import { AuditEvent } from '@entity/entities/AuditEvent.entity';
       AuditEvent,
     ]),
   ],
-  exports: [TypeOrmModule],
+  exports: [NestTypeOrmModule],
 })
-export class TypeOrmDbModule {}
+export class TypeOrmModule {}

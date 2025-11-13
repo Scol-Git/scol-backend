@@ -7,5 +7,6 @@
     "sourceMap": true,
     "removeComments": true
   },
-  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
+  "include": ["src/**/*.ts"], // ✅ only src
+  "exclude": ["node_modules", "dist", "migrations", "**/*.spec.ts", "test"]
 }

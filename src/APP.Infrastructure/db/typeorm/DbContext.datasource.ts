@@ -1,6 +1,6 @@
 // src/APP.Infrastructure/db/typeorm/migration.config.ts
 import 'reflect-metadata';
-import { DataSource } from 'typeorm';
+import { DataSource as DbContext } from 'typeorm';
 import * as path from 'path';
 import * as fs from 'fs';
 import { config as dotenvConfig } from 'dotenv';
@@ -37,11 +37,11 @@ if (!url) {
 
 console.log('TypeORM CLI using DATABASE_URL:', url);
 
-export default new DataSource({
+export default new DbContext({
   type: 'postgres',
   url,
   entities: [Organization, User, Project, Todo, TodoDependency, AuditEvent],
-  migrations: ['src/migrations/*{.ts,.js}'],
+  migrations: ['migrations/*{.ts,.js}'],
   synchronize: false,
   logging: false,
   // ssl: true, // usually not needed if ?sslmode=require is in the URL

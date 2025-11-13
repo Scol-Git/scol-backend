@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { envValidationSchema } from './config.schema';
+import { InfrastructureEnvSchema } from './InfrastructureEnvSchema.schema';
 
 @Global()
 @Module({
@@ -8,9 +8,9 @@ import { envValidationSchema } from './config.schema';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      validationSchema: envValidationSchema,
+      validationSchema: InfrastructureEnvSchema,
       envFilePath: ['.env.local', '.env'],
     }),
   ],
 })
-export class InfrastructureConfig {}
+export class InfrastructureConfigModule {}

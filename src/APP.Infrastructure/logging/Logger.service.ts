@@ -2,9 +2,9 @@ import { Injectable, LoggerService } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 
 @Injectable()
-export class AppLogger implements LoggerService {
+export class Logger implements LoggerService {
   constructor(private readonly pino: PinoLogger) {
-    this.pino.setContext(AppLogger.name);
+    this.pino.setContext(Logger.name);
   }
 
   // --- .NET-style methods ---

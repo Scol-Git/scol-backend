@@ -1,13 +1,15 @@
+// src/main.ts
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { AppModule } from './app.module';
+import { AppModule } from './AppModule.module';
+import { HttpExceptionFilter } from '@api/filters/HttpExceptionFilter.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  app.useLogger(app.get(Logger)); // connect nest logger to nestjs-pino
+  app.useLogger(app.get(Logger));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -17,14 +19,19 @@ async function bootstrap() {
     }),
   );
 
+  // ✅ Let Nest inject AppLogger into the filter
+  app.useGlobalFilters(app.get(HttpExceptionFilter));
+
   const swaggerCfg = new DocumentBuilder()
     .setTitle('SCOL Backend')
-    .setDescription('Sanity endpoints')
+    .setDescription('API documentation')
     .setVersion('1.0.0')
     .build();
   const doc = SwaggerModule.createDocument(app, swaggerCfg);
   SwaggerModule.setup('/swagger', app, doc);
 
-  await app.listen(process.env.PORT || 3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  console.log(`🚀 Server running on http://localhost:${port}`);
 }
 bootstrap();
