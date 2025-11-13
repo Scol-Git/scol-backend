@@ -1,8 +1,11 @@
-// src/APP.Infrastructure/logging/logging.module.ts
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Global, Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import type { Options as PinoHttpOptions, StdSerializers } from 'pino-http';
+import { randomUUID } from 'crypto';
 import { Logger } from './Logger.service';
+
+const CORRELATION_HEADER = 'x-correlation-id';
 
 @Global()
 @Module({
@@ -18,6 +21,33 @@ import { Logger } from './Logger.service';
           // 🚫 disable automatic access logs
           autoLogging: false,
 
+          /**
+           * ✅ One correlationId per request
+           *
+           * - If client sends x-correlation-id or x-request-id, reuse it
+           * - Otherwise generate a new UUID
+           * - pino-http will put the id on req.id and in every log
+           */
+          genReqId: (req) => {
+            const headerId =
+              (req.headers[CORRELATION_HEADER] as string) ||
+              (req.headers['x-request-id'] as string);
+
+            return headerId ?? randomUUID();
+          },
+
+          /**
+           * ✅ Attach correlationId to every log line
+           *
+           * nestjs-pino binds a request-scoped logger which has access
+           * to req.id (populated by genReqId above).
+           */
+          customProps: (req) => {
+            return {
+              correlationId: (req as any).id,
+            };
+          },
+
           // 🚫 strip req/res from bound logger so your app logs don't include them
           serializers: {
             // keep error serializer default behavior
@@ -26,9 +56,6 @@ import { Logger } from './Logger.service';
             req: (() => undefined) as unknown as StdSerializers['req'],
             res: (() => undefined) as unknown as StdSerializers['res'],
           },
-
-          // don’t add per-request props to every log
-          customProps: () => ({}),
 
           // redact secrets
           redact: [
