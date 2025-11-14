@@ -4,6 +4,9 @@ import { TypeOrmModule } from './db/typeorm/TypeOrmModule.module';
 import { LoggingModule } from './logging/LoggingModule.module';
 import { InfrastructureConfigModule } from './config/InfrastructureConfig';
 
+// Import QueryBuilder extension methods to register them globally
+import './db/extensions/QueryBuilderExtensions';
+
 @Module({
   imports: [InfrastructureConfigModule, LoggingModule, TypeOrmModule],
   exports: [InfrastructureConfigModule, LoggingModule, TypeOrmModule],

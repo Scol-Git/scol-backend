@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   ArgumentsHost,
@@ -7,9 +6,11 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Inject,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { Logger } from '@infra/logging/Logger.service';
+import type { ILogger } from '@shared/interfaces/logging/ILogger.interface';
+import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
 interface ProblemDetails {
   type: string;
@@ -23,7 +24,9 @@ interface ProblemDetails {
 @Catch()
 @Injectable()
 export class HttpExceptionFilter implements ExceptionFilter {
-  constructor(private readonly _logger: Logger) {}
+  constructor(
+    @Inject(ILoggerToken) private readonly _logger: ILogger,
+  ) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const http = host.switchToHttp();

@@ -9,5 +9,4 @@ export class OrganizationResponseDto {
   @ApiProperty({ example: 'Azura' })
   @AutoMap()
   name!: string;
-
 }

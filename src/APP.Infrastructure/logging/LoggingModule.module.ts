@@ -4,6 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 import type { Options as PinoHttpOptions, StdSerializers } from 'pino-http';
 import { randomUUID } from 'crypto';
 import { Logger } from './Logger.service';
+import { ILogger } from '@shared/tokens/injection.tokens';
 
 const CORRELATION_HEADER = 'x-correlation-id';
 
@@ -78,7 +79,13 @@ const CORRELATION_HEADER = 'x-correlation-id';
       },
     }),
   ],
-  providers: [Logger],
-  exports: [LoggerModule, Logger],
+  providers: [
+    // Register Logger with interface token (following .NET DI pattern)
+    {
+      provide: ILogger,
+      useClass: Logger,
+    },
+  ],
+  exports: [LoggerModule, ILogger],
 })
 export class LoggingModule {}

@@ -1,8 +1,15 @@
 import { Injectable, LoggerService } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
+import { ILogger } from '@shared/interfaces/logging/ILogger.interface';
 
+/**
+ * Logger service implementing structured logging.
+ * 
+ * Implements ILogger interface following .NET's ILogger<T> pattern.
+ * Uses Pino for high-performance JSON logging.
+ */
 @Injectable()
-export class Logger implements LoggerService {
+export class Logger implements ILogger, LoggerService {
   constructor(private readonly pino: PinoLogger) {
     this.pino.setContext(Logger.name);
   }

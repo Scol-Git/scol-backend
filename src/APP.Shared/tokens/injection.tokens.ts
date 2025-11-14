@@ -1,0 +1,99 @@
+/**
+ * Dependency Injection Tokens
+ *
+ * This file contains all DI tokens used for interface-based dependency injection.
+ * Following .NET's approach of programming to interfaces, not implementations.
+ *
+ * Usage:
+ * - Define: export const IServiceName = Symbol('IServiceName');
+ * - Register: { provide: IServiceName, useClass: ServiceNameImpl }
+ * - Inject: @Inject(IServiceName) private readonly _service: IServiceName
+ */
+
+// ============================================================================
+// Core Infrastructure Tokens
+// ============================================================================
+
+/**
+ * Token for ILogger
+ * Provides structured logging capabilities (Pino implementation)
+ */
+export const ILogger = Symbol('ILogger');
+
+/**
+ * Token for IMapper
+ * Provides object-to-object mapping (AutoMapper implementation)
+ */
+export const IMapper = Symbol('IMapper');
+
+// ============================================================================
+// Service Layer Tokens (APP.BLL)
+// ============================================================================
+
+/**
+ * Token for IOrganizationService
+ * Manages organization CRUD operations with pagination and filtering
+ */
+export const IOrganizationService = Symbol('IOrganizationService');
+
+/**
+ * Token for ITodoService (future implementation)
+ * Manages todo CRUD operations with optimistic locking
+ */
+export const ITodoService = Symbol('ITodoService');
+
+/**
+ * Token for IProjectService (future implementation)
+ * Manages project CRUD operations
+ */
+export const IProjectService = Symbol('IProjectService');
+
+/**
+ * Token for IUserService (future implementation)
+ * Manages user CRUD operations with authentication
+ */
+export const IUserService = Symbol('IUserService');
+
+// ============================================================================
+// Infrastructure Layer Tokens (APP.Infrastructure)
+// ============================================================================
+
+/**
+ * Token for ICacheService (future implementation)
+ * Provides caching abstraction (Redis implementation)
+ */
+export const ICacheService = Symbol('ICacheService');
+
+/**
+ * Token for IMessageSender (future implementation)
+ * Provides message bus abstraction (RabbitMQ implementation)
+ */
+export const IMessageSender = Symbol('IMessageSender');
+
+/**
+ * Token for IEmailSender (future implementation)
+ * Provides email sending abstraction (SMTP implementation)
+ */
+export const IEmailSender = Symbol('IEmailSender');
+
+/**
+ * Token for IEventBus (future implementation)
+ * Provides domain event publishing abstraction
+ */
+export const IEventBus = Symbol('IEventBus');
+
+// ============================================================================
+// Security Layer Tokens
+// ============================================================================
+
+/**
+ * Token for IJwtService (future implementation)
+ * Provides JWT token generation and validation
+ */
+export const IJwtService = Symbol('IJwtService');
+
+/**
+ * Token for IPasswordHasher (future implementation)
+ * Provides password hashing abstraction (bcrypt implementation)
+ */
+export const IPasswordHasher = Symbol('IPasswordHasher');

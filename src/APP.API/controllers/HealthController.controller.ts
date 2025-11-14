@@ -1,9 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
-import { Logger } from '@infra/logging/Logger.service';
+import { Controller, Get, Inject } from '@nestjs/common';
+import type { ILogger } from '@shared/interfaces/logging/ILogger.interface';
+import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly _logger: Logger) {}
+  constructor(
+    @Inject(ILoggerToken) private readonly _logger: ILogger,
+  ) {}
 
   @Get()
   ping() {
