@@ -15,5 +15,22 @@ export const InfrastructureEnvSchema = Joi.object({
   DB_PASS: Joi.string().optional(),
   DB_NAME: Joi.string().optional(),
 
-  // add later: REDIS_URL, RABBITMQ_URL, JWT_SECRET, etc.
+  // Email Configuration (optional, defaults to console mode)
+  EMAIL_PROVIDER: Joi.string().valid('console', 'smtp').default('console'),
+  SMTP_HOST: Joi.string().optional(),
+  SMTP_PORT: Joi.number().optional(),
+  SMTP_SECURE: Joi.alternatives()
+    .try(
+      Joi.boolean(),
+      Joi.string().valid('true', 'false', '1', '0', 'yes', 'no'),
+    )
+    .optional(),
+  SMTP_USER: Joi.string().optional(),
+  SMTP_PASS: Joi.string().optional(),
+  SMTP_FROM: Joi.string().optional(),
+
+  // RabbitMQ (optional)
+  RABBITMQ_URL: Joi.string().uri().optional(),
+
+  // add later: REDIS_URL, JWT_SECRET, etc.
 });

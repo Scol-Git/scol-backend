@@ -54,6 +54,12 @@ export const IProjectService = Symbol('IProjectService');
  */
 export const IUserService = Symbol('IUserService');
 
+/**
+ * Token for INotificationService
+ * Manages email and message notifications
+ */
+export const INotificationService = Symbol('INotificationService');
+
 // ============================================================================
 // Infrastructure Layer Tokens (APP.Infrastructure)
 // ============================================================================

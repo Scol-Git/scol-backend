@@ -56,10 +56,6 @@ export class OrganizationService implements IOrganizationService {
   async list(
     searchDto: SearchOrganizationsRequestDto,
   ): Promise<PaginatedResponse<OrganizationResponseDto>> {
-    this._logger.LogInfo('Listing organizations with pagination', {
-      searchDto,
-    });
-
     // Build PagedQuery from DTO
     const pagedQuery = new PagedQuery<Organization>();
     pagedQuery.pageNumber = searchDto.pageNumber || 1;
