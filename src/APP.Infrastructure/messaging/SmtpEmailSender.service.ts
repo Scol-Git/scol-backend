@@ -11,13 +11,13 @@ import { Injectable, OnModuleInit, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import {
-  type IEmailSender,
+import type { IEmailSender } from '@shared/interfaces/infrastructure';
+import type {
   EmailMessage,
   EmailOptions,
-} from '@shared/interfaces/infrastructure/IEmailSender.interface';
+} from '@shared/interfaces/infrastructure/types';
 import { ILogger } from '@shared/tokens/injection.tokens';
-import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging/ILogger.interface';
+import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 
 @Injectable()
 export class SmtpEmailSender implements IEmailSender, OnModuleInit {
@@ -82,7 +82,7 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
     }
 
     // Log configuration for debugging
-    this._logger.LogInfo('🔧 Configuring SMTP transporter', {
+    this._logger.LogInfo('Configuring SMTP transporter', {
       host,
       port,
       secure,
@@ -179,7 +179,7 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
       const fromAddress = email.from || this._defaultFrom;
 
       // Log what we're attempting to use (helpful for debugging Gmail overrides)
-      this._logger.LogInfo('📧 Sending email with FROM address', {
+      this._logger.LogInfo('Sending email with FROM address', {
         from: fromAddress,
         smtpUser: this._config.get<string>('SMTP_USER'),
         note: "Gmail may override FROM if domain doesn't match authenticated account",
@@ -232,7 +232,7 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
       const promises = emails.map((email) => this.sendEmail(email));
       await Promise.all(promises);
 
-      this._logger.LogInfo('📧 Batch emails sent successfully', {
+      this._logger.LogInfo('Batch emails sent successfully', {
         count: emails.length,
       });
     } catch (error) {
@@ -263,7 +263,7 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
 
       await this.sendHtmlEmail(to, subject, htmlContent, options);
 
-      this._logger.LogInfo('📧 Templated email sent successfully', {
+      this._logger.LogInfo('Templated email sent successfully', {
         to,
         templateId,
       });

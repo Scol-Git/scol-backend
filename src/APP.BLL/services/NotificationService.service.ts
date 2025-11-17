@@ -13,10 +13,10 @@ import {
   IEmailSender,
   IMessageSender,
 } from '@shared/tokens/injection.tokens';
-import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging/ILogger.interface';
-import type { IEmailSender as IEmailSenderInterface } from '@shared/interfaces/infrastructure/IEmailSender.interface';
-import type { IMessageSender as IMessageSenderInterface } from '@shared/interfaces/infrastructure/IMessageSender.interface';
-import type { INotificationService } from '@shared/interfaces/services/INotificationService.interface';
+import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
+import type { IEmailSender as IEmailSenderInterface } from '@shared/interfaces/infrastructure';
+import type { IMessageSender as IMessageSenderInterface } from '@shared/interfaces/infrastructure';
+import type { INotificationService } from '@shared/interfaces/services';
 import { SendEmailRequestDto } from '@shared/dtos/notifications/SendEmailRequestDto.dto';
 import { SendTemplatedEmailRequestDto } from '@shared/dtos/notifications/SendTemplatedEmailRequestDto.dto';
 import { SendMessageRequestDto } from '@shared/dtos/notifications/SendMessageRequestDto.dto';

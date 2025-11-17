@@ -1,7 +1,7 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { UserContextAccessor } from '@shared/context/UserContextAccessor';
-import { ICurrentUser } from '@shared/interfaces/ICurrentUser.interface';
+import { ICurrentUser } from '@shared/interfaces/domain';
 
 /**
  * Middleware that populates the UserContextAccessor with the current user.

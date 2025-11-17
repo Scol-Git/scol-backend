@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import { UnauthorizedException } from '@nestjs/common';
-import { ICurrentUser } from '@shared/interfaces/ICurrentUser.interface';
+import { ICurrentUser } from '@shared/interfaces/domain';
 
 /**
  * Provides access to the current user context throughout the application.

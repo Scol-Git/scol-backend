@@ -2,9 +2,18 @@
  * Interface for object-to-object mapping service.
  * 
  * Provides abstraction for AutoMapper functionality.
- * Similar to .NET's IMapper from AutoMapper library.
+ * Similar to .NET Core's IMapper from AutoMapper library.
  * 
  * @interface IMapper
+ * 
+ * @example
+ * ```typescript
+ * // Map single object
+ * const dto = mapper.map(entity, Organization, OrganizationResponseDto);
+ * 
+ * // Map array
+ * const dtos = mapper.mapArray(entities, Organization, OrganizationResponseDto);
+ * ```
  */
 export interface IMapper {
   /**
@@ -16,7 +25,9 @@ export interface IMapper {
    * @returns Mapped destination object
    * 
    * @example
+   * ```typescript
    * const dto = mapper.map(entity, Organization, OrganizationResponseDto);
+   * ```
    */
   map<TSource, TDestination>(
     source: TSource,
@@ -33,7 +44,9 @@ export interface IMapper {
    * @returns Array of mapped destination objects
    * 
    * @example
+   * ```typescript
    * const dtos = mapper.mapArray(entities, Organization, OrganizationResponseDto);
+   * ```
    */
   mapArray<TSource, TDestination>(
     sourceArray: TSource[],
@@ -71,5 +84,4 @@ export interface IMapper {
     destinationType: new (...args: any[]) => TDestination,
   ): Promise<TDestination[]>;
 }
-
 

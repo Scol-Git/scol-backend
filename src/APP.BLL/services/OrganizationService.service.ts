@@ -7,8 +7,8 @@ import {
 import { DataSource as DbContext } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 
-import type { ILogger } from '@shared/interfaces/logging/ILogger.interface';
-import type { IMapper } from '@shared/interfaces/mapping/IMapper.interface';
+import type { ILogger } from '@shared/interfaces/logging';
+import type { IMapper } from '@shared/interfaces/mapping';
 import {
   ILogger as ILoggerToken,
   IMapper as IMapperToken,
@@ -21,7 +21,7 @@ import { PaginatedResponse } from '@shared/models/PaginatedResponse';
 import { PagedQuery } from '@shared/models/PagedQuery';
 
 import { Organization } from '@entity/entities/Organization.entity';
-import type { IOrganizationService } from '@shared/interfaces/services/IOrganizationService.interface';
+import type { IOrganizationService } from '@shared/interfaces/services';
 
 /**
  * Organization service implementing full CRUD operations with pagination,

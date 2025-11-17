@@ -8,13 +8,10 @@
  * @implements {IEmailSender}
  */
 import { Injectable, Inject } from '@nestjs/common';
-import {
-  type IEmailSender,
-  EmailMessage,
-  EmailOptions,
-} from '@shared/interfaces/infrastructure/IEmailSender.interface';
+import type { IEmailSender } from '@shared/interfaces/infrastructure';
+import type { EmailMessage, EmailOptions } from '@shared/interfaces/infrastructure/types';
 import { ILogger } from '@shared/tokens/injection.tokens';
-import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging/ILogger.interface';
+import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 
 @Injectable()
 export class ConsoleEmailSender implements IEmailSender {

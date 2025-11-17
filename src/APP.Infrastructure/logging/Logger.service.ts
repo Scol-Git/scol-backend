@@ -1,6 +1,6 @@
 import { Injectable, LoggerService } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { ILogger } from '@shared/interfaces/logging/ILogger.interface';
+import { ILogger } from '@shared/interfaces/logging';
 
 /**
  * Logger service implementing structured logging.

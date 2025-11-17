@@ -1,6 +1,6 @@
 import { Injectable, NestMiddleware, Inject } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import type { ILogger } from '@shared/interfaces/logging/ILogger.interface';
+import type { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
 /**

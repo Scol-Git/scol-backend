@@ -1,30 +1,47 @@
+import type { EmailMessage, EmailOptions } from './types';
+
 /**
- * Interface for email sending service (SMTP/SendGrid implementation)
+ * Interface for email sending service (SMTP/SendGrid implementation).
  * 
  * Provides abstraction for email operations.
- * Following .NET's IEmailSender pattern.
+ * Follows .NET Core's IEmailSender pattern.
  * 
  * @interface IEmailSender
  * 
- * TODO: Implement email service (Nodemailer/SendGrid) in Phase 3+
+ * @example
+ * ```typescript
+ * // Send simple email
+ * await emailSender.sendEmail({
+ *   to: 'user@example.com',
+ *   subject: 'Welcome',
+ *   html: '<h1>Welcome!</h1>'
+ * });
+ * 
+ * // Send templated email
+ * await emailSender.sendTemplatedEmail(
+ *   'welcome-template',
+ *   'user@example.com',
+ *   { userName: 'John' }
+ * );
+ * ```
  */
 export interface IEmailSender {
   /**
-   * Send a single email
+   * Send a single email.
    * 
    * @param email - Email data
    */
   sendEmail(email: EmailMessage): Promise<void>;
 
   /**
-   * Send multiple emails in batch
+   * Send multiple emails in batch.
    * 
    * @param emails - Array of email messages
    */
   sendBatch(emails: EmailMessage[]): Promise<void>;
 
   /**
-   * Send email using a template
+   * Send email using a template.
    * 
    * @param templateId - Template identifier
    * @param to - Recipient email address
@@ -39,7 +56,7 @@ export interface IEmailSender {
   ): Promise<void>;
 
   /**
-   * Send email with HTML content
+   * Send email with HTML content.
    * 
    * @param to - Recipient email address
    * @param subject - Email subject
@@ -54,7 +71,7 @@ export interface IEmailSender {
   ): Promise<void>;
 
   /**
-   * Send plain text email
+   * Send plain text email.
    * 
    * @param to - Recipient email address
    * @param subject - Email subject
@@ -68,80 +85,4 @@ export interface IEmailSender {
     options?: EmailOptions,
   ): Promise<void>;
 }
-
-/**
- * Represents an email message
- */
-export interface EmailMessage {
-  /** Recipient email address */
-  to: string | string[];
-
-  /** Sender email address */
-  from?: string;
-
-  /** Email subject */
-  subject: string;
-
-  /** Plain text content */
-  text?: string;
-
-  /** HTML content */
-  html?: string;
-
-  /** CC recipients */
-  cc?: string | string[];
-
-  /** BCC recipients */
-  bcc?: string | string[];
-
-  /** Reply-to address */
-  replyTo?: string;
-
-  /** Email attachments */
-  attachments?: EmailAttachment[];
-
-  /** Additional options */
-  options?: EmailOptions;
-}
-
-/**
- * Email attachment
- */
-export interface EmailAttachment {
-  /** Filename */
-  filename: string;
-
-  /** File content (Buffer or base64 string) */
-  content: Buffer | string;
-
-  /** Content type (MIME type) */
-  contentType?: string;
-
-  /** Content disposition (attachment or inline) */
-  disposition?: 'attachment' | 'inline';
-
-  /** Content ID (for inline images) */
-  cid?: string;
-}
-
-/**
- * Additional email options
- */
-export interface EmailOptions {
-  /** Priority (high, normal, low) */
-  priority?: 'high' | 'normal' | 'low';
-
-  /** Custom headers */
-  headers?: Record<string, string>;
-
-  /** Tracking options */
-  tracking?: {
-    opens?: boolean;
-    clicks?: boolean;
-  };
-
-  /** Tags for categorization */
-  tags?: string[];
-}
-
 

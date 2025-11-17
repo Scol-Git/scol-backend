@@ -1,6 +1,21 @@
 /**
  * Represents the current authenticated user context.
+ * 
  * Used throughout the application for authorization and multi-tenancy.
+ * Follows .NET Core's ICurrentUser pattern for user context management.
+ * 
+ * @interface ICurrentUser
+ * @example
+ * ```typescript
+ * const user: ICurrentUser = {
+ *   userId: '123',
+ *   orgId: 'org-456',
+ *   email: 'user@example.com',
+ *   roles: ['Admin', 'User'],
+ *   isSuperAdmin: false,
+ *   allowedOrganizationsId: ['org-456']
+ * };
+ * ```
  */
 export interface ICurrentUser {
   /** Unique identifier of the user */
@@ -21,5 +36,4 @@ export interface ICurrentUser {
   /** List of organization IDs the user has access to (for multi-org users) */
   allowedOrganizationsId: string[];
 }
-
 

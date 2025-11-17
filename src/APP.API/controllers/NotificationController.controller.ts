@@ -14,8 +14,8 @@ import {
   ApiBadRequestResponse,
 } from '@nestjs/swagger';
 import { ILogger, INotificationService } from '@shared/tokens/injection.tokens';
-import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging/ILogger.interface';
-import type { INotificationService as INotificationServiceInterface } from '@shared/interfaces/services/INotificationService.interface';
+import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
+import type { INotificationService as INotificationServiceInterface } from '@shared/interfaces/services';
 import { SendEmailRequestDto } from '@shared/dtos/notifications/SendEmailRequestDto.dto';
 import { SendTemplatedEmailRequestDto } from '@shared/dtos/notifications/SendTemplatedEmailRequestDto.dto';
 import { SendMessageRequestDto } from '@shared/dtos/notifications/SendMessageRequestDto.dto';

@@ -25,8 +25,8 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 
-import type { ILogger } from '@shared/interfaces/logging/ILogger.interface';
-import type { IOrganizationService } from '@shared/interfaces/services/IOrganizationService.interface';
+import type { ILogger } from '@shared/interfaces/logging';
+import type { IOrganizationService } from '@shared/interfaces/services';
 import {
   ILogger as ILoggerToken,
   IOrganizationService as IOrganizationServiceToken,

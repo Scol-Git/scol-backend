@@ -1,16 +1,33 @@
+import type { PublishOptions } from './types';
+
 /**
- * Interface for message bus/queue service (RabbitMQ implementation)
+ * Interface for message bus/queue service (RabbitMQ implementation).
  * 
  * Provides abstraction for publishing messages to a message broker.
- * Following .NET's IMessageBus pattern.
+ * Follows .NET Core's IMessageBus pattern.
  * 
  * @interface IMessageSender
  * 
- * TODO: Implement RabbitMQ service in Phase 3+
+ * @example
+ * ```typescript
+ * // Publish message
+ * await messageSender.publish('notifications', {
+ *   userId: '123',
+ *   message: 'Hello'
+ * });
+ * 
+ * // Publish with delay
+ * await messageSender.publishDelayed(
+ *   'notifications',
+ *   message,
+ *   5000, // 5 seconds
+ *   { routingKey: 'email' }
+ * );
+ * ```
  */
 export interface IMessageSender {
   /**
-   * Publish a message to a queue or exchange
+   * Publish a message to a queue or exchange.
    * 
    * @param queueOrExchange - Name of the queue or exchange
    * @param message - Message payload
@@ -23,7 +40,7 @@ export interface IMessageSender {
   ): Promise<void>;
 
   /**
-   * Publish multiple messages in batch
+   * Publish multiple messages in batch.
    * 
    * @param queueOrExchange - Name of the queue or exchange
    * @param messages - Array of message payloads
@@ -36,7 +53,7 @@ export interface IMessageSender {
   ): Promise<void>;
 
   /**
-   * Publish a message with delay
+   * Publish a message with delay.
    * 
    * @param queueOrExchange - Name of the queue or exchange
    * @param message - Message payload
@@ -50,31 +67,4 @@ export interface IMessageSender {
     options?: PublishOptions,
   ): Promise<void>;
 }
-
-/**
- * Options for publishing messages
- */
-export interface PublishOptions {
-  /** Routing key for exchanges */
-  routingKey?: string;
-
-  /** Message priority (0-10) */
-  priority?: number;
-
-  /** Message expiration in milliseconds */
-  expiration?: number;
-
-  /** Correlation ID for request-reply patterns */
-  correlationId?: string;
-
-  /** Reply-to queue name */
-  replyTo?: string;
-
-  /** Custom headers */
-  headers?: Record<string, any>;
-
-  /** Whether message should be persistent */
-  persistent?: boolean;
-}
-
 

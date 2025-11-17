@@ -1,5 +1,5 @@
 import { Controller, Get, Inject } from '@nestjs/common';
-import type { ILogger } from '@shared/interfaces/logging/ILogger.interface';
+import type { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
 @Controller('health')

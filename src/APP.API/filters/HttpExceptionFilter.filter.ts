@@ -9,7 +9,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import type { ILogger } from '@shared/interfaces/logging/ILogger.interface';
+import type { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
 interface ProblemDetails {

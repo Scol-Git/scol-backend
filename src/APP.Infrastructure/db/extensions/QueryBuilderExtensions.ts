@@ -1,7 +1,6 @@
 import { SelectQueryBuilder, Brackets } from 'typeorm';
 import { BadRequestException } from '@nestjs/common';
-import { ICurrentUser } from '@shared/interfaces/ICurrentUser.interface';
-import { IHaveOrganization } from '@shared/interfaces/IHaveOrganization.interface';
+import { ICurrentUser, IHaveOrganization } from '@shared/interfaces/domain';
 import { VisibilityLevel } from '@shared/enums/VisibilityLevel.enum';
 import { PagedQuery } from '@shared/models/PagedQuery';
 import { Filter } from '@shared/models/Filter';

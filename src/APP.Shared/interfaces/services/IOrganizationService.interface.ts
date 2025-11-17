@@ -5,17 +5,29 @@ import { OrganizationResponseDto } from '@shared/dtos/organizations/Organization
 import { PaginatedResponse } from '@shared/models/PaginatedResponse';
 
 /**
- * Interface for Organization Service
- *
+ * Interface for Organization Service.
+ * 
  * Defines the contract for organization management operations.
- * Following .NET's approach of programming to interfaces, not implementations.
- *
+ * Follows .NET Core's approach of programming to interfaces, not implementations.
+ * 
  * @interface IOrganizationService
+ * 
+ * @example
+ * ```typescript
+ * // Get organization by ID
+ * const org = await organizationService.getById('123');
+ * 
+ * // Create organization
+ * const newOrg = await organizationService.create(createDto);
+ * 
+ * // List organizations with pagination
+ * const result = await organizationService.list(searchDto);
+ * ```
  */
 export interface IOrganizationService {
   /**
    * Get paginated list of organizations with filtering and sorting.
-   *
+   * 
    * @param searchDto - Search parameters for pagination, filtering, and sorting
    * @returns Paginated response containing organizations
    */
@@ -25,7 +37,7 @@ export interface IOrganizationService {
 
   /**
    * Get single organization by ID.
-   *
+   * 
    * @param id - Organization ID
    * @returns Organization DTO
    * @throws NotFoundException if organization not found
@@ -34,7 +46,7 @@ export interface IOrganizationService {
 
   /**
    * Create new organization.
-   *
+   * 
    * @param dto - Organization creation data
    * @returns Created organization DTO
    * @throws ConflictException if organization with same name already exists
@@ -43,7 +55,7 @@ export interface IOrganizationService {
 
   /**
    * Update existing organization.
-   *
+   * 
    * @param id - Organization ID
    * @param dto - Organization update data
    * @returns Updated organization DTO
@@ -57,9 +69,10 @@ export interface IOrganizationService {
 
   /**
    * Delete organization.
-   *
+   * 
    * @param id - Organization ID
    * @throws NotFoundException if organization not found
    */
   delete(id: string): Promise<void>;
 }
+

@@ -16,12 +16,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import type { Connection, Channel } from 'amqplib';
-import {
-  type IMessageSender,
-  PublishOptions,
-} from '@shared/interfaces/infrastructure/IMessageSender.interface';
+import type { IMessageSender } from '@shared/interfaces/infrastructure';
+import type { PublishOptions } from '@shared/interfaces/infrastructure/types';
 import { ILogger } from '@shared/tokens/injection.tokens';
-import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging/ILogger.interface';
+import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 
 /**
  * RabbitMQ Exchange and Queue Configuration
@@ -207,7 +205,7 @@ export class RabbitMQMessageSender
       }
 
       this._initializedTopology = true;
-      this._logger.LogInfo('✅ RabbitMQ topology setup completed', {
+      this._logger.LogInfo('RabbitMQ topology setup completed', {
         exchanges: this._topology.length,
         totalQueues: this._topology.reduce(
           (sum, ex) => sum + ex.queues.length,
@@ -320,7 +318,7 @@ export class RabbitMQMessageSender
         await this.publish(queueOrExchange, message, options);
       }
 
-      this._logger.LogInfo('📤 Batch messages published to RabbitMQ', {
+      this._logger.LogInfo('Batch messages published to RabbitMQ', {
         exchange: queueOrExchange,
         count: messages.length,
       });
@@ -364,7 +362,7 @@ export class RabbitMQMessageSender
 
       await this.publish(queueOrExchange, message, delayedOptions);
 
-      this._logger.LogInfo('⏰ Delayed message published to RabbitMQ', {
+      this._logger.LogInfo('Delayed message published to RabbitMQ', {
         exchange: queueOrExchange,
         delayMs,
       });

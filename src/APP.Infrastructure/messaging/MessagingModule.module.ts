@@ -17,7 +17,7 @@ import { RabbitMQMessageSender } from './RabbitMQMessageSender.service';
 import { SmtpEmailSender } from './SmtpEmailSender.service';
 import { ConsoleEmailSender } from './ConsoleEmailSender.service';
 import { LoggingModule } from '../logging/LoggingModule.module';
-import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging/ILogger.interface';
+import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 
 @Module({
   imports: [ConfigModule, LoggingModule],
