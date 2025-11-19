@@ -27,6 +27,12 @@ import { Project } from '@entity/entities/Project.entity';
 import { Todo } from '@entity/entities/Todo.entity';
 import { TodoDependency } from '@entity/entities/TodoDependency.entity';
 import { AuditEvent } from '@entity/entities/AuditEvent.entity';
+import { Role } from '@entity/entities/Role.entity';
+import { Permission } from '@entity/entities/Permission.entity';
+import { UserRole } from '@entity/entities/UserRole.entity';
+import { RolePermission } from '@entity/entities/RolePermission.entity';
+import { ExternalAuthProvider } from '@entity/entities/ExternalAuthProvider.entity';
+import { RefreshToken } from '@entity/entities/RefreshToken.entity';
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -40,9 +46,22 @@ console.log('TypeORM CLI using DATABASE_URL:', url);
 export default new DbContext({
   type: 'postgres',
   url,
-  entities: [Organization, User, Project, Todo, TodoDependency, AuditEvent],
-  migrations: ['migrations/*{.ts,.js}'],
-  synchronize: false,
+  entities: [
+    Organization,
+    User,
+    Project,
+    Todo,
+    TodoDependency,
+    AuditEvent,
+    Role,
+    Permission,
+    UserRole,
+    RolePermission,
+    ExternalAuthProvider,
+    RefreshToken,
+  ],
+  migrations: ['migrations/*.ts'], // Only load .ts files to avoid duplicates with compiled .js files
+  synchronize: false, // Never use synchronize in production - use migrations instead
   logging: false,
   // ssl: true, // usually not needed if ?sslmode=require is in the URL
 });

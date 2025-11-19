@@ -3,9 +3,11 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { OrganizationController } from './controllers/OrganizationController.controller';
 import { HealthController } from './controllers/HealthController.controller';
 import { NotificationController } from './controllers/NotificationController.controller';
+import { AuthController } from './auth/AuthController.controller';
 
 import { OrganizationService } from '@bll/services/OrganizationService.service';
 import { NotificationService } from '@bll/services/NotificationService.service';
+import { AuthService } from '@bll/services/AuthService.service';
 import {
   IOrganizationService,
   INotificationService,
@@ -17,6 +19,10 @@ import { RequestLoggingMiddleware } from './middleware/RequestLoggingMiddleware'
 import { InfrastructureModule } from '@infra/InfrastructureModule.module';
 import { MappingModule } from '@bll/mappings/MappingModule.module';
 import { MessagingModule } from '@infra/messaging/MessagingModule.module';
+import { SecurityModule } from '@infra/security/SecurityModule.module';
+import { JwtAuthGuard } from './auth/guards/JwtAuthGuard.guard';
+import { PermissionGuard } from './auth/guards/PermissionGuard.guard';
+import { RoleGuard } from './auth/guards/RoleGuard.guard';
 
 /**
  * API Module - Entry point for the REST API layer.
@@ -29,11 +35,13 @@ import { MessagingModule } from '@infra/messaging/MessagingModule.module';
     InfrastructureModule, // ✅ registers DataSource + Logger (global)
     MappingModule, // ✅ registers MAPPER + OrganizationMapper (global)
     MessagingModule, // ✅ registers IMessageSender + IEmailSender
+    SecurityModule, // ✅ registers JwtService + PasswordHasher (global)
   ],
   controllers: [
     OrganizationController,
     HealthController,
     NotificationController,
+    AuthController,
   ],
   providers: [
     // Register OrganizationService with interface token (following .NET DI pattern)
@@ -46,6 +54,12 @@ import { MessagingModule } from '@infra/messaging/MessagingModule.module';
       provide: INotificationService,
       useClass: NotificationService,
     },
+    // Register AuthService
+    AuthService,
+    // Register Guards
+    JwtAuthGuard,
+    PermissionGuard,
+    RoleGuard,
     HttpExceptionFilter,
   ],
 })

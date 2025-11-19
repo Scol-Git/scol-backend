@@ -26,6 +26,17 @@ async function bootstrap() {
     .setTitle('SCOL Backend')
     .setDescription('API documentation')
     .setVersion('1.0.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+    )
     .build();
   const doc = SwaggerModule.createDocument(app, swaggerCfg);
   SwaggerModule.setup('/swagger', app, doc);

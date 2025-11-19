@@ -1,0 +1,213 @@
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  Get,
+  Query,
+  Param,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from './guards/JwtAuthGuard.guard';
+import { PermissionGuard } from './guards/PermissionGuard.guard';
+import { RoleGuard } from './guards/RoleGuard.guard';
+import { CurrentUser } from './decorators/CurrentUser.decorator';
+import { RequirePermission } from './decorators/RequirePermission.decorator';
+import { RequireRole } from './decorators/RequireRole.decorator';
+import { AuthService } from '@bll/services/AuthService.service';
+import { RegisterRequestDto } from '@shared/dtos/auth/RegisterRequestDto.dto';
+import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto.dto';
+import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto.dto';
+import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto.dto';
+import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto.dto';
+import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto.dto';
+import type { JwtPayload } from '@shared/interfaces/security';
+import type { ILogger } from '@shared/interfaces/logging';
+import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
+import { Inject } from '@nestjs/common';
+
+/**
+ * Auth Controller
+ *
+ * Handles authentication endpoints: registration, login, token refresh, password reset.
+ *
+ * @controller AuthController
+ */
+@ApiTags('Authentication')
+@Controller('auth')
+export class AuthController {
+  constructor(
+    private readonly _authService: AuthService,
+    @Inject(ILoggerToken) private readonly _logger: ILogger,
+  ) {}
+
+  /**
+   * Register a new user
+   */
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a new user' })
+  @ApiBody({ type: RegisterRequestDto })
+  @ApiResponse({
+    status: 201,
+    description: 'User registered successfully',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 409, description: 'User already exists' })
+  async register(
+    @Body() dto: RegisterRequestDto,
+    @Query('orgId') orgId: string,
+  ): Promise<AuthResponseDto> {
+    if (!orgId) {
+      throw new Error('orgId query parameter is required');
+    }
+
+    this._logger.LogInfo('User registration attempt', { email: dto.email });
+    return this._authService.register(dto, orgId);
+  }
+
+  /**
+   * Login with email and password
+   */
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiBody({ type: LoginRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(
+    @Body() dto: LoginRequestDto,
+    @Query('orgId') orgId: string,
+  ): Promise<AuthResponseDto> {
+    if (!orgId) {
+      throw new Error('orgId query parameter is required');
+    }
+
+    this._logger.LogInfo('User login attempt', { email: dto.email });
+    return this._authService.login(dto, orgId);
+  }
+
+  /**
+   * Refresh access token
+   */
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiBody({ type: RefreshTokenRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Token refreshed successfully',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+  async refreshToken(
+    @Body() dto: RefreshTokenRequestDto,
+  ): Promise<AuthResponseDto> {
+    this._logger.LogInfo('Token refresh attempt');
+    return this._authService.refreshToken(dto);
+  }
+
+  /**
+   * Request password reset
+   */
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset' })
+  @ApiBody({ type: ForgotPasswordRequestDto })
+  @ApiResponse({ status: 200, description: 'Password reset email sent' })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordRequestDto,
+    @Query('orgId') orgId: string,
+  ): Promise<{ message: string }> {
+    if (!orgId) {
+      throw new Error('orgId query parameter is required');
+    }
+
+    this._logger.LogInfo('Password reset requested', { email: dto.email });
+    await this._authService.forgotPassword(dto, orgId);
+    return {
+      message: 'If the email exists, a password reset link has been sent',
+    };
+  }
+
+  /**
+   * Reset password with token
+   */
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password with token' })
+  @ApiBody({ type: ResetPasswordRequestDto })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired token' })
+  async resetPassword(
+    @Body() dto: ResetPasswordRequestDto,
+    @Query('orgId') orgId: string,
+  ): Promise<{ message: string }> {
+    if (!orgId) {
+      throw new Error('orgId query parameter is required');
+    }
+
+    this._logger.LogInfo('Password reset attempt');
+    await this._authService.resetPassword(dto, orgId);
+    return { message: 'Password reset successfully' };
+  }
+
+  /**
+   * Get current user profile
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getProfile(@CurrentUser() user: JwtPayload): Promise<JwtPayload> {
+    return user;
+  }
+
+  /**
+   * Example endpoint with permission check
+   */
+  @Get('example-permission')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('todo:create')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Example endpoint requiring permission : todo:create',
+  })
+  async exampleWithPermission(
+    @CurrentUser() user: JwtPayload,
+  ): Promise<{ message: string }> {
+    return {
+      message: `You have the required permission! User: ${user.email}`,
+    };
+  }
+
+  /**
+   * Example endpoint with role check
+   */
+  @Get('example-role')
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @RequireRole('admin')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Example endpoint requiring role : Admin' })
+  async exampleWithRole(
+    @CurrentUser() user: JwtPayload,
+  ): Promise<{ message: string }> {
+    return {
+      message: `You have the required role! User: ${user.email}`,
+    };
+  }
+}

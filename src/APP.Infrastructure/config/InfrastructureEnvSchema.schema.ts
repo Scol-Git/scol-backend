@@ -32,5 +32,16 @@ export const InfrastructureEnvSchema = Joi.object({
   // RabbitMQ (optional)
   RABBITMQ_URL: Joi.string().uri().optional(),
 
-  // add later: REDIS_URL, JWT_SECRET, etc.
+  // Redis Cache (optional, falls back to in-memory if not provided)
+  REDIS_URL: Joi.string().uri().optional(),
+
+  // JWT Configuration
+  JWT_SECRET: Joi.string().min(32).required(),
+  JWT_ACCESS_TOKEN_EXPIRES_IN: Joi.string().default('15m'),
+  JWT_REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('7d'),
+
+  // Google OAuth Configuration (optional)
+  GOOGLE_CLIENT_ID: Joi.string().optional(),
+  GOOGLE_CLIENT_SECRET: Joi.string().optional(),
+  GOOGLE_CALLBACK_URL: Joi.string().uri().optional(),
 });
