@@ -10,13 +10,13 @@ import { randomBytes, createHash } from 'crypto';
 import type { ILogger } from '@shared/interfaces/logging';
 import type { IJwtService, JwtPayload } from '@shared/interfaces/security';
 import type { IPasswordHasher } from '@shared/interfaces/security';
-import type { IAppConfig } from '@shared/interfaces/config/IAppConfig.interface';
+import type { IApplicationConfig } from '@shared/interfaces/config/IApplicationConfig.interface';
 import type { IAuthService } from '@shared/interfaces/services';
 import {
   ILogger as ILoggerToken,
   IJwtService as IJwtServiceToken,
   IPasswordHasher as IPasswordHasherToken,
-  IAppConfig as IAppConfigToken,
+  IApplicationConfig as IApplicationConfigToken,
 } from '@shared/tokens/injection.tokens';
 import { InvalidCredentialsException } from '@shared/exceptions/auth/InvalidCredentialsException';
 import { AccountLockedException } from '@shared/exceptions/auth/AccountLockedException';
@@ -51,7 +51,8 @@ export class AuthService implements IAuthService {
     @Inject(IJwtServiceToken) private readonly _jwtService: IJwtService,
     @Inject(IPasswordHasherToken)
     private readonly _passwordHasher: IPasswordHasher,
-    @Inject(IAppConfigToken) private readonly _appConfig: IAppConfig,
+    @Inject(IApplicationConfigToken)
+    private readonly _config: IApplicationConfig,
   ) {}
 
   /**
@@ -139,10 +140,10 @@ export class AuthService implements IAuthService {
 
       // Lock account after threshold failed attempts
       if (
-        user.failedLoginAttempts >= this._appConfig.auth.accountLockoutThreshold
+        user.failedLoginAttempts >= this._config.auth.accountLockoutThreshold
       ) {
         const lockoutDuration =
-          this._appConfig.auth.accountLockoutDurationMinutes * 60 * 1000;
+          this._config.auth.accountLockoutDurationMinutes * 60 * 1000;
         user.lockedUntil = new Date(Date.now() + lockoutDuration);
         user.status = UserStatus.Locked;
         await this._dbContext.getRepository(User).save(user);
@@ -234,8 +235,7 @@ export class AuthService implements IAuthService {
     const tokenHash = this._hashToken(resetToken);
 
     user.passwordResetToken = tokenHash;
-    const expirationHours =
-      this._appConfig.auth.passwordResetTokenExpirationHours;
+    const expirationHours = this._config.auth.passwordResetTokenExpirationHours;
     user.passwordResetTokenExpiresAt = new Date(
       Date.now() + expirationHours * 60 * 60 * 1000,
     );
@@ -391,7 +391,7 @@ export class AuthService implements IAuthService {
 
     // Save refresh token to database
     const tokenHash = this._hashToken(refreshToken);
-    const expirationDays = this._appConfig.auth.refreshTokenExpirationDays;
+    const expirationDays = this._config.auth.refreshTokenExpirationDays;
     const refreshTokenEntity = this._dbContext
       .getRepository(RefreshToken)
       .create({

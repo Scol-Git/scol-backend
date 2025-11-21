@@ -1,21 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { IAppConfig } from '@shared/interfaces/config/IAppConfig.interface';
+import type { IApplicationConfig } from '@shared/interfaces/config/IApplicationConfig.interface';
 
 /**
  * Application Configuration Service
  * 
- * Provides type-safe access to application configuration.
- * Implements IAppConfig interface for dependency injection.
+ * Provides type-safe access to application/business logic layer configuration.
+ * Implements IApplicationConfig interface for dependency injection.
  * 
- * @class AppConfig
- * @implements {IAppConfig}
+ * @class ApplicationConfig
+ * @implements {IApplicationConfig}
  */
 @Injectable()
-export class AppConfig implements IAppConfig {
-  /**
-   * Authentication configuration
-   */
+export class ApplicationConfig implements IApplicationConfig {
   auth = {
     accountLockoutThreshold: this._config.get<number>(
       'AUTH_ACCOUNT_LOCKOUT_THRESHOLD',
@@ -35,14 +32,9 @@ export class AppConfig implements IAppConfig {
     ),
   };
 
-  /**
-   * JWT configuration
-   */
-  jwt = {
-    accessTokenExpiresIn:
-      this._config.get<string>('JWT_ACCESS_TOKEN_EXPIRES_IN') || '15m',
-    refreshTokenExpiresIn:
-      this._config.get<string>('JWT_REFRESH_TOKEN_EXPIRES_IN') || '7d',
+  pagination = {
+    defaultPageSize: this._config.get<number>('PAGINATION_DEFAULT_PAGE_SIZE', 10),
+    maxPageSize: this._config.get<number>('PAGINATION_MAX_PAGE_SIZE', 100),
   };
 
   constructor(private readonly _config: ConfigService) {}

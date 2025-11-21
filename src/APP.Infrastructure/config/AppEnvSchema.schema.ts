@@ -1,6 +1,6 @@
 import * as Joi from 'joi';
 
-export const InfrastructureEnvSchema = Joi.object({
+export const AppEnvSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
     .default('development'),
@@ -44,4 +44,19 @@ export const InfrastructureEnvSchema = Joi.object({
   GOOGLE_CLIENT_ID: Joi.string().optional(),
   GOOGLE_CLIENT_SECRET: Joi.string().optional(),
   GOOGLE_CALLBACK_URL: Joi.string().uri().optional(),
+
+  // Application Configuration
+  AUTH_ACCOUNT_LOCKOUT_THRESHOLD: Joi.number().default(5),
+  AUTH_ACCOUNT_LOCKOUT_DURATION_MINUTES: Joi.number().default(30),
+  AUTH_REFRESH_TOKEN_EXPIRATION_DAYS: Joi.number().default(7),
+  AUTH_PASSWORD_RESET_TOKEN_EXPIRATION_HOURS: Joi.number().default(1),
+  PAGINATION_DEFAULT_PAGE_SIZE: Joi.number().default(10),
+  PAGINATION_MAX_PAGE_SIZE: Joi.number().default(100),
+
+  // API Configuration
+  CORS_ENABLED: Joi.string().valid('true', 'false').default('true'),
+  CORS_ORIGINS: Joi.string().default('*'),
+  RATE_LIMIT_ENABLED: Joi.string().valid('true', 'false').default('false'),
+  RATE_LIMIT_WINDOW_MS: Joi.number().default(900000), // 15 minutes
+  RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
 });

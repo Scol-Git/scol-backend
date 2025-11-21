@@ -7,20 +7,21 @@
  * @module MessagingModule
  */
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
   IMessageSender,
   IEmailSender,
   ILogger,
+  IInfrastructureConfig,
 } from '@shared/tokens/injection.tokens';
 import { RabbitMQMessageSender } from './RabbitMQMessageSender.service';
 import { SmtpEmailSender } from './SmtpEmailSender.service';
 import { ConsoleEmailSender } from './ConsoleEmailSender.service';
 import { LoggingModule } from '../logging/LoggingModule.module';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
+import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@shared/interfaces/config/IInfrastructureConfig.interface';
 
 @Module({
-  imports: [ConfigModule, LoggingModule],
+  imports: [LoggingModule],
   providers: [
     // ============================================================================
     // Message Sender Provider (RabbitMQ)
@@ -35,11 +36,8 @@ import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
     // ============================================================================
     {
       provide: IEmailSender,
-      useFactory: (configService: ConfigService, logger: ILoggerInterface) => {
-        const emailProvider = configService.get<string>(
-          'EMAIL_PROVIDER',
-          'console',
-        );
+      useFactory: (config: IInfrastructureConfigInterface, logger: ILoggerInterface) => {
+        const emailProvider = config.email.provider;
 
         // Use console email sender for development/testing
         if (emailProvider === 'console') {
@@ -50,16 +48,16 @@ import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
         }
 
         // Use SMTP email sender for production
-        const host = configService.get<string>('SMTP_HOST');
-        const port = configService.get<string>('SMTP_PORT');
+        const host = config.email.smtp.host;
+        const port = config.email.smtp.port;
         logger.LogInfo('Using SmtpEmailSender', {
           emailProvider,
           host: host || 'MISSING',
           port: port || 'MISSING',
         });
-        return new SmtpEmailSender(configService, logger);
+        return new SmtpEmailSender(config, logger);
       },
-      inject: [ConfigService, ILogger],
+      inject: [IInfrastructureConfig, ILogger],
     },
   ],
   exports: [IMessageSender, IEmailSender],

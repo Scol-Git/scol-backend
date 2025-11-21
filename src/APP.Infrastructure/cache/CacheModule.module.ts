@@ -1,10 +1,10 @@
 import { Module, Global } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ICacheService, ILogger } from '@shared/tokens/injection.tokens';
+import { ICacheService, ILogger, IInfrastructureConfig } from '@shared/tokens/injection.tokens';
 import { RedisCacheService } from './RedisCacheService.service';
 import { InMemoryCacheService } from './InMemoryCacheService.service';
 import { LoggingModule } from '../logging/LoggingModule.module';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
+import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@shared/interfaces/config/IInfrastructureConfig.interface';
 
 /**
  * Cache Module
@@ -16,15 +16,15 @@ import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
  */
 @Global()
 @Module({
-  imports: [ConfigModule, LoggingModule],
+  imports: [LoggingModule],
   providers: [
     {
       provide: ICacheService,
       useFactory: (
-        config: ConfigService,
+        config: IInfrastructureConfigInterface,
         logger: ILoggerInterface,
       ) => {
-        const redisUrl = config.get<string>('REDIS_URL');
+        const redisUrl = config.cache.redisUrl;
         
         if (redisUrl) {
           return new RedisCacheService(config, logger);
@@ -32,7 +32,7 @@ import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
         
         return new InMemoryCacheService();
       },
-      inject: [ConfigService, ILogger],
+      inject: [IInfrastructureConfig, ILogger],
     },
   ],
   exports: [ICacheService],

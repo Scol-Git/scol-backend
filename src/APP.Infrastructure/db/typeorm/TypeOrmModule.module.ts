@@ -2,6 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule as NestTypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
+import type { IInfrastructureConfig } from '@shared/interfaces/config/IInfrastructureConfig.interface';
+import { IInfrastructureConfig as IInfrastructureConfigToken } from '@shared/tokens/injection.tokens';
 
 // Import QueryBuilder extension methods to register them globally
 import '../extensions/QueryBuilderExtensions';
@@ -23,18 +25,21 @@ import { RefreshToken } from '@entity/entities/RefreshToken.entity';
 @Module({
   imports: [
     NestTypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (cfg: ConfigService): DataSourceOptions => {
-        const url = cfg.get<string>('DATABASE_URL');
+      inject: [IInfrastructureConfigToken, ConfigService],
+      useFactory: (
+        config: IInfrastructureConfig,
+        cfg: ConfigService,
+      ): DataSourceOptions => {
+        const url = config.database.url;
         const base: DataSourceOptions = url
           ? { type: 'postgres', url }
           : {
               type: 'postgres',
-              host: cfg.get<string>('DB_HOST'),
-              port: cfg.get<number>('DB_PORT'),
-              username: cfg.get<string>('DB_USER'),
-              password: cfg.get<string>('DB_PASS'),
-              database: cfg.get<string>('DB_NAME'),
+              host: config.database.host,
+              port: config.database.port,
+              username: config.database.username,
+              password: config.database.password,
+              database: config.database.database,
             };
 
         return {

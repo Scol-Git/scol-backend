@@ -13,12 +13,12 @@ import {
   OnModuleInit,
   Inject,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import type { Connection, Channel } from 'amqplib';
 import type { IMessageSender } from '@shared/interfaces/infrastructure';
 import type { PublishOptions } from '@shared/interfaces/infrastructure/types';
-import { ILogger } from '@shared/tokens/injection.tokens';
+import type { IInfrastructureConfig } from '@shared/interfaces/config/IInfrastructureConfig.interface';
+import { ILogger, IInfrastructureConfig as IInfrastructureConfigToken } from '@shared/tokens/injection.tokens';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 
 /**
@@ -83,7 +83,7 @@ export class RabbitMQMessageSender
   ];
 
   constructor(
-    private readonly _config: ConfigService,
+    @Inject(IInfrastructureConfigToken) private readonly _config: IInfrastructureConfig,
     @Inject(ILogger) private readonly _logger: ILoggerInterface,
   ) {}
 
@@ -91,7 +91,7 @@ export class RabbitMQMessageSender
    * Initialize RabbitMQ connection on module startup
    */
   async onModuleInit(): Promise<void> {
-    const url = this._config.get<string>('RABBITMQ_URL');
+    const url = this._config.messaging.rabbitmqUrl;
 
     if (!url) {
       this._logger.LogWarning(

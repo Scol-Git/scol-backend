@@ -1,8 +1,8 @@
 import { Injectable, OnModuleDestroy, OnModuleInit, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import type { ICacheService } from '@shared/interfaces/infrastructure';
-import { ILogger } from '@shared/tokens/injection.tokens';
+import type { IInfrastructureConfig } from '@shared/interfaces/config/IInfrastructureConfig.interface';
+import { ILogger, IInfrastructureConfig as IInfrastructureConfigToken } from '@shared/tokens/injection.tokens';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 
 /**
@@ -20,12 +20,12 @@ export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleD
   private _isConnected = false;
 
   constructor(
-    private readonly _config: ConfigService,
+    @Inject(IInfrastructureConfigToken) private readonly _config: IInfrastructureConfig,
     @Inject(ILogger) private readonly _logger: ILoggerInterface,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const redisUrl = this._config.get<string>('REDIS_URL');
+    const redisUrl = this._config.cache.redisUrl;
     
     if (!redisUrl) {
       this._logger.LogWarning('REDIS_URL not configured, Redis cache will not be available');

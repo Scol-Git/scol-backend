@@ -8,7 +8,6 @@
  * @implements {IEmailSender}
  */
 import { Injectable, OnModuleInit, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import type { IEmailSender } from '@shared/interfaces/infrastructure';
@@ -16,7 +15,11 @@ import type {
   EmailMessage,
   EmailOptions,
 } from '@shared/interfaces/infrastructure/types';
-import { ILogger } from '@shared/tokens/injection.tokens';
+import type { IInfrastructureConfig } from '@shared/interfaces/config/IInfrastructureConfig.interface';
+import {
+  ILogger,
+  IInfrastructureConfig as IInfrastructureConfigToken,
+} from '@shared/tokens/injection.tokens';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 
 @Injectable()
@@ -26,7 +29,8 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
   private _defaultFrom: string;
 
   constructor(
-    private readonly _config: ConfigService,
+    @Inject(IInfrastructureConfigToken)
+    private readonly _config: IInfrastructureConfig,
     @Inject(ILogger) private readonly _logger: ILoggerInterface,
   ) {
     // Will be set properly in onModuleInit after config is fully loaded
@@ -37,48 +41,32 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
    * Initialize SMTP transporter on module startup
    */
   async onModuleInit(): Promise<void> {
-    const host = this._config.get<string>('SMTP_HOST');
-    const portStr = this._config.get<string>('SMTP_PORT');
-    const port = portStr ? parseInt(portStr, 10) : undefined;
+    const host = this._config.email.smtp.host;
+    const port = this._config.email.smtp.port;
 
     // Validate required configuration
-    if (!host || !port || isNaN(port)) {
+    if (!host || !port) {
       this._logger.LogWarning(
         'SMTP not configured. Email functionality will be disabled.',
         {
           host: host || 'MISSING',
-          port: portStr || 'MISSING',
-          parsedPort: port,
+          port: port || 'MISSING',
         },
       );
       return;
     }
 
-    // Parse SMTP_SECURE (handle both string and boolean from env)
-    const secureValue = this._config.get<string | boolean>('SMTP_SECURE');
-    let secure: boolean;
-    if (secureValue === undefined || secureValue === '') {
-      // Auto-detect based on port: 465 = SSL, others = STARTTLS
-      secure = port === 465;
-    } else if (typeof secureValue === 'boolean') {
-      // Already a boolean (from Joi validation)
-      secure = secureValue;
-    } else {
-      // Parse string to boolean
-      const secureStr = String(secureValue).toLowerCase();
-      secure = secureStr === 'true' || secureStr === '1' || secureStr === 'yes';
-    }
+    // Use secure from config (already parsed as boolean)
+    const secure = this._config.email.smtp.secure ?? port === 465;
 
-    const user = this._config.get<string>('SMTP_USER');
-    const pass = this._config.get<string>('SMTP_PASS');
+    const user = this._config.email.smtp.user;
+    const pass = this._config.email.smtp.password;
 
     // Read SMTP_FROM and update default
-    // Note: Strip quotes if they exist (some .env parsers include them)
-    let smtpFrom = this._config.get<string>('SMTP_FROM');
+    const smtpFrom = this._config.email.smtp.from;
     if (smtpFrom) {
       // Remove surrounding quotes if present
-      smtpFrom = smtpFrom.replace(/^["']|["']$/g, '').trim();
-      this._defaultFrom = smtpFrom;
+      this._defaultFrom = smtpFrom.replace(/^["']|["']$/g, '').trim();
     }
 
     // Log configuration for debugging
@@ -86,7 +74,6 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
       host,
       port,
       secure,
-      secureRaw: secureValue,
       hasUser: !!user,
       hasPass: !!pass,
       userLength: user?.length || 0,
@@ -138,10 +125,14 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
         defaultFrom: this._defaultFrom,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorCode = (error as any)?.code;
-      const errorReason = (error as any)?.reason;
+      const errorCode =
+        error && typeof error === 'object' && 'code' in error
+          ? (error as { code: unknown }).code
+          : undefined;
+      const errorReason =
+        error && typeof error === 'object' && 'reason' in error
+          ? (error as { reason: unknown }).reason
+          : undefined;
 
       this._logger.LogError('Failed to configure SMTP transporter', error, {
         host,
@@ -181,11 +172,12 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
       // Log what we're attempting to use (helpful for debugging Gmail overrides)
       this._logger.LogInfo('Sending email with FROM address', {
         from: fromAddress,
-        smtpUser: this._config.get<string>('SMTP_USER'),
+        smtpUser: this._config.email.smtp.user,
         note: "Gmail may override FROM if domain doesn't match authenticated account",
       });
 
-      const result = await this._transporter.sendMail({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const sendResult = await this._transporter.sendMail({
         from: fromAddress,
         to: email.to,
         cc: email.cc,
@@ -199,11 +191,19 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
         headers: email.options?.headers,
       });
 
+      const messageId: string | undefined =
+        sendResult &&
+        typeof sendResult === 'object' &&
+        'messageId' in sendResult &&
+        typeof (sendResult as { messageId: unknown }).messageId === 'string'
+          ? (sendResult as { messageId: string }).messageId
+          : undefined;
+
       this._logger.LogInfo('📧 Email sent successfully', {
         to: email.to,
         subject: email.subject,
         from: fromAddress,
-        messageId: result.messageId,
+        messageId,
       });
     } catch (error) {
       this._logger.LogError('Failed to send email', error, {
@@ -257,7 +257,7 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
   ): Promise<void> {
     try {
       // Load template (in a real implementation, load from filesystem or database)
-      const template = await this._loadTemplate(templateId);
+      const template = this._loadTemplate(templateId);
       const subject = this._renderTemplate(template.subject, data);
       const htmlContent = this._renderTemplate(template.body, data);
 
@@ -324,9 +324,7 @@ export class SmtpEmailSender implements IEmailSender, OnModuleInit {
    * Load email template (placeholder implementation)
    * In production, load from filesystem, database, or external service
    */
-  private async _loadTemplate(
-    templateId: string,
-  ): Promise<{ subject: string; body: string }> {
+  private _loadTemplate(templateId: string): { subject: string; body: string } {
     // Placeholder templates
     const templates: Record<string, { subject: string; body: string }> = {
       welcome: {

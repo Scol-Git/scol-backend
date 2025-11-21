@@ -6,7 +6,7 @@ import { LoggingModule } from '@infra/logging/LoggingModule.module';
 import { SecurityModule } from '@infra/security/SecurityModule.module';
 import { MappingModule } from '@bll/mappings/MappingModule.module';
 import { TypeOrmModule } from '@infra/db/typeorm/TypeOrmModule.module';
-import { InfrastructureConfigModule } from '@infra/config/InfrastructureConfig';
+import { AppConfigModule } from '@infra/config/AppConfigModule.module';
 
 /**
  * Root Application Module
@@ -17,7 +17,7 @@ import { InfrastructureConfigModule } from '@infra/config/InfrastructureConfig';
 @Module({
   imports: [
     // @Global modules - imported once, available everywhere
-    InfrastructureConfigModule, // Provides IAppConfig (also @Global)
+    AppConfigModule, // Provides IInfrastructureConfig, IApplicationConfig, ISecurityConfig, IApiConfig
     LoggingModule, // Provides ILogger
     SecurityModule, // Provides IJwtService, IPasswordHasher
     MappingModule, // Provides IMapper

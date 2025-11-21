@@ -115,7 +115,25 @@ export const IPasswordHasher = Symbol('IPasswordHasher');
 // ============================================================================
 
 /**
- * Token for IAppConfig
- * Provides type-safe application configuration
+ * Token for IInfrastructureConfig
+ * Provides infrastructure layer configuration (database, email, cache, messaging)
  */
-export const IAppConfig = Symbol('IAppConfig');
+export const IInfrastructureConfig = Symbol('IInfrastructureConfig');
+
+/**
+ * Token for IApplicationConfig
+ * Provides application/business logic layer configuration (auth, pagination)
+ */
+export const IApplicationConfig = Symbol('IApplicationConfig');
+
+/**
+ * Token for ISecurityConfig
+ * Provides security layer configuration (JWT, OAuth)
+ */
+export const ISecurityConfig = Symbol('ISecurityConfig');
+
+/**
+ * Token for IApiConfig
+ * Provides API/presentation layer configuration (CORS, rate limiting)
+ */
+export const IApiConfig = Symbol('IApiConfig');

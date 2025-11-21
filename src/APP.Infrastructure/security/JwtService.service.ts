@@ -2,9 +2,8 @@ import { Injectable, Inject } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
 import type { IJwtService, JwtPayload } from '@shared/interfaces/security';
-import type { IAppConfig } from '@shared/interfaces/config/IAppConfig.interface';
-import { IAppConfig as IAppConfigToken } from '@shared/tokens/injection.tokens';
-import { ConfigService } from '@nestjs/config';
+import type { ISecurityConfig } from '@shared/interfaces/config/ISecurityConfig.interface';
+import { ISecurityConfig as ISecurityConfigToken } from '@shared/tokens/injection.tokens';
 
 /**
  * JWT Service
@@ -21,13 +20,11 @@ export class JwtService implements IJwtService {
   private readonly refreshTokenExpiresIn: string;
 
   constructor(
-    private readonly _config: ConfigService,
-    @Inject(IAppConfigToken) private readonly _appConfig: IAppConfig,
+    @Inject(ISecurityConfigToken) private readonly _config: ISecurityConfig,
   ) {
-    this.secret =
-      this._config.get<string>('JWT_SECRET') || 'change-me-in-production';
-    this.accessTokenExpiresIn = this._appConfig.jwt.accessTokenExpiresIn;
-    this.refreshTokenExpiresIn = this._appConfig.jwt.refreshTokenExpiresIn;
+    this.secret = _config.jwt.secret;
+    this.accessTokenExpiresIn = _config.jwt.accessTokenExpiresIn;
+    this.refreshTokenExpiresIn = _config.jwt.refreshTokenExpiresIn;
   }
 
   generateAccessToken(payload: JwtPayload): string {
