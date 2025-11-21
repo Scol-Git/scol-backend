@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   ArgumentsHost,
   Catch,
@@ -24,9 +23,7 @@ interface ProblemDetails {
 @Catch()
 @Injectable()
 export class HttpExceptionFilter implements ExceptionFilter {
-  constructor(
-    @Inject(ILoggerToken) private readonly _logger: ILogger,
-  ) {}
+  constructor(@Inject(ILoggerToken) private readonly _logger: ILogger) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const http = host.switchToHttp();
@@ -38,13 +35,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ? exception.getStatus()
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    // Prefer the “response body” from HttpException, if provided
+    // Prefer the "response body" from HttpException, if provided
     let detail = 'Internal server error';
     if (isHttp) {
       const payload = exception.getResponse();
-      if (typeof payload === 'string') detail = payload;
-      else if (payload && typeof payload === 'object' && 'message' in payload) {
-        const msg = (payload as any).message;
+      if (typeof payload === 'string') {
+        detail = payload;
+      } else if (
+        payload &&
+        typeof payload === 'object' &&
+        'message' in payload
+      ) {
+        const msg = (payload as { message?: string | string[] }).message;
         detail = Array.isArray(msg)
           ? msg.join(', ')
           : String(msg ?? exception.message);

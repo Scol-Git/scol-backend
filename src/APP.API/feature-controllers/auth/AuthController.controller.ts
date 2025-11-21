@@ -8,6 +8,7 @@ import {
   Get,
   Query,
   Param,
+  Inject,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,23 +17,26 @@ import {
   ApiBearerAuth,
   ApiBody,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from './guards/JwtAuthGuard.guard';
-import { PermissionGuard } from './guards/PermissionGuard.guard';
-import { RoleGuard } from './guards/RoleGuard.guard';
-import { CurrentUser } from './decorators/CurrentUser.decorator';
-import { RequirePermission } from './decorators/RequirePermission.decorator';
-import { RequireRole } from './decorators/RequireRole.decorator';
-import { AuthService } from '@bll/services/AuthService.service';
+import { JwtAuthGuard } from '../../common/guards/JwtAuthGuard.guard';
+import { PermissionGuard } from '../../common/guards/PermissionGuard.guard';
+import { RoleGuard } from '../../common/guards/RoleGuard.guard';
+import { CurrentUser } from '../../common/decorators/CurrentUser.decorator';
+import { RequirePermission } from '../../common/decorators/RequirePermission.decorator';
+import { RequireRole } from '../../common/decorators/RequireRole.decorator';
+import type { IAuthService } from '@shared/interfaces/services';
+import { IAuthService as IAuthServiceToken } from '@shared/tokens/injection.tokens';
 import { RegisterRequestDto } from '@shared/dtos/auth/RegisterRequestDto.dto';
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto.dto';
 import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto.dto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto.dto';
 import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto.dto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto.dto';
-import type { JwtPayload } from '@shared/interfaces/security';
+import type { ICurrentUser } from '@shared/interfaces/domain';
 import type { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
-import { Inject } from '@nestjs/common';
+import { ValidationException } from '@shared/exceptions/ValidationException';
+import { Permission } from '@shared/enums/Permission.enum';
+import { Role } from '@shared/enums/Role.enum';
 
 /**
  * Auth Controller
@@ -45,7 +49,7 @@ import { Inject } from '@nestjs/common';
 @Controller('auth')
 export class AuthController {
   constructor(
-    private readonly _authService: AuthService,
+    @Inject(IAuthServiceToken) private readonly _authService: IAuthService,
     @Inject(ILoggerToken) private readonly _logger: ILogger,
   ) {}
 
@@ -67,7 +71,7 @@ export class AuthController {
     @Query('orgId') orgId: string,
   ): Promise<AuthResponseDto> {
     if (!orgId) {
-      throw new Error('orgId query parameter is required');
+      throw new ValidationException('orgId query parameter is required');
     }
 
     this._logger.LogInfo('User registration attempt', { email: dto.email });
@@ -92,7 +96,7 @@ export class AuthController {
     @Query('orgId') orgId: string,
   ): Promise<AuthResponseDto> {
     if (!orgId) {
-      throw new Error('orgId query parameter is required');
+      throw new ValidationException('orgId query parameter is required');
     }
 
     this._logger.LogInfo('User login attempt', { email: dto.email });
@@ -132,7 +136,7 @@ export class AuthController {
     @Query('orgId') orgId: string,
   ): Promise<{ message: string }> {
     if (!orgId) {
-      throw new Error('orgId query parameter is required');
+      throw new ValidationException('orgId query parameter is required');
     }
 
     this._logger.LogInfo('Password reset requested', { email: dto.email });
@@ -156,7 +160,7 @@ export class AuthController {
     @Query('orgId') orgId: string,
   ): Promise<{ message: string }> {
     if (!orgId) {
-      throw new Error('orgId query parameter is required');
+      throw new ValidationException('orgId query parameter is required');
     }
 
     this._logger.LogInfo('Password reset attempt');
@@ -173,7 +177,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getProfile(@CurrentUser() user: JwtPayload): Promise<JwtPayload> {
+  async getProfile(@CurrentUser() user: ICurrentUser): Promise<ICurrentUser> {
     return user;
   }
 
@@ -182,13 +186,13 @@ export class AuthController {
    */
   @Get('example-permission')
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission('todo:create')
+  @RequirePermission(Permission.TODO_CREATE)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Example endpoint requiring permission : todo:create',
   })
   async exampleWithPermission(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: ICurrentUser,
   ): Promise<{ message: string }> {
     return {
       message: `You have the required permission! User: ${user.email}`,
@@ -200,11 +204,11 @@ export class AuthController {
    */
   @Get('example-role')
   @UseGuards(JwtAuthGuard, RoleGuard)
-  @RequireRole('admin')
+  @RequireRole(Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Example endpoint requiring role : Admin' })
   async exampleWithRole(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: ICurrentUser,
   ): Promise<{ message: string }> {
     return {
       message: `You have the required role! User: ${user.email}`,

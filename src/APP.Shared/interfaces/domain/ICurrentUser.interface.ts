@@ -27,8 +27,11 @@ export interface ICurrentUser {
   /** User's email address */
   email: string;
 
-  /** Array of roles/permissions the user has */
+  /** Array of roles the user has */
   roles: string[];
+
+  /** Array of permissions the user has (from roles) */
+  permissions?: string[];
 
   /** Whether the user is a super admin (bypasses org restrictions) */
   isSuperAdmin: boolean;

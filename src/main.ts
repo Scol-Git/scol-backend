@@ -5,7 +5,7 @@ import { Logger } from 'nestjs-pino';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './AppModule.module';
-import { HttpExceptionFilter } from '@api/filters/HttpExceptionFilter.filter';
+import { HttpExceptionFilter } from '@api/common/filters/HttpExceptionFilter.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });

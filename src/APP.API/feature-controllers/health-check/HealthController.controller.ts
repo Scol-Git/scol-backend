@@ -1,7 +1,10 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import type { ILogger } from '@shared/interfaces/logging';
 import type { ICacheService } from '@shared/interfaces/infrastructure';
-import { ILogger as ILoggerToken, ICacheService as ICacheServiceToken } from '@shared/tokens/injection.tokens';
+import {
+  ILogger as ILoggerToken,
+  ICacheService as ICacheServiceToken,
+} from '@shared/tokens/injection.tokens';
 
 @Controller('health')
 export class HealthController {
@@ -13,7 +16,7 @@ export class HealthController {
   @Get()
   async ping() {
     this._logger.LogInfo('Health check hit');
-    
+
     // Check cache health
     let cacheStatus = 'unknown';
     try {

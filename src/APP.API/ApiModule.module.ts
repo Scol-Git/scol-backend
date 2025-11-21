@@ -1,66 +1,49 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 
-import { OrganizationController } from './controllers/OrganizationController.controller';
-import { HealthController } from './controllers/HealthController.controller';
-import { NotificationController } from './controllers/NotificationController.controller';
-import { AuthController } from './auth/AuthController.controller';
+// Feature modules
+import { OrganizationModule } from './feature-controllers/organizations/OrganizationModule.module';
+import { AuthModule } from './feature-controllers/auth/AuthModule.module';
+import { NotificationModule } from './feature-controllers/notifications/NotificationModule.module';
+import { HealthCheckModule } from './feature-controllers/health-check/HealthCheckModule.module';
 
-import { OrganizationService } from '@bll/services/OrganizationService.service';
-import { NotificationService } from '@bll/services/NotificationService.service';
-import { AuthService } from '@bll/services/AuthService.service';
-import {
-  IOrganizationService,
-  INotificationService,
-} from '@shared/tokens/injection.tokens';
+// Non-global modules (only where needed)
+import { MessagingModule } from '@infra/messaging/MessagingModule.module'; // Used by NotificationModule
 
-import { HttpExceptionFilter } from './filters/HttpExceptionFilter.filter';
-import { UserContextMiddleware } from './middleware/UserContextMiddleware';
-import { RequestLoggingMiddleware } from './middleware/RequestLoggingMiddleware';
-import { InfrastructureModule } from '@infra/InfrastructureModule.module';
-import { MappingModule } from '@bll/mappings/MappingModule.module';
-import { MessagingModule } from '@infra/messaging/MessagingModule.module';
-import { SecurityModule } from '@infra/security/SecurityModule.module';
-import { JwtAuthGuard } from './auth/guards/JwtAuthGuard.guard';
-import { PermissionGuard } from './auth/guards/PermissionGuard.guard';
-import { RoleGuard } from './auth/guards/RoleGuard.guard';
+// Common modules
+import { GuardsModule } from './common/guards/GuardsModule.module';
+
+// Common middleware & filters
+import { HttpExceptionFilter } from './common/filters/HttpExceptionFilter.filter';
+import { UserContextMiddleware } from './common/middleware/UserContextMiddleware';
+import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMiddleware';
 
 /**
  * API Module - Entry point for the REST API layer.
  *
- * Registers controllers, services, and middleware.
+ * Registers feature modules, common controllers, middleware, and filters.
  * Uses interface-based DI following .NET's approach of programming to interfaces.
+ *
+ * Note: @Global modules (LoggingModule, SecurityModule, MappingModule, TypeOrmModule)
+ * are imported in AppModule and available everywhere automatically.
  */
 @Module({
   imports: [
-    InfrastructureModule, // ✅ registers DataSource + Logger (global)
-    MappingModule, // ✅ registers MAPPER + OrganizationMapper (global)
-    MessagingModule, // ✅ registers IMessageSender + IEmailSender
-    SecurityModule, // ✅ registers JwtService + PasswordHasher (global)
-  ],
-  controllers: [
-    OrganizationController,
-    HealthController,
-    NotificationController,
-    AuthController,
+    // Global common modules
+    GuardsModule, // Provides JwtAuthGuard, PermissionGuard, RoleGuard globally
+
+    // Feature modules
+    OrganizationModule,
+    AuthModule,
+    NotificationModule,
+    HealthCheckModule,
+
+    // Non-global modules (only where needed)
+    MessagingModule, // Used by NotificationModule
   ],
   providers: [
-    // Register OrganizationService with interface token (following .NET DI pattern)
-    {
-      provide: IOrganizationService,
-      useClass: OrganizationService,
-    },
-    // Register NotificationService with interface token
-    {
-      provide: INotificationService,
-      useClass: NotificationService,
-    },
-    // Register AuthService
-    AuthService,
-    // Register Guards
-    JwtAuthGuard,
-    PermissionGuard,
-    RoleGuard,
     HttpExceptionFilter,
+    RequestLoggingMiddleware,
+    UserContextMiddleware,
   ],
 })
 export class ApiModule implements NestModule {

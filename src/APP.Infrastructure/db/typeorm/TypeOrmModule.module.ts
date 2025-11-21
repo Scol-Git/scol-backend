@@ -3,6 +3,9 @@ import { TypeOrmModule as NestTypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
 
+// Import QueryBuilder extension methods to register them globally
+import '../extensions/QueryBuilderExtensions';
+
 import { Organization } from '@entity/entities/Organization.entity';
 import { User } from '@entity/entities/User.entity';
 import { Project } from '@entity/entities/Project.entity';

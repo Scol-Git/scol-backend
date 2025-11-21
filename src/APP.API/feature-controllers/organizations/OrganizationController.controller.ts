@@ -248,3 +248,4 @@ export class OrganizationController {
     this._logger.LogInfo('Delete organization success', { orgId: id });
   }
 }
+

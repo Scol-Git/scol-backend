@@ -30,7 +30,7 @@ export class UserContextMiddleware implements NestMiddleware {
    */
   use(req: Request, res: Response, next: NextFunction): void {
     // Extract user from request (set by JwtAuthGuard or other auth mechanism)
-    const user = (req as any).user as ICurrentUser | undefined;
+    const user = (req as Request & { user?: ICurrentUser }).user;
 
     if (user) {
       // Run the rest of the request within the user context

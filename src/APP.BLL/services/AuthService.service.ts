@@ -1,7 +1,6 @@
 import {
   Injectable,
   Inject,
-  UnauthorizedException,
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,11 +10,18 @@ import { randomBytes, createHash } from 'crypto';
 import type { ILogger } from '@shared/interfaces/logging';
 import type { IJwtService, JwtPayload } from '@shared/interfaces/security';
 import type { IPasswordHasher } from '@shared/interfaces/security';
+import type { IAppConfig } from '@shared/interfaces/config/IAppConfig.interface';
+import type { IAuthService } from '@shared/interfaces/services';
 import {
   ILogger as ILoggerToken,
   IJwtService as IJwtServiceToken,
   IPasswordHasher as IPasswordHasherToken,
+  IAppConfig as IAppConfigToken,
 } from '@shared/tokens/injection.tokens';
+import { InvalidCredentialsException } from '@shared/exceptions/auth/InvalidCredentialsException';
+import { AccountLockedException } from '@shared/exceptions/auth/AccountLockedException';
+import { InvalidTokenException } from '@shared/exceptions/auth/InvalidTokenException';
+import { QueryBuilderConstants } from '@shared/constants/QueryBuilder.constants';
 import { User } from '@entity/entities/User.entity';
 import { Organization } from '@entity/entities/Organization.entity';
 import { UserRole } from '@entity/entities/UserRole.entity';
@@ -34,15 +40,18 @@ import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestD
  *
  * Handles authentication and authorization operations.
  * Supports email/password and OAuth authentication.
+ *
+ * @implements {IAuthService}
  */
 @Injectable()
-export class AuthService {
+export class AuthService implements IAuthService {
   constructor(
     @InjectDataSource() private readonly _dbContext: DbContext,
     @Inject(ILoggerToken) private readonly _logger: ILogger,
     @Inject(IJwtServiceToken) private readonly _jwtService: IJwtService,
     @Inject(IPasswordHasherToken)
     private readonly _passwordHasher: IPasswordHasher,
+    @Inject(IAppConfigToken) private readonly _appConfig: IAppConfig,
   ) {}
 
   /**
@@ -110,12 +119,12 @@ export class AuthService {
       .findOne({ where: { email: dto.email, orgId } });
 
     if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
     // Check if user can login
     if (!user.canLogin()) {
-      throw new UnauthorizedException('Account is locked or inactive');
+      throw new AccountLockedException(user.lockedUntil);
     }
 
     // Verify password
@@ -128,18 +137,20 @@ export class AuthService {
       // Increment failed login attempts
       user.failedLoginAttempts += 1;
 
-      // Lock account after 5 failed attempts for 30 minutes
-      if (user.failedLoginAttempts >= 5) {
-        user.lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
+      // Lock account after threshold failed attempts
+      if (
+        user.failedLoginAttempts >= this._appConfig.auth.accountLockoutThreshold
+      ) {
+        const lockoutDuration =
+          this._appConfig.auth.accountLockoutDurationMinutes * 60 * 1000;
+        user.lockedUntil = new Date(Date.now() + lockoutDuration);
         user.status = UserStatus.Locked;
         await this._dbContext.getRepository(User).save(user);
-        throw new UnauthorizedException(
-          'Account locked due to too many failed login attempts',
-        );
+        throw new AccountLockedException(user.lockedUntil);
       }
 
       await this._dbContext.getRepository(User).save(user);
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
     // Reset failed login attempts and update last login
@@ -169,7 +180,7 @@ export class AuthService {
     try {
       payload = this._jwtService.verifyToken(dto.refreshToken);
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new InvalidTokenException('Invalid refresh token');
     }
 
     // Find refresh token in database
@@ -182,7 +193,7 @@ export class AuthService {
       });
 
     if (!refreshToken || !refreshToken.isValid()) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new InvalidTokenException('Invalid or expired refresh token');
     }
 
     // Revoke old token
@@ -192,7 +203,7 @@ export class AuthService {
     // Get user
     const user = refreshToken.user;
     if (!user || !user.canLogin()) {
-      throw new UnauthorizedException('User account is locked or inactive');
+      throw new AccountLockedException(user?.lockedUntil);
     }
 
     // Get permissions and roles
@@ -223,7 +234,11 @@ export class AuthService {
     const tokenHash = this._hashToken(resetToken);
 
     user.passwordResetToken = tokenHash;
-    user.passwordResetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expirationHours =
+      this._appConfig.auth.passwordResetTokenExpirationHours;
+    user.passwordResetTokenExpiresAt = new Date(
+      Date.now() + expirationHours * 60 * 60 * 1000,
+    );
 
     await this._dbContext.getRepository(User).save(user);
 
@@ -252,11 +267,11 @@ export class AuthService {
     });
 
     if (!user || !user.passwordResetTokenExpiresAt) {
-      throw new UnauthorizedException('Invalid or expired reset token');
+      throw new InvalidTokenException('Invalid or expired reset token');
     }
 
     if (user.passwordResetTokenExpiresAt < new Date()) {
-      throw new UnauthorizedException('Reset token has expired');
+      throw new InvalidTokenException('Reset token has expired');
     }
 
     // Update password
@@ -286,10 +301,17 @@ export class AuthService {
     // Get permissions from roles using explicit RolePermission junction table
     const userRoles = await this._dbContext
       .getRepository(UserRole)
-      .createQueryBuilder('userRole')
-      .innerJoinAndSelect('userRole.role', 'role')
-      .where('userRole.userId = :userId', { userId })
-      .andWhere('userRole.orgId = :orgId', { orgId })
+      .createQueryBuilder(QueryBuilderConstants.USER_ROLE_ALIAS)
+      .innerJoinAndSelect(
+        QueryBuilderConstants.JOIN_ROLE,
+        QueryBuilderConstants.ROLE_ALIAS,
+      )
+      .where(QueryBuilderConstants.WHERE_USER_ID, {
+        [QueryBuilderConstants.PARAM_USER_ID]: userId,
+      })
+      .andWhere(QueryBuilderConstants.WHERE_ORG_ID, {
+        [QueryBuilderConstants.PARAM_ORG_ID]: orgId,
+      })
       .getMany();
 
     const roleIds = userRoles.map((ur) => ur.roleId);
@@ -300,9 +322,14 @@ export class AuthService {
     // Get permissions for all user roles
     const rolePermissions = await this._dbContext
       .getRepository(RolePermission)
-      .createQueryBuilder('rolePermission')
-      .innerJoinAndSelect('rolePermission.permission', 'permission')
-      .where('rolePermission.roleId IN (:...roleIds)', { roleIds })
+      .createQueryBuilder(QueryBuilderConstants.ROLE_PERMISSION_ALIAS)
+      .innerJoinAndSelect(
+        QueryBuilderConstants.JOIN_PERMISSION,
+        QueryBuilderConstants.PERMISSION_ALIAS,
+      )
+      .where(QueryBuilderConstants.WHERE_ROLE_IDS, {
+        [QueryBuilderConstants.PARAM_ROLE_IDS]: roleIds,
+      })
       .getMany();
 
     const permissionNames = new Set<string>();
@@ -324,10 +351,17 @@ export class AuthService {
   ): Promise<string[]> {
     const userRoles = await this._dbContext
       .getRepository(UserRole)
-      .createQueryBuilder('userRole')
-      .innerJoinAndSelect('userRole.role', 'role')
-      .where('userRole.userId = :userId', { userId })
-      .andWhere('userRole.orgId = :orgId', { orgId })
+      .createQueryBuilder(QueryBuilderConstants.USER_ROLE_ALIAS)
+      .innerJoinAndSelect(
+        QueryBuilderConstants.JOIN_ROLE,
+        QueryBuilderConstants.ROLE_ALIAS,
+      )
+      .where(QueryBuilderConstants.WHERE_USER_ID, {
+        [QueryBuilderConstants.PARAM_USER_ID]: userId,
+      })
+      .andWhere(QueryBuilderConstants.WHERE_ORG_ID, {
+        [QueryBuilderConstants.PARAM_ORG_ID]: orgId,
+      })
       .getMany();
 
     return userRoles
@@ -357,12 +391,13 @@ export class AuthService {
 
     // Save refresh token to database
     const tokenHash = this._hashToken(refreshToken);
+    const expirationDays = this._appConfig.auth.refreshTokenExpirationDays;
     const refreshTokenEntity = this._dbContext
       .getRepository(RefreshToken)
       .create({
         userId: user.id,
         tokenHash,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        expiresAt: new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000),
       });
 
     await this._dbContext.getRepository(RefreshToken).save(refreshTokenEntity);

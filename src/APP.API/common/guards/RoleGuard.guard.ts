@@ -3,11 +3,10 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { IJwtService, JwtPayload } from '@shared/interfaces/security';
-import { IJwtService as IJwtServiceToken } from '@shared/tokens/injection.tokens';
+import type { ICurrentUser } from '@shared/interfaces/domain';
+import { Role } from '@shared/enums/Role.enum';
 
 export const ROLES_KEY = 'roles';
 
@@ -21,13 +20,10 @@ export const ROLES_KEY = 'roles';
  */
 @Injectable()
 export class RoleGuard implements CanActivate {
-  constructor(
-    private readonly _reflector: Reflector,
-    @Inject(IJwtServiceToken) private readonly _jwtService: IJwtService,
-  ) {}
+  constructor(private readonly _reflector: Reflector) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this._reflector.getAllAndOverride<string[]>(
+  canActivate(context: ExecutionContext): boolean {
+    const requiredRoles = this._reflector.getAllAndOverride<Role[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
@@ -37,15 +33,17 @@ export class RoleGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user as JwtPayload | undefined;
+    const request = context.switchToHttp().getRequest<{ user?: ICurrentUser }>();
+    const user = request.user;
 
     if (!user) {
       throw new ForbiddenException('User not authenticated');
     }
 
     // Check if user has any of the required roles
-    const hasRole = requiredRoles.some((role) => user.roles?.includes(role));
+    // Convert enum values to strings for comparison
+    const requiredRoleStrings = requiredRoles.map(r => String(r));
+    const hasRole = requiredRoleStrings.some((role) => user.roles?.includes(role));
 
     // Super admin bypass
     if (user.isSuperAdmin) {
@@ -61,3 +59,4 @@ export class RoleGuard implements CanActivate {
     return true;
   }
 }
+

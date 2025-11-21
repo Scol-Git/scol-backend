@@ -1,18 +1,12 @@
 import {
   Injectable,
-  Inject,
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource as DbContext } from 'typeorm';
-import { InjectDataSource } from '@nestjs/typeorm';
 
+import { BaseService } from '@bll/core/BaseService';
 import type { ILogger } from '@shared/interfaces/logging';
 import type { IMapper } from '@shared/interfaces/mapping';
-import {
-  ILogger as ILoggerToken,
-  IMapper as IMapperToken,
-} from '@shared/tokens/injection.tokens';
 import { CreateOrganizationRequestDto } from '@shared/dtos/organizations/CreateOrganizationRequestDto.dto';
 import { UpdateOrganizationRequestDto } from '@shared/dtos/organizations/UpdateOrganizationRequestDto.dto';
 import { SearchOrganizationsRequestDto } from '@shared/dtos/organizations/SearchOrganizationsRequestDto.dto';
@@ -30,15 +24,16 @@ import type { IOrganizationService } from '@shared/interfaces/services';
  * Implements IOrganizationService interface following .NET's approach
  * of programming to interfaces, not implementations.
  *
- * Uses interface-based DI for Logger and Mapper following .NET patterns.
+ * Extends BaseService for common functionality (repository access, logger, mapper).
  */
 @Injectable()
-export class OrganizationService implements IOrganizationService {
-  constructor(
-    @InjectDataSource() private readonly _dbContext: DbContext,
-    @Inject(ILoggerToken) private readonly _logger: ILogger,
-    @Inject(IMapperToken) private readonly _mapper: IMapper,
-  ) {}
+export class OrganizationService
+  extends BaseService<Organization>
+  implements IOrganizationService
+{
+  protected getEntityClass(): new () => Organization {
+    return Organization;
+  }
 
   /**
    * Get paginated list of organizations with filtering and sorting.
@@ -125,8 +120,7 @@ export class OrganizationService implements IOrganizationService {
   async getById(id: string): Promise<OrganizationResponseDto> {
     this._logger.LogInfo('Getting organization by ID', { id });
 
-    const repo = this._dbContext.getRepository(Organization);
-    const entity = await repo.findOne({ where: { id } });
+    const entity = await this.getRepository().findOne({ where: { id } });
 
     if (!entity) {
       this._logger.LogWarning('Organization not found', { id });
@@ -148,7 +142,7 @@ export class OrganizationService implements IOrganizationService {
   ): Promise<OrganizationResponseDto> {
     this._logger.LogInfo('Creating organization', { name: dto.name });
 
-    const repo = this._dbContext.getRepository(Organization);
+    const repo = this.getRepository();
 
     // Check for duplicates
     const exists = await repo.findOne({ where: { name: dto.name } });
@@ -188,7 +182,7 @@ export class OrganizationService implements IOrganizationService {
   ): Promise<OrganizationResponseDto> {
     this._logger.LogInfo('Updating organization', { id, dto });
 
-    const repo = this._dbContext.getRepository(Organization);
+    const repo = this.getRepository();
 
     // Find existing organization
     const entity = await repo.findOne({ where: { id } });
@@ -232,7 +226,7 @@ export class OrganizationService implements IOrganizationService {
   async delete(id: string): Promise<void> {
     this._logger.LogInfo('Deleting organization', { id });
 
-    const repo = this._dbContext.getRepository(Organization);
+    const repo = this.getRepository();
 
     const entity = await repo.findOne({ where: { id } });
     if (!entity) {

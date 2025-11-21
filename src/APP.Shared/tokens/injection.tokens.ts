@@ -60,6 +60,12 @@ export const IUserService = Symbol('IUserService');
  */
 export const INotificationService = Symbol('INotificationService');
 
+/**
+ * Token for IAuthService
+ * Manages authentication and authorization operations
+ */
+export const IAuthService = Symbol('IAuthService');
+
 // ============================================================================
 // Infrastructure Layer Tokens (APP.Infrastructure)
 // ============================================================================
@@ -103,3 +109,13 @@ export const IJwtService = Symbol('IJwtService');
  * Provides password hashing abstraction (bcrypt implementation)
  */
 export const IPasswordHasher = Symbol('IPasswordHasher');
+
+// ============================================================================
+// Configuration Tokens
+// ============================================================================
+
+/**
+ * Token for IAppConfig
+ * Provides type-safe application configuration
+ */
+export const IAppConfig = Symbol('IAppConfig');
