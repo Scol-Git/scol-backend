@@ -94,6 +94,12 @@ export const IEmailSender = Symbol('IEmailSender');
  */
 export const IEventBus = Symbol('IEventBus');
 
+/**
+ * Token for IRateLimitingStorage
+ * Provides rate limiting storage abstraction (Redis implementation)
+ */
+export const IRateLimitingStorage = Symbol('IRateLimitingStorage');
+
 // ============================================================================
 // Security Layer Tokens
 // ============================================================================

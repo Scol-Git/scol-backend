@@ -10,6 +10,7 @@ export * from './ICacheService.interface';
 export * from './IEmailSender.interface';
 export * from './IEventBus.interface';
 export * from './IMessageSender.interface';
+export * from './IRateLimitingStorage.interface';
 
 // Export types for convenience
 export * from './types';

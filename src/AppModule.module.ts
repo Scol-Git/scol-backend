@@ -7,6 +7,8 @@ import { SecurityModule } from '@infra/security/SecurityModule.module';
 import { MappingModule } from '@bll/mappings/MappingModule.module';
 import { TypeOrmModule } from '@infra/db/typeorm/TypeOrmModule.module';
 import { AppConfigModule } from '@infra/config/AppConfigModule.module';
+import { CacheModule } from '@infra/cache/CacheModule.module';
+import { RateLimitingModule } from '@infra/rate-limiting/RateLimitingModule.module';
 
 /**
  * Root Application Module
@@ -22,6 +24,8 @@ import { AppConfigModule } from '@infra/config/AppConfigModule.module';
     SecurityModule, // Provides IJwtService, IPasswordHasher
     MappingModule, // Provides IMapper
     TypeOrmModule, // Provides DbContext (via @InjectDataSource())
+    CacheModule, // Provides ICacheService (Redis + in-memory fallback)
+    RateLimitingModule, // Provides IRateLimitingStorage (Redis + in-memory fallback)
 
     // Application module
     ApiModule,

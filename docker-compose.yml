@@ -1,5 +1,5 @@
 # Docker Compose for SCOL Backend Infrastructure
-# Provides RabbitMQ for message queueing
+# Provides RabbitMQ for message queueing and Redis for caching/rate limiting
 #
 # Usage:
 #   docker-compose up -d        # Start services in detached mode
@@ -7,6 +7,26 @@
 #   docker-compose logs -f      # View logs
 
 services:
+  # ============================================================================
+  # Redis Cache & Rate Limiting
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: scol-redis
+    hostname: redis
+    ports:
+      - '6379:6379' # Redis port
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - scol-network
+
   # ============================================================================
   # RabbitMQ Message Broker
   # ============================================================================
@@ -46,6 +66,8 @@ services:
   #     - scol-network
 
 volumes:
+  redis_data:
+    driver: local
   rabbitmq_data:
     driver: local
   rabbitmq_logs:

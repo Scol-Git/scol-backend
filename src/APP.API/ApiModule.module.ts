@@ -6,9 +6,6 @@ import { AuthModule } from './feature-controllers/auth/AuthModule.module';
 import { NotificationModule } from './feature-controllers/notifications/NotificationModule.module';
 import { HealthCheckModule } from './feature-controllers/health-check/HealthCheckModule.module';
 
-// Non-global modules (only where needed)
-import { MessagingModule } from '@infra/messaging/MessagingModule.module'; // Used by NotificationModule
-
 // Common modules
 import { GuardsModule } from './common/guards/GuardsModule.module';
 
@@ -29,16 +26,13 @@ import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMidd
 @Module({
   imports: [
     // Global common modules
-    GuardsModule, // Provides JwtAuthGuard, PermissionGuard, RoleGuard globally
+    GuardsModule, // Provides JwtAuthGuard, PermissionGuard, RoleGuard, RateLimitGuard globally
 
     // Feature modules
     OrganizationModule,
     AuthModule,
     NotificationModule,
     HealthCheckModule,
-
-    // Non-global modules (only where needed)
-    MessagingModule, // Used by NotificationModule
   ],
   providers: [
     HttpExceptionFilter,

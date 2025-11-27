@@ -56,7 +56,23 @@ export const AppEnvSchema = Joi.object({
   // API Configuration
   CORS_ENABLED: Joi.string().valid('true', 'false').default('true'),
   CORS_ORIGINS: Joi.string().default('*'),
+
+  // Rate Limiting Configuration
   RATE_LIMIT_ENABLED: Joi.string().valid('true', 'false').default('false'),
-  RATE_LIMIT_WINDOW_MS: Joi.number().default(900000), // 15 minutes
-  RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
+
+  // Global rate limiting
+  RATE_LIMIT_GLOBAL_LIMIT: Joi.number().integer().min(1).default(10000),
+  RATE_LIMIT_GLOBAL_WINDOW_SECONDS: Joi.number().integer().min(1).default(60),
+
+  // IP-based rate limiting (anonymous/unauthenticated users)
+  RATE_LIMIT_IP_LIMIT: Joi.number().integer().min(1).default(100),
+  RATE_LIMIT_IP_WINDOW_SECONDS: Joi.number().integer().min(1).default(60),
+
+  // User-based rate limiting (authenticated users)
+  RATE_LIMIT_USER_LIMIT: Joi.number().integer().min(1).default(1000),
+  RATE_LIMIT_USER_WINDOW_SECONDS: Joi.number().integer().min(1).default(60),
+
+  // Exempt users and roles (comma-separated, optional)
+  RATE_LIMIT_EXEMPT_USERS: Joi.string().allow('').optional(),
+  RATE_LIMIT_EXEMPT_ROLES: Joi.string().allow('').optional(),
 });
