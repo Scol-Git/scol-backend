@@ -1,12 +1,37 @@
 # Docker Compose for SCOL Backend Infrastructure
-# Provides RabbitMQ for message queueing and Redis for caching/rate limiting
+# Provides PostgreSQL, Redis, and RabbitMQ services
 #
 # Usage:
-#   docker-compose up -d        # Start services in detached mode
-#   docker-compose down         # Stop services
-#   docker-compose logs -f      # View logs
+#   docker-compose up -d                    # Start all services in detached mode
+#   docker-compose up -d postgres redis     # Start specific services only
+#   docker-compose down                     # Stop all services
+#   docker-compose logs -f                 # View logs for all services
+#   docker-compose logs -f postgres        # View logs for specific service
 
 services:
+  # ============================================================================
+  # PostgreSQL Database
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: scol-postgres
+    hostname: postgres
+    ports:
+      - '5432:5432' # PostgreSQL port
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: scol_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scol-network
+
   # ============================================================================
   # Redis Cache & Rate Limiting
   # ============================================================================
@@ -66,6 +91,8 @@ services:
   #     - scol-network
 
 volumes:
+  postgres_data:
+    driver: local
   redis_data:
     driver: local
   rabbitmq_data:
