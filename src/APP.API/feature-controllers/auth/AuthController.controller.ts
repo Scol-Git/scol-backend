@@ -37,6 +37,7 @@ import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { Permission } from '@shared/enums/Permission.enum';
 import { Role } from '@shared/enums/Role.enum';
+import { UserContextAccessor } from '@shared/context/UserContextAccessor';
 
 /**
  * Auth Controller
@@ -177,8 +178,19 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getProfile(@CurrentUser() user: ICurrentUser): Promise<ICurrentUser> {
-    return user;
+  getProfile(@CurrentUser() user: ICurrentUser): any {
+    //from @CurrentUser decorator
+    const userFromDecorator = user;
+    console.log('UserInfoFromDecorator:', userFromDecorator);
+
+    //from UserContextAccessor.userContext (middleware)
+    const userFromContext = UserContextAccessor.userContext;
+    console.log('UserInfoFromContext:', userFromContext);
+
+    return {
+      UserInfoFromDecorator: userFromDecorator,
+      UserInfoFromContext: userFromContext,
+    };
   }
 
   /**

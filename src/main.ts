@@ -6,6 +6,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './AppModule.module';
 import { HttpExceptionFilter } from '@api/common/filters/HttpExceptionFilter.filter';
+import { UserContextInterceptor } from '@api/common/interceptors/UserContextInterceptor.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -21,6 +22,9 @@ async function bootstrap() {
 
   // ✅ Let Nest inject AppLogger into the filter
   app.useGlobalFilters(app.get(HttpExceptionFilter));
+
+  // ✅ Register UserContextInterceptor globally (runs after guards, before controllers)
+  app.useGlobalInterceptors(new UserContextInterceptor());
 
   const swaggerCfg = new DocumentBuilder()
     .setTitle('SCOL Backend')

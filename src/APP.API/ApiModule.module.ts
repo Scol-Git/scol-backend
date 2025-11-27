@@ -11,7 +11,6 @@ import { GuardsModule } from './common/guards/GuardsModule.module';
 
 // Common middleware & filters
 import { HttpExceptionFilter } from './common/filters/HttpExceptionFilter.filter';
-import { UserContextMiddleware } from './common/middleware/UserContextMiddleware';
 import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMiddleware';
 
 /**
@@ -34,11 +33,7 @@ import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMidd
     NotificationModule,
     HealthCheckModule,
   ],
-  providers: [
-    HttpExceptionFilter,
-    RequestLoggingMiddleware,
-    UserContextMiddleware,
-  ],
+  providers: [HttpExceptionFilter, RequestLoggingMiddleware],
 })
 export class ApiModule implements NestModule {
   /**
@@ -46,8 +41,6 @@ export class ApiModule implements NestModule {
    * Registers request logging and user context middleware globally.
    */
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(RequestLoggingMiddleware, UserContextMiddleware)
-      .forRoutes('*');
+    consumer.apply(RequestLoggingMiddleware).forRoutes('*');
   }
 }
