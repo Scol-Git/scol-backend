@@ -9,8 +9,13 @@ Get the project running in 5 minutes:
 1. **Install dependencies**: `npm install`
 2. **Choose your setup**: [All Docker](#option-1-all-services-with-docker-recommended) or [Custom Setup](#option-2-custom-setup)
 3. **Setup environment**: Create `.env.local` file (see below)
-4. **Run migrations**: `npm run typeorm:run`
-5. **Run the app**: `npm run start:dev`
+4. **Generate migrations**: `npm run typeorm:gen migrations/<MigrationName>`
+   Example:
+   ```bash
+   npm run typeorm:gen migrations/InitialMigration
+   ```
+5. **Run migrations**: `npm run typeorm:run`
+6. **Run the app**: `npm run start:dev`
 
 The API will be available at `http://localhost:3000` and Swagger UI at `http://localhost:3000/swagger`
 
@@ -183,6 +188,7 @@ RATE_LIMIT_ENABLED=false
 The database is automatically created when you start the Docker container. Just run migrations:
 
 ```bash
+npm run typeorm:gen migrations/InitialMigration
 npm run typeorm:run
 ```
 
@@ -204,6 +210,7 @@ npm run typeorm:run
 Run database migrations to create all tables:
 
 ```bash
+npm run typeorm:gen migrations/InitialMigration
 npm run typeorm:run
 ```
 
@@ -221,7 +228,7 @@ npm run typeorm:revert
 **If you need to generate a new migration:**
 
 ```bash
-npm run typeorm:gen -- migrations/YourMigrationName
+npm run typeorm:gen migrations/YourMigrationName
 ```
 
 ---
@@ -302,35 +309,6 @@ Run without watch mode:
 ```bash
 npm start
 ```
-
----
-
-## ✅ Verify Installation
-
-### 1. Check Server Status
-
-Visit the health check endpoint:
-
-```bash
-curl http://localhost:3000/health
-```
-
-Or open in browser: http://localhost:3000/health
-
-### 2. Access Swagger UI
-
-Open the interactive API documentation:
-
-http://localhost:3000/swagger
-
-Here you can:
-- View all available endpoints
-- Test API endpoints directly
-- See request/response schemas
-
-### 3. Test Database Connection
-
-The health check endpoint will show database status. If migrations ran successfully, you should see database tables created.
 
 ---
 
