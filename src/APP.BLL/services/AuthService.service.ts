@@ -17,7 +17,9 @@ import {
   IJwtService as IJwtServiceToken,
   IPasswordHasher as IPasswordHasherToken,
   IAppConfig as IAppConfigToken,
+  IFirebaseService as IFirebaseServiceToken,
 } from '@shared/tokens/injection.tokens';
+import type { IFirebaseService } from '@shared/interfaces/security';
 import { InvalidCredentialsException } from '@shared/exceptions/auth/InvalidCredentialsException';
 import { AccountLockedException } from '@shared/exceptions/auth/AccountLockedException';
 import { InvalidTokenException } from '@shared/exceptions/auth/InvalidTokenException';
@@ -34,6 +36,8 @@ import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto.dto';
 import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto.dto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto.dto';
 import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto.dto';
+import { FirebaseLoginRequestDto } from '@shared/dtos/auth/FirebaseLoginRequestDto.dto';
+import { FirebaseVerifyPhoneRequestDto } from '@shared/dtos/auth/FirebaseVerifyPhoneRequestDto.dto';
 
 /**
  * Auth Service
@@ -52,6 +56,7 @@ export class AuthService implements IAuthService {
     @Inject(IPasswordHasherToken)
     private readonly _passwordHasher: IPasswordHasher,
     @Inject(IAppConfigToken) private readonly _appConfig: IAppConfig,
+    @Inject(IFirebaseServiceToken) private readonly _firebaseService: IFirebaseService,
   ) {}
 
   /**
@@ -412,6 +417,177 @@ export class AuthService implements IAuthService {
         permissions,
       },
     };
+  }
+
+  /**
+   * Login with Firebase ID token (Google authentication)
+   */
+  async loginWithFirebase(
+    dto: FirebaseLoginRequestDto,
+    orgId?: string,
+  ): Promise<AuthResponseDto> {
+    // Verify Firebase ID token
+    const firebaseUser = await this._firebaseService.verifyIdToken(dto.idToken);
+
+    if (!firebaseUser.email) {
+      throw new ConflictException('Email is required for Firebase authentication');
+    }
+
+    // Find user by Firebase UID
+    let user = await this._dbContext
+      .getRepository(User)
+      .findOne({ where: { firebaseUid: firebaseUser.uid } });
+
+    let finalOrgId = orgId;
+
+    if (user) {
+      // User exists - use their existing orgId (ignore provided orgId if different)
+      finalOrgId = user.orgId;
+      
+      // Update user info from Firebase if needed
+      if (firebaseUser.email && user.email !== firebaseUser.email) {
+        user.email = firebaseUser.email;
+      }
+      if (firebaseUser.email_verified !== undefined) {
+        user.emailVerified = firebaseUser.email_verified;
+      }
+    } else {
+      // User doesn't exist - need to determine orgId
+      if (orgId) {
+        // Verify organization exists if provided
+        const org = await this._dbContext
+          .getRepository(Organization)
+          .findOne({ where: { id: orgId } });
+
+        if (!org) {
+          throw new NotFoundException('Organization not found');
+        }
+
+        // Check if user exists by email in this org (for linking accounts)
+        user = await this._dbContext
+          .getRepository(User)
+          .findOne({ where: { email: firebaseUser.email, orgId } });
+
+        if (user) {
+          // Link Firebase UID to existing user
+          user.firebaseUid = firebaseUser.uid;
+          finalOrgId = user.orgId;
+        } else {
+          // Create new user in provided organization
+          user = this._dbContext.getRepository(User).create({
+            email: firebaseUser.email,
+            orgId,
+            status: UserStatus.Active,
+            firebaseUid: firebaseUser.uid,
+            emailVerified: firebaseUser.email_verified || false,
+            phoneVerified: false, // Phone not verified yet
+          });
+        }
+      } else {
+        // No orgId provided - create personal organization for user
+        const orgName = firebaseUser.name 
+          ? `${firebaseUser.name}'s Organization`
+          : `${firebaseUser.email}'s Organization`;
+
+        // Check if personal org already exists (by name pattern)
+        let personalOrg = await this._dbContext
+          .getRepository(Organization)
+          .findOne({ where: { name: orgName } });
+
+        if (!personalOrg) {
+          // Create personal organization
+          personalOrg = this._dbContext.getRepository(Organization).create({
+            name: orgName,
+          });
+          await this._dbContext.getRepository(Organization).save(personalOrg);
+          this._logger.LogInfo('Created personal organization for Firebase user', {
+            orgId: personalOrg.id,
+            orgName,
+          });
+        }
+
+        finalOrgId = personalOrg.id;
+
+        // Check if user exists by email (might have been created in this org before)
+        user = await this._dbContext
+          .getRepository(User)
+          .findOne({ where: { email: firebaseUser.email, orgId: finalOrgId } });
+
+        if (user) {
+          // Link Firebase UID to existing user
+          user.firebaseUid = firebaseUser.uid;
+        } else {
+          // Create new user in personal organization
+          user = this._dbContext.getRepository(User).create({
+            email: firebaseUser.email,
+            orgId: finalOrgId,
+            status: UserStatus.Active,
+            firebaseUid: firebaseUser.uid,
+            emailVerified: firebaseUser.email_verified || false,
+            phoneVerified: false, // Phone not verified yet
+          });
+        }
+      }
+    }
+
+    // Ensure finalOrgId is set (should always be set at this point)
+    if (!finalOrgId) {
+      throw new Error('Organization ID is required but was not determined');
+    }
+
+    // Update last login
+    user.lastLoginAt = new Date();
+    await this._dbContext.getRepository(User).save(user);
+
+    // Get permissions and roles
+    const permissions = await this._getUserPermissions(user.id, finalOrgId);
+    const roles = await this._getUserRoles(user.id, finalOrgId);
+
+    this._logger.LogInfo('Firebase login successful', {
+      userId: user.id,
+      email: user.email,
+      firebaseUid: firebaseUser.uid,
+      orgId: finalOrgId,
+    });
+
+    return this._generateAuthResponse(user, roles, permissions);
+  }
+
+  /**
+   * Verify phone number with Firebase ID token
+   */
+  async verifyPhoneWithFirebase(
+    dto: FirebaseVerifyPhoneRequestDto,
+  ): Promise<{ message: string }> {
+    // Verify Firebase ID token (should include phone_number after OTP verification)
+    const firebaseUser = await this._firebaseService.verifyIdToken(dto.idToken);
+
+    if (!firebaseUser.phone_number) {
+      throw new InvalidTokenException('Firebase token does not include phone number');
+    }
+
+    // Find user by Firebase UID
+    const user = await this._dbContext
+      .getRepository(User)
+      .findOne({ where: { firebaseUid: firebaseUser.uid } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Update phone number and verification status
+    user.phone = firebaseUser.phone_number;
+    user.phoneVerified = true;
+
+    await this._dbContext.getRepository(User).save(user);
+
+    this._logger.LogInfo('Phone verified via Firebase', {
+      userId: user.id,
+      phone: firebaseUser.phone_number,
+      firebaseUid: firebaseUser.uid,
+    });
+
+    return { message: 'Phone number verified successfully' };
   }
 
   /**

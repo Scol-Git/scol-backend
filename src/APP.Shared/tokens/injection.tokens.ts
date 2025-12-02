@@ -110,6 +110,12 @@ export const IJwtService = Symbol('IJwtService');
  */
 export const IPasswordHasher = Symbol('IPasswordHasher');
 
+/**
+ * Token for IFirebaseService
+ * Provides Firebase Admin SDK operations for token verification
+ */
+export const IFirebaseService = Symbol('IFirebaseService');
+
 // ============================================================================
 // Configuration Tokens
 // ============================================================================

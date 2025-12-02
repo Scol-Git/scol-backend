@@ -3,6 +3,8 @@ import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto.dto';
 import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto.dto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto.dto';
 import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto.dto';
+import { FirebaseLoginRequestDto } from '@shared/dtos/auth/FirebaseLoginRequestDto.dto';
+import { FirebaseVerifyPhoneRequestDto } from '@shared/dtos/auth/FirebaseVerifyPhoneRequestDto.dto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto.dto';
 
 /**
@@ -85,5 +87,34 @@ export interface IAuthService {
     dto: ResetPasswordRequestDto,
     orgId: string,
   ): Promise<void>;
+
+  /**
+   * Login with Firebase ID token (Google authentication).
+   * Verifies the Firebase ID token, creates/updates user in DB, and issues app tokens.
+   * 
+   * @param dto - Firebase login request (idToken)
+   * @param orgId - Organization ID (optional - if not provided, uses user's existing org or creates personal org)
+   * @returns Authentication response with tokens and user info
+   * @throws UnauthorizedException if Firebase token is invalid
+   * @throws NotFoundException if organization not found (when orgId is provided)
+   */
+  loginWithFirebase(
+    dto: FirebaseLoginRequestDto,
+    orgId?: string,
+  ): Promise<AuthResponseDto>;
+
+  /**
+   * Verify phone number with Firebase ID token.
+   * Verifies the Firebase ID token (which includes phone_number after OTP verification),
+   * and updates the user's phone and phoneVerified status.
+   * 
+   * @param dto - Firebase verify phone request (idToken)
+   * @returns Promise that resolves when phone is verified
+   * @throws UnauthorizedException if Firebase token is invalid
+   * @throws NotFoundException if user not found
+   */
+  verifyPhoneWithFirebase(
+    dto: FirebaseVerifyPhoneRequestDto,
+  ): Promise<{ message: string }>;
 }
 

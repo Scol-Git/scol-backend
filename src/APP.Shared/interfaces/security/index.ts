@@ -6,6 +6,7 @@
 
 export * from './IJwtService.interface';
 export * from './IPasswordHasher.interface';
+export * from './IFirebaseService.interface';
 
 
 

@@ -55,6 +55,16 @@ export class User extends BaseEntity {
   @Column({ type: 'timestamptz', nullable: true })
   passwordResetTokenExpiresAt?: Date;
 
+  // Firebase Authentication
+  @Column({ type: 'varchar', length: 128, nullable: true, unique: true })
+  firebaseUid?: string; // Firebase User UID
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phone?: string; // Phone number (e.g., +1234567890)
+
+  @Column({ type: 'boolean', default: false })
+  phoneVerified!: boolean; // Whether phone number is verified
+
   // Relationships
   @OneToMany(() => Todo, (t) => t.assignee)
   todos!: Todo[];

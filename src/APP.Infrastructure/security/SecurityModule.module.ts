@@ -1,8 +1,9 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { IJwtService, IPasswordHasher } from '@shared/tokens/injection.tokens';
+import { IJwtService, IPasswordHasher, IFirebaseService } from '@shared/tokens/injection.tokens';
 import { JwtService } from './JwtService.service';
 import { PasswordHasher } from './PasswordHasher.service';
+import { FirebaseService } from './FirebaseService.service';
 
 /**
  * Security Module
@@ -23,7 +24,11 @@ import { PasswordHasher } from './PasswordHasher.service';
       provide: IPasswordHasher,
       useClass: PasswordHasher,
     },
+    {
+      provide: IFirebaseService,
+      useClass: FirebaseService,
+    },
   ],
-  exports: [IJwtService, IPasswordHasher],
+  exports: [IJwtService, IPasswordHasher, IFirebaseService],
 })
 export class SecurityModule {}

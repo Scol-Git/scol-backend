@@ -12,6 +12,7 @@
     "start:prod": "npm run build && node dist/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:verbose": "jest --verbose",
     "typeorm:gen": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:generate -d ./src/APP.Infrastructure/db/typeorm/DbContext.datasource.ts",
     "typeorm:run": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:run -d ./src/APP.Infrastructure/db/typeorm/DbContext.datasource.ts",
     "typeorm:revert": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:revert -d ./src/APP.Infrastructure/db/typeorm/DbContext.datasource.ts"
@@ -19,17 +20,18 @@
   "dependencies": {
     "@automapper/classes": "8.8.1",
     "@automapper/core": "8.8.1",
-    "@nestjs/common": "11.0.1",
+    "@nestjs/common": "^11.0.1",
     "@nestjs/config": "4.0.2",
-    "@nestjs/core": "11.0.1",
-    "@nestjs/platform-express": "11.0.1",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "11.2.1",
-    "@nestjs/typeorm": "11.0.0",
+    "@nestjs/typeorm": "^11.0.0",
     "amqplib": "^0.10.9",
     "bcrypt": "^6.0.0",
     "class-transformer": "0.5.1",
     "class-validator": "0.14.2",
     "dotenv": "^16.4.5",
+    "firebase-admin": "^13.6.0",
     "ioredis": "^5.8.2",
     "joi": "18.0.1",
     "jsonwebtoken": "^9.0.2",
@@ -40,10 +42,10 @@
     "pg": "8.16.3",
     "pino": "9.14.0",
     "pino-http": "10.5.0",
-    "reflect-metadata": "0.1.14",
-    "rxjs": "7.8.1",
+    "reflect-metadata": "^0.1.14",
+    "rxjs": "^7.8.1",
     "swagger-ui-express": "5.0.1",
-    "typeorm": "0.3.27"
+    "typeorm": "^0.3.27"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.2.0",
@@ -57,7 +59,7 @@
     "@types/ioredis": "^4.28.10",
     "@types/jest": "30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "22.10.7",
+    "@types/node": "^22.10.7",
     "@types/nodemailer": "^7.0.3",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/pino-http": "5.8.4",
@@ -84,15 +86,22 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
+    "rootDir": ".",
+    "testRegex": "(src/.*\\.spec\\.ts|test/.*\\.spec\\.ts)$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.(t|j)s"
     ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "coverageDirectory": "coverage",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@api/(.*)$": "<rootDir>/src/APP.API/$1",
+      "^@bll/(.*)$": "<rootDir>/src/APP.BLL/$1",
+      "^@infra/(.*)$": "<rootDir>/src/APP.Infrastructure/$1",
+      "^@entity/(.*)$": "<rootDir>/src/APP.Entity/$1",
+      "^@shared/(.*)$": "<rootDir>/src/APP.Shared/$1"
+    }
   }
 }

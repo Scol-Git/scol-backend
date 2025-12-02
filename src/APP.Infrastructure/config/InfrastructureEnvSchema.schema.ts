@@ -44,4 +44,9 @@ export const InfrastructureEnvSchema = Joi.object({
   GOOGLE_CLIENT_ID: Joi.string().optional(),
   GOOGLE_CLIENT_SECRET: Joi.string().optional(),
   GOOGLE_CALLBACK_URL: Joi.string().uri().optional(),
+
+  // Firebase Configuration
+  FIREBASE_PROJECT_ID: Joi.string().optional(),
+  FIREBASE_SERVICE_ACCOUNT_PATH: Joi.string().optional(),
+  FIREBASE_SKIP_VERIFICATION: Joi.boolean().optional().default(false),
 });

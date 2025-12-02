@@ -13,7 +13,8 @@
       "@bll/*": ["src/APP.BLL/*"],
       "@infra/*": ["src/APP.Infrastructure/*"],
       "@entity/*": ["src/APP.Entity/*"],
-      "@shared/*": ["src/APP.Shared/*"]
+      "@shared/*": ["src/APP.Shared/*"],
+      "@/test/*": ["test/*"]
     },
     "strict": true
   }
