@@ -36,8 +36,6 @@ import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto.dto';
 import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto.dto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto.dto';
 import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto.dto';
-import { FirebaseLoginRequestDto } from '@shared/dtos/auth/FirebaseLoginRequestDto.dto';
-import { FirebaseVerifyPhoneRequestDto } from '@shared/dtos/auth/FirebaseVerifyPhoneRequestDto.dto';
 
 /**
  * Auth Service
@@ -423,11 +421,11 @@ export class AuthService implements IAuthService {
    * Login with Firebase ID token (Google authentication)
    */
   async loginWithFirebase(
-    dto: FirebaseLoginRequestDto,
+    idToken: string,
     orgId?: string,
   ): Promise<AuthResponseDto> {
     // Verify Firebase ID token
-    const firebaseUser = await this._firebaseService.verifyIdToken(dto.idToken);
+    const firebaseUser = await this._firebaseService.verifyIdToken(idToken);
 
     if (!firebaseUser.email) {
       throw new ConflictException('Email is required for Firebase authentication');
@@ -557,10 +555,10 @@ export class AuthService implements IAuthService {
    * Verify phone number with Firebase ID token
    */
   async verifyPhoneWithFirebase(
-    dto: FirebaseVerifyPhoneRequestDto,
+    idToken: string,
   ): Promise<{ message: string }> {
     // Verify Firebase ID token (should include phone_number after OTP verification)
-    const firebaseUser = await this._firebaseService.verifyIdToken(dto.idToken);
+    const firebaseUser = await this._firebaseService.verifyIdToken(idToken);
 
     if (!firebaseUser.phone_number) {
       throw new InvalidTokenException('Firebase token does not include phone number');

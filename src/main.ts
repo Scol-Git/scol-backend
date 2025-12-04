@@ -11,6 +11,25 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
 
+  // ✅ Enable CORS for cross-origin requests (required for web apps)
+  app.enableCors({
+    origin: true, // Allow all origins in development (use specific origins in production)
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers',
+    ],
+    exposedHeaders: ['Authorization'],
+    credentials: true, // Allow cookies/auth headers
+    preflightContinue: false,
+    optionsSuccessStatus: 204, // Return 204 for OPTIONS requests
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

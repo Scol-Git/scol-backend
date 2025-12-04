@@ -9,7 +9,10 @@ import {
   Query,
   Param,
   Inject,
+  Req,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -17,6 +20,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiQuery,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/JwtAuthGuard.guard';
 import { PermissionGuard } from '../../common/guards/PermissionGuard.guard';
@@ -31,8 +35,6 @@ import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto.dto';
 import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto.dto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto.dto';
 import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto.dto';
-import { FirebaseLoginRequestDto } from '@shared/dtos/auth/FirebaseLoginRequestDto.dto';
-import { FirebaseVerifyPhoneRequestDto } from '@shared/dtos/auth/FirebaseVerifyPhoneRequestDto.dto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto.dto';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 import type { ILogger } from '@shared/interfaces/logging';
@@ -226,7 +228,7 @@ export class AuthController {
    * - Existing users: Uses their current organization
    * - New users: Creates a personal organization automatically
    * 
-   * @param dto - Firebase ID token from client
+   * @param request - Express request object to extract Authorization header
    * @param orgId - Optional organization ID to join (for new users)
    * @returns Authentication response with access token, refresh token, and user info
    */
@@ -234,11 +236,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Login with Firebase ID token (Google authentication)',
-    description: 'Authenticates using Firebase ID token. orgId is optional - if not provided, existing users use their current org, new users get a personal organization created automatically.'
+    description: 'Authenticates using Firebase ID token from Authorization header. orgId is optional - if not provided, existing users use their current org, new users get a personal organization created automatically.'
   })
-  @ApiBody({ 
-    type: FirebaseLoginRequestDto,
-    description: 'Firebase ID token received from Firebase after Google authentication'
+  @ApiHeader({
+    name: 'Authorization',
+    description: 'Firebase ID token in Bearer format: Bearer <firebase-id-token>',
+    required: true,
   })
   @ApiQuery({ 
     name: 'orgId', 
@@ -253,7 +256,7 @@ export class AuthController {
   })
   @ApiResponse({ 
     status: 401, 
-    description: 'Invalid or expired Firebase ID token' 
+    description: 'Invalid or expired Firebase ID token, or missing Authorization header' 
   })
   @ApiResponse({ 
     status: 404, 
@@ -264,11 +267,13 @@ export class AuthController {
     description: 'Email is required for Firebase authentication' 
   })
   async loginWithFirebase(
-    @Body() dto: FirebaseLoginRequestDto,
+    @Req() request: Request,
     @Query('orgId') orgId?: string,
   ): Promise<AuthResponseDto> {
+    const authHeader = request.headers.authorization;
+    const idToken = this._extractTokenFromHeader(authHeader);
     this._logger.LogInfo('Firebase login attempt', { hasOrgId: !!orgId });
-    return this._authService.loginWithFirebase(dto, orgId);
+    return this._authService.loginWithFirebase(idToken, orgId);
   }
 
   /**
@@ -278,18 +283,19 @@ export class AuthController {
    * The Firebase token must include the phone_number claim.
    * Updates the user's phone number and sets phoneVerified to true.
    * 
-   * @param dto - Firebase ID token that includes phone_number claim
+   * @param request - Express request object to extract Authorization header
    * @returns Success message
    */
   @Post('firebase/verify-phone')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Verify phone number with Firebase ID token (after OTP verification)',
-    description: 'Verifies phone number using Firebase ID token received after successful OTP verification. The token must include phone_number claim. Updates user record with verified phone number.'
+    description: 'Verifies phone number using Firebase ID token from Authorization header received after successful OTP verification. The token must include phone_number claim. Updates user record with verified phone number.'
   })
-  @ApiBody({ 
-    type: FirebaseVerifyPhoneRequestDto,
-    description: 'Firebase ID token received after phone OTP verification (must include phone_number claim)'
+  @ApiHeader({
+    name: 'authorization',
+    description: 'Firebase ID token in Bearer format: Bearer <firebase-id-token> (must include phone_number claim)',
+    required: true,
   })
   @ApiResponse({
     status: 200,
@@ -306,16 +312,33 @@ export class AuthController {
   })
   @ApiResponse({ 
     status: 401, 
-    description: 'Invalid or expired Firebase token, or token does not include phone_number claim' 
+    description: 'Invalid or expired Firebase token, missing Authorization header, or token does not include phone_number claim' 
   })
   @ApiResponse({ 
     status: 404, 
     description: 'User not found (user must exist and have firebaseUid set)' 
   })
   async verifyPhoneWithFirebase(
-    @Body() dto: FirebaseVerifyPhoneRequestDto,
+    @Req() request: Request,
   ): Promise<{ message: string }> {
+    const authHeader = request.headers.authorization;
+    const idToken = this._extractTokenFromHeader(authHeader);
     this._logger.LogInfo('Firebase phone verification attempt', {});
-    return this._authService.verifyPhoneWithFirebase(dto);
+    return this._authService.verifyPhoneWithFirebase(idToken);
+  }
+
+  /**
+   * Extract token from Authorization header
+   * 
+   * @param authHeader - Authorization header value
+   * @returns Extracted token string
+   * @throws UnauthorizedException if header is missing or invalid format
+   */
+  private _extractTokenFromHeader(authHeader: string | undefined): string {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Missing or invalid Authorization header. Expected format: Bearer <firebase-id-token>');
+    }
+
+    return authHeader.substring(7);
   }
 }
