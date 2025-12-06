@@ -5,63 +5,62 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { config as dotenvConfig } from 'dotenv';
 
-// --- Load env from root: prefer .env.local, fallback to .env ---
-const root = process.cwd();
-const envLocal = path.join(root, '.env.local');
-const envDefault = path.join(root, '.env');
+// ---------------------------
+// 1. Resolve project root safely
+// ---------------------------
+const projectRoot = path.resolve(__dirname, '../../../..');
 
-if (fs.existsSync(envLocal)) {
-  dotenvConfig({ path: envLocal });
-} else if (fs.existsSync(envDefault)) {
-  dotenvConfig({ path: envDefault });
+// ---------------------------
+// 2. Load .env.local first, fallback to .env
+// ---------------------------
+const envLocalPath = path.join(projectRoot, '.env.local');
+const envPath = path.join(projectRoot, '.env');
+
+if (fs.existsSync(envLocalPath)) {
+  dotenvConfig({ path: envLocalPath });
+} else if (fs.existsSync(envPath)) {
+  dotenvConfig({ path: envPath });
 } else {
   console.warn(
     'No .env.local or .env found at project root; relying on process.env',
   );
 }
 
-// --- Entities (via path aliases) ---
-import { Organization } from '@entity/entities/Organization.entity';
-import { User } from '@entity/entities/User.entity';
-import { Project } from '@entity/entities/Project.entity';
-import { Todo } from '@entity/entities/Todo.entity';
-import { TodoDependency } from '@entity/entities/TodoDependency.entity';
-import { AuditEvent } from '@entity/entities/AuditEvent.entity';
-import { Role } from '@entity/entities/Role.entity';
-import { Permission } from '@entity/entities/Permission.entity';
-import { UserRole } from '@entity/entities/UserRole.entity';
-import { RolePermission } from '@entity/entities/RolePermission.entity';
-import { ExternalAuthProvider } from '@entity/entities/ExternalAuthProvider.entity';
-import { RefreshToken } from '@entity/entities/RefreshToken.entity';
-
-const url = process.env.DATABASE_URL;
-if (!url) {
+// ---------------------------
+// 3. Validate required env vars
+// ---------------------------
+if (!process.env.DATABASE_URL) {
   throw new Error(
-    'DATABASE_URL is not set. Put it in .env.local (or .env) at project root.',
+    '❌ DATABASE_URL is missing. Put it inside .env.local or .env at project root.',
   );
 }
 
-console.log('TypeORM CLI using DATABASE_URL:', url);
+const dbUrl = process.env.DATABASE_URL;
+
+// ---------------------------
+// 4. Determine migration path based on mode
+// ---------------------------
+// ts-node -> use .ts
+// prod build -> use dist .js
+const isTs = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+const migrationPath = isTs
+  ? path.join(projectRoot, 'migrations', '*.ts')
+  : path.join(projectRoot, 'dist', 'migrations', '*.js');
+
+// ---------------------------
+// 5. Import entities (manual or glob)
+// ---------------------------
+import { SysCountries } from '@entity/entities/SysCountries.entity';
 
 export default new DbContext({
   type: 'postgres',
-  url,
-  entities: [
-    Organization,
-    User,
-    Project,
-    Todo,
-    TodoDependency,
-    AuditEvent,
-    Role,
-    Permission,
-    UserRole,
-    RolePermission,
-    ExternalAuthProvider,
-    RefreshToken,
-  ],
-  migrations: ['migrations/*.ts'], // Only load .ts files to avoid duplicates with compiled .js files
-  synchronize: false, // Never use synchronize in production - use migrations instead
+  url: dbUrl,
+  synchronize: false,
   logging: false,
+
+  entities: [SysCountries],
+
+  migrations: [migrationPath],
+
   // ssl: true, // usually not needed if ?sslmode=require is in the URL
 });

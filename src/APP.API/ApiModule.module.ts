@@ -1,17 +1,14 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 
-// Feature modules
-import { OrganizationModule } from './feature-controllers/organizations/OrganizationModule.module';
-import { AuthModule } from './feature-controllers/auth/AuthModule.module';
-import { NotificationModule } from './feature-controllers/notifications/NotificationModule.module';
-import { HealthCheckModule } from './feature-controllers/health-check/HealthCheckModule.module';
-
 // Common modules
 import { GuardsModule } from './common/guards/GuardsModule.module';
-
-// Common middleware & filters
 import { HttpExceptionFilter } from './common/filters/HttpExceptionFilter.filter';
 import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMiddleware';
+
+// Feature modules
+
+
+
 
 /**
  * API Module - Entry point for the REST API layer.
@@ -28,10 +25,7 @@ import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMidd
     GuardsModule, // Provides JwtAuthGuard, PermissionGuard, RoleGuard, RateLimitGuard globally
 
     // Feature modules
-    OrganizationModule,
-    AuthModule,
-    NotificationModule,
-    HealthCheckModule,
+    
   ],
   providers: [HttpExceptionFilter, RequestLoggingMiddleware],
 })

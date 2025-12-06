@@ -11,7 +11,6 @@ import { GuardsModule } from '@api/common/guards/GuardsModule.module';
  */
 @Module({
   imports: [
-    CacheModule, // Provides ICacheService for health checks
     GuardsModule, // Provides RateLimitGuard for rate limiting tests
   ],
   controllers: [HealthController],

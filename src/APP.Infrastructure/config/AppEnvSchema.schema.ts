@@ -29,9 +29,6 @@ export const AppEnvSchema = Joi.object({
   SMTP_PASS: Joi.string().optional(),
   SMTP_FROM: Joi.string().optional(),
 
-  // RabbitMQ (optional)
-  RABBITMQ_URL: Joi.string().uri().optional(),
-
   // Redis Cache (optional, falls back to in-memory if not provided)
   REDIS_URL: Joi.string().uri().optional(),
 
@@ -39,11 +36,6 @@ export const AppEnvSchema = Joi.object({
   JWT_SECRET: Joi.string().min(32).required(),
   JWT_ACCESS_TOKEN_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('7d'),
-
-  // Google OAuth Configuration (optional)
-  GOOGLE_CLIENT_ID: Joi.string().optional(),
-  GOOGLE_CLIENT_SECRET: Joi.string().optional(),
-  GOOGLE_CALLBACK_URL: Joi.string().uri().optional(),
 
   // Application Configuration
   AUTH_ACCOUNT_LOCKOUT_THRESHOLD: Joi.number().default(5),

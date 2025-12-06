@@ -4,10 +4,10 @@ import type { IInfrastructureConfig } from '@shared/interfaces/config/IInfrastru
 
 /**
  * Infrastructure Configuration Service
- * 
+ *
  * Provides type-safe access to infrastructure layer configuration.
  * Implements IInfrastructureConfig interface for dependency injection.
- * 
+ *
  * @class InfrastructureConfig
  * @implements {IInfrastructureConfig}
  */
@@ -23,12 +23,15 @@ export class InfrastructureConfig implements IInfrastructureConfig {
   };
 
   email = {
-    provider: (this._config.get<string>('EMAIL_PROVIDER') || 'console') as 'console' | 'smtp',
+    provider: (this._config.get<string>('EMAIL_PROVIDER') || 'console') as
+      | 'console'
+      | 'smtp',
     smtp: {
       host: this._config.get<string>('SMTP_HOST'),
       port: this._config.get<number>('SMTP_PORT'),
-      secure: this._config.get<string>('SMTP_SECURE') === 'true' || 
-              this._config.get<boolean>('SMTP_SECURE') === true,
+      secure:
+        this._config.get<string>('SMTP_SECURE') === 'true' ||
+        this._config.get<boolean>('SMTP_SECURE') === true,
       user: this._config.get<string>('SMTP_USER'),
       password: this._config.get<string>('SMTP_PASS'),
       from: this._config.get<string>('SMTP_FROM'),
@@ -39,10 +42,5 @@ export class InfrastructureConfig implements IInfrastructureConfig {
     redisUrl: this._config.get<string>('REDIS_URL'),
   };
 
-  messaging = {
-    rabbitmqUrl: this._config.get<string>('RABBITMQ_URL'),
-  };
-
   constructor(private readonly _config: ConfigService) {}
 }
-

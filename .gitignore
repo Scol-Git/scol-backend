@@ -57,5 +57,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Compiled files of migrations/
 migrations/*
+dist/migrations/*
 
+# Lock files
 package-lock.json

@@ -23,7 +23,7 @@
 export * from './domain';
 
 // Service interfaces
-export * from './services';
+// export * from './services';
 
 // Infrastructure interfaces
 export * from './infrastructure';
