@@ -8,7 +8,8 @@ import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMidd
 // Feature modules
 
 
-
+import { AuthModule } from './feature-controllers/auth/AuthModule.module';
+import { HealthCheckModule } from './feature-controllers/health-check/HealthCheckModule.module';
 
 /**
  * API Module - Entry point for the REST API layer.
@@ -25,7 +26,8 @@ import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMidd
     GuardsModule, // Provides JwtAuthGuard, PermissionGuard, RoleGuard, RateLimitGuard globally
 
     // Feature modules
-    
+    AuthModule,
+    HealthCheckModule,
   ],
   providers: [HttpExceptionFilter, RequestLoggingMiddleware],
 })

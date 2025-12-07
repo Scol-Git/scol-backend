@@ -51,6 +51,20 @@ const migrationPath = isTs
 // 5. Import entities (manual or glob)
 // ---------------------------
 import { SysCountries } from '@entity/entities/SysCountries.entity';
+import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
+import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
+import { SysProgrammes } from '@entity/entities/SysProgrammes.entity';
+import { SysPermissions } from '@entity/entities/SysPermissions.entity';
+import { SysRoles } from '@entity/entities/SysRoles.entity';
+import { SysLeadProfiles } from '@entity/entities/SysLeadProfiles.entity';
+import { SysUsers } from '@entity/entities/SysUsers.entity';
+import { LeadAcademicResults } from '@entity/entities/LeadAcademicResults.entity';
+import { LeadTestResults } from '@entity/entities/LeadTestResults.entity';
+import { LeadPreferredCountries } from '@entity/entities/LeadPreferredCountries.entity';
+import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.entity';
+import { UserSessions } from '@entity/entities/UserSessions.entity';
+import { UserPermissions } from '@entity/entities/UserPermissions.entity';
+import { UserRoles } from '@entity/entities/UserRoles.entity';
 
 export default new DbContext({
   type: 'postgres',
@@ -58,7 +72,23 @@ export default new DbContext({
   synchronize: false,
   logging: false,
 
-  entities: [SysCountries],
+  entities: [
+    SysCountries,
+    SysAcademicDegrees,
+    SysEnglishTests,
+    SysProgrammes,
+    SysPermissions,
+    SysRoles,
+    SysLeadProfiles,
+    SysUsers,
+    LeadAcademicResults,
+    LeadTestResults,
+    LeadPreferredCountries,
+    LeadPreferredPrograms,
+    UserSessions,
+    UserPermissions,
+    UserRoles,
+  ],
 
   migrations: [migrationPath],
 
