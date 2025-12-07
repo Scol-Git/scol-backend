@@ -34,8 +34,24 @@ export const AppEnvSchema = Joi.object({
 
   // JWT Configuration
   JWT_SECRET: Joi.string().min(32).required(),
+  JWT_ACCESS_SECRET: Joi.string().min(32).optional(),
+  JWT_REFRESH_SECRET: Joi.string().min(32).optional(),
   JWT_ACCESS_TOKEN_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('7d'),
+
+  // Password / hashing
+  BCRYPT_SALT_ROUNDS: Joi.number().integer().min(8).default(12),
+  PASSWORD_MIN_LENGTH: Joi.number().integer().min(6).default(8),
+  PASSWORD_BLOCK_COMMON: Joi.string().valid('true', 'false').default('true'),
+
+  // OTP settings
+  OTP_LENGTH: Joi.number().integer().min(4).max(10).default(6),
+  OTP_TTL_SECONDS: Joi.number().integer().min(30).default(300),
+  OTP_MAX_ATTEMPTS: Joi.number().integer().min(1).default(3),
+  OTP_RESEND_COOLDOWN_SECONDS: Joi.number().integer().min(10).default(60),
+  OTP_DAILY_PHONE_LIMIT: Joi.number().integer().min(1).default(5),
+  OTP_DAILY_IP_LIMIT: Joi.number().integer().min(1).default(20),
+  REDIS_KEY_PREFIX_AUTH: Joi.string().default('auth:'),
 
   // Application Configuration
   AUTH_ACCOUNT_LOCKOUT_THRESHOLD: Joi.number().default(5),

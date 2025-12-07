@@ -15,14 +15,16 @@ import { ISecurityConfig as ISecurityConfigToken } from '@shared/tokens/injectio
  */
 @Injectable()
 export class JwtService implements IJwtService {
-  private readonly secret: string;
+  private readonly accessSecret: string;
+  private readonly refreshSecret: string;
   private readonly accessTokenExpiresIn: string;
   private readonly refreshTokenExpiresIn: string;
 
   constructor(
     @Inject(ISecurityConfigToken) private readonly _config: ISecurityConfig,
   ) {
-    this.secret = _config.jwt.secret;
+    this.accessSecret = _config.jwt.accessSecret || _config.jwt.secret;
+    this.refreshSecret = _config.jwt.refreshSecret || _config.jwt.secret;
     this.accessTokenExpiresIn = _config.jwt.accessTokenExpiresIn;
     this.refreshTokenExpiresIn = _config.jwt.refreshTokenExpiresIn;
   }
@@ -37,7 +39,7 @@ export class JwtService implements IJwtService {
       isSuperAdmin: payload.isSuperAdmin || false,
     };
 
-    return jwt.sign(tokenPayload, this.secret, {
+    return jwt.sign(tokenPayload, this.accessSecret, {
       expiresIn: this.accessTokenExpiresIn,
     } as SignOptions);
   }
@@ -49,14 +51,15 @@ export class JwtService implements IJwtService {
       email: payload.email,
     };
 
-    return jwt.sign(tokenPayload, this.secret, {
+    return jwt.sign(tokenPayload, this.refreshSecret, {
       expiresIn: this.refreshTokenExpiresIn,
     } as SignOptions);
   }
 
-  verifyToken(token: string): JwtPayload {
+  verifyToken(token: string, type: 'access' | 'refresh' = 'access'): JwtPayload {
+    const secret = type === 'access' ? this.accessSecret : this.refreshSecret;
     try {
-      const decoded = jwt.verify(token, this.secret) as jwt.JwtPayload;
+      const decoded = jwt.verify(token, secret) as jwt.JwtPayload;
 
       return {
         sub: decoded.sub as string,

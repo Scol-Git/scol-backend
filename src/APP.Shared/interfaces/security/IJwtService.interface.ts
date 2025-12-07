@@ -29,7 +29,7 @@ export interface IJwtService {
    * @returns Decoded token payload
    * @throws Error if token is invalid or expired
    */
-  verifyToken(token: string): JwtPayload;
+  verifyToken(token: string, type?: 'access' | 'refresh'): JwtPayload;
 
   /**
    * Decode token without verification (for inspection only).

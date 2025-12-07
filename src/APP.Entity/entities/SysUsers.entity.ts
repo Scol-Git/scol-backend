@@ -75,5 +75,14 @@ export class SysUsers extends BaseEntity {
   })
   @AutoMap()
   isPhoneVerified!: boolean;
+
+  @Column({
+    name: 'totalOtpAttempt',
+    type: 'int',
+    nullable: false,
+    default: 0,
+  })
+  @AutoMap()
+  totalOtpAttempt!: number;
 }
 

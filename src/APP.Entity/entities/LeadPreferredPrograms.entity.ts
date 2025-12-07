@@ -17,11 +17,11 @@ export class LeadPreferredPrograms extends BaseEntity {
   leadId!: string;
 
   @Column({
-    name: 'country_id',
+    name: 'programme_id',
     type: 'uuid',
     nullable: false,
   })
   @AutoMap()
-  countryId!: string;
+  programmeId!: string;
 }
 
