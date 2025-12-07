@@ -1,6 +1,7 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
+import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
 
 /**
  * @class SysCountries
@@ -16,4 +17,15 @@ export class SysCountries extends BaseEntity {
   })
   @AutoMap()
   countryName!: string;
+
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+
+  /**
+   * One-to-Many: Lead preferences
+   * All leads who have selected this country as a preference
+   */
+  @OneToMany(() => LeadPreferredCountries, (pref) => pref.country)
+  leadPreferences!: LeadPreferredCountries[];
 }

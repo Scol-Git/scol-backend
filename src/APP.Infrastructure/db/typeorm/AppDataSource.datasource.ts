@@ -1,6 +1,8 @@
-// src/APP.Infrastructure/db/typeorm/migration.config.ts
+// src/APP.Infrastructure/db/typeorm/DbContext.datasource.ts
+// AppDataSource - TypeORM DataSource for migrations and CLI operations
+// This is separate from AppDbContext (runtime Nest provider)
 import 'reflect-metadata';
-import { DataSource as DbContext } from 'typeorm';
+import { DataSource } from 'typeorm';
 import * as path from 'path';
 import * as fs from 'fs';
 import { config as dotenvConfig } from 'dotenv';
@@ -66,7 +68,16 @@ import { UserSessions } from '@entity/entities/UserSessions.entity';
 import { UserPermissions } from '@entity/entities/UserPermissions.entity';
 import { UserRoles } from '@entity/entities/UserRoles.entity';
 
-export default new DbContext({
+/**
+ * AppDataSource - TypeORM DataSource for migrations and CLI operations
+ * Use this for:
+ * - Running migrations (npm run migration:run)
+ * - Generating migrations (npm run migration:generate)
+ * - CLI operations
+ *
+ * For runtime dependency injection in services, use AppDbContext instead
+ */
+export const AppDataSource = new DataSource({
   type: 'postgres',
   url: dbUrl,
   synchronize: false,
@@ -94,3 +105,6 @@ export default new DbContext({
 
   // ssl: true, // usually not needed if ?sslmode=require is in the URL
 });
+
+// Export as default for TypeORM CLI compatibility
+export default AppDataSource;

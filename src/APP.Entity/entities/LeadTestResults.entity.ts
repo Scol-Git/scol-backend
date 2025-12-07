@@ -1,6 +1,8 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
+import { SysLeadProfiles } from './SysLeadProfiles.entity';
+import { SysEnglishTests } from './SysEnglishTests.entity';
 
 /**
  * @class LeadTestResults
@@ -50,5 +52,24 @@ export class LeadTestResults extends BaseEntity {
   })
   @AutoMap()
   isVerified!: boolean;
-}
 
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+
+  /**
+   * Many-to-One: Lead profile
+   * Each test result belongs to one lead profile
+   */
+  @ManyToOne(() => SysLeadProfiles, (lead) => lead.testResults)
+  @JoinColumn({ name: 'lead_id' })
+  lead!: SysLeadProfiles;
+
+  /**
+   * Many-to-One: English test type
+   * Each result is associated with a specific test (IELTS, TOEFL, etc.)
+   */
+  @ManyToOne(() => SysEnglishTests, (test) => test.leadResults)
+  @JoinColumn({ name: 'test_id' })
+  test!: SysEnglishTests;
+}

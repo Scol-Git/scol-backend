@@ -1,6 +1,8 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
+import { SysUsers } from './SysUsers.entity';
+import { SysRoles } from './SysRoles.entity';
 
 /**
  * @class UserRoles
@@ -23,5 +25,23 @@ export class UserRoles extends BaseEntity {
   })
   @AutoMap()
   roleId!: string;
-}
 
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+  /**
+   * Many-to-One: User
+   * Direct access to the user in this junction
+   */
+  @ManyToOne(() => SysUsers, (user) => user.roles)
+  @JoinColumn({ name: 'user_id' })
+  user!: SysUsers;
+
+  /**
+   * Many-to-One: Role
+   * Direct access to the role in this junction
+   */
+  @ManyToOne(() => SysRoles, (role) => role.users)
+  @JoinColumn({ name: 'role_id' })
+  role!: SysRoles;
+}

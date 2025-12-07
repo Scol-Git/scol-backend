@@ -1,6 +1,7 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
+import { LeadAcademicResults } from './LeadAcademicResults.entity';
 
 /**
  * @class SysAcademicDegrees
@@ -16,5 +17,15 @@ export class SysAcademicDegrees extends BaseEntity {
   })
   @AutoMap()
   degreeName!: string;
-}
 
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+
+  /**
+   * One-to-Many: Lead academic results
+   * All academic results associated with this degree type
+   */
+  @OneToMany(() => LeadAcademicResults, (result) => result.degree)
+  leadResults!: LeadAcademicResults[];
+}

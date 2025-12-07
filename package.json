@@ -12,9 +12,9 @@
     "start:prod": "npm run build && node dist/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "typeorm:gen": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:generate -d ./src/APP.Infrastructure/db/typeorm/DbContext.datasource.ts",
-    "typeorm:run": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:run -d ./src/APP.Infrastructure/db/typeorm/DbContext.datasource.ts",
-    "typeorm:revert": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:revert -d ./src/APP.Infrastructure/db/typeorm/DbContext.datasource.ts"
+    "typeorm:gen": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:generate -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts",
+    "typeorm:run": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:run -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts",
+    "typeorm:revert": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:revert -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts"
   },
   "dependencies": {
     "@automapper/classes": "8.8.1",

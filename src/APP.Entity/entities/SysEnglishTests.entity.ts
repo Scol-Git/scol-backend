@@ -1,6 +1,7 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
+import { LeadTestResults } from './LeadTestResults.entity';
 
 /**
  * @class SysEnglishTests
@@ -16,5 +17,15 @@ export class SysEnglishTests extends BaseEntity {
   })
   @AutoMap()
   testName!: string;
-}
 
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+
+  /**
+   * One-to-Many: Lead test results
+   * All test results associated with this test type
+   */
+  @OneToMany(() => LeadTestResults, (result) => result.test)
+  leadResults!: LeadTestResults[];
+}

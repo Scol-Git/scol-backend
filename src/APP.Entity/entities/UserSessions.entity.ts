@@ -1,6 +1,7 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
+import { SysUsers } from './SysUsers.entity';
 
 /**
  * @class UserSessions
@@ -58,5 +59,16 @@ export class UserSessions extends BaseEntity {
   })
   @AutoMap()
   userAgent?: string;
-}
 
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+
+  /**
+   * Many-to-One: User
+   * Each session belongs to one user
+   */
+  @ManyToOne(() => SysUsers, (user) => user.sessions)
+  @JoinColumn({ name: 'user_id' })
+  user!: SysUsers;
+}

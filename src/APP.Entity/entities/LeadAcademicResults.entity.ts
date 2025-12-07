@@ -1,6 +1,8 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
+import { SysLeadProfiles } from './SysLeadProfiles.entity';
+import { SysAcademicDegrees } from './SysAcademicDegrees.entity';
 
 /**
  * @class LeadAcademicResults
@@ -59,5 +61,24 @@ export class LeadAcademicResults extends BaseEntity {
   })
   @AutoMap()
   isVerified!: boolean;
-}
 
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+
+  /**
+   * Many-to-One: Lead profile
+   * Each academic result belongs to one lead profile
+   */
+  @ManyToOne(() => SysLeadProfiles, (lead) => lead.academicResults)
+  @JoinColumn({ name: 'lead_id' })
+  lead!: SysLeadProfiles;
+
+  /**
+   * Many-to-One: Academic degree
+   * Each result is associated with a degree type
+   */
+  @ManyToOne(() => SysAcademicDegrees, (degree) => degree.leadResults)
+  @JoinColumn({ name: 'degree_id' })
+  degree!: SysAcademicDegrees;
+}

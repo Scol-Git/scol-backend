@@ -24,6 +24,7 @@ import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.en
 import { UserSessions } from '@entity/entities/UserSessions.entity';
 import { UserPermissions } from '@entity/entities/UserPermissions.entity';
 import { UserRoles } from '@entity/entities/UserRoles.entity';
+import { AppDbContext } from './AppDbContext';
 
 @Global()
 @Module({
@@ -92,6 +93,7 @@ import { UserRoles } from '@entity/entities/UserRoles.entity';
       UserRoles,
     ]),
   ],
-  exports: [NestTypeOrmModule],
+  providers: [AppDbContext],
+  exports: [AppDbContext],
 })
 export class TypeOrmModule {}
