@@ -15,6 +15,10 @@ import { OtpUser } from '@api/common/decorators/OtpUser.decorator';
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { OtpJwtGuard } from '@api/common/guards/OtpJwtGuard.guard';
 import { RateLimit } from '@api/common/decorators/RateLimit.decorator';
+import {
+  ReqInfo,
+  ReqInfoPayload,
+} from '@api/common/decorators/ReqInfo.decorator';
 import { AuthService } from '@bll/services/auth/AuthService';
 import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLead.dto';
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/OtpVerificationResponse.dto';
@@ -71,12 +75,6 @@ export class AuthController {
     @Body() dto: RegisterLeadRequestDto,
   ): Promise<RegisterLeadResponseDto> {
     return await this.authService.registerLead(dto);
-
-    // return {
-    //   otpAccessToken: '1234567890',
-    //   expiresIn: 300,
-    //   message: 'OTP sent successfully.',
-    // };
   }
 
   /**
@@ -92,15 +90,15 @@ export class AuthController {
   async verifyOtp(
     @Body() dto: VerifyOtpDto,
     @OtpUser() otpUser: OtpUserPayload,
-    @Req() req: Request,
+    @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<AuthResponseDto> {
-    const ip = req.ip;
-    const userAgent =
-      typeof req.headers['user-agent'] === 'string'
-        ? req.headers['user-agent']
-        : req.headers['user-agent']?.[0];
-
-    return await this.authService.verifyOtp(dto, otpUser, ip, userAgent);
+    console.log('reqInfo', reqInfo);
+    return await this.authService.verifyOtp(
+      dto,
+      otpUser,
+      reqInfo.ip,
+      reqInfo.userAgent,
+    );
   }
 
   /**
@@ -114,10 +112,9 @@ export class AuthController {
   @AddSwaggerDoc('auth', 'resendOtp')
   async resendOtp(
     @OtpUser() otpUserPayload: OtpUserPayload,
-    @Req() req: Request,
+    @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<RegisterLeadResponseDto> {
-    const ip = req.ip || '';
-    return await this.authService.resendOtp(otpUserPayload, ip);
+    return await this.authService.resendOtp(otpUserPayload, reqInfo.ip);
   }
 
   /**
@@ -131,10 +128,9 @@ export class AuthController {
   @AddSwaggerDoc('auth', 'login')
   async login(
     @Body() dto: LoginRequestDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent?: string,
+    @Req() reqInfo: { ip: string; userAgent: string },
   ): Promise<AuthResponseDto> {
-    return await this.authService.login(dto, ip, userAgent);
+    return await this.authService.login(dto, reqInfo.ip, reqInfo.userAgent);
   }
 
   /**
@@ -147,9 +143,12 @@ export class AuthController {
   @AddSwaggerDoc('auth', 'refresh')
   async refresh(
     @Body() dto: RefreshTokenRequestDto,
-    @Ip() ip: string,
+    @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<TokenRefreshResponseDto> {
-    return await this.authService.refreshAccessToken(dto.refreshToken, ip);
+    return await this.authService.refreshAccessToken(
+      dto.refreshToken,
+      reqInfo.ip,
+    );
   }
 
   /**
