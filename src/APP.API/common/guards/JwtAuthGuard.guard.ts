@@ -35,6 +35,13 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const payload = this._jwtService.verifyToken(token);
 
+      // Reject OTP tokens - they should only be used with OtpJwtGuard
+      if ((payload as any).aud === 'otp') {
+        throw new UnauthorizedException(
+          'Invalid token type. OTP tokens cannot be used for authentication.',
+        );
+      }
+
       // Convert JwtPayload (infrastructure) to ICurrentUser (domain) at boundary
       const currentUser = JwtPayloadToCurrentUserMapper.toCurrentUser(payload);
 

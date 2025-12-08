@@ -2,7 +2,7 @@
  * Base class for all business-related exceptions.
  * Extends the standard Error class with an additional error code property.
  *
- * This class should be extended by specific business exception types.
+ * This class can be instantiated directly or extended by specific business exception types.
  *
  * @example
  * export class TodoNotFoundException extends BusinessException {
@@ -11,7 +11,7 @@
  *   }
  * }
  */
-export abstract class BusinessException extends Error {
+export class BusinessException extends Error {
   /**
    * Creates a new BusinessException instance.
    *

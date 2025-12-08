@@ -77,7 +77,7 @@ import { UserRoles } from '@entity/entities/UserRoles.entity';
  *
  * For runtime dependency injection in services, use AppDbContext instead
  */
-export const AppDataSource = new DataSource({
+const AppDataSource = new DataSource({
   type: 'postgres',
   url: dbUrl,
   synchronize: false,
@@ -106,5 +106,5 @@ export const AppDataSource = new DataSource({
   // ssl: true, // usually not needed if ?sslmode=require is in the URL
 });
 
-// Export as default for TypeORM CLI compatibility
+// Export as default for TypeORM CLI compatibility (required by TypeORM CLI)
 export default AppDataSource;

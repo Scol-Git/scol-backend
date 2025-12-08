@@ -6,10 +6,10 @@ import { ISecurityConfig as ISecurityConfigToken } from '@shared/tokens/injectio
 
 /**
  * Password Hasher Service
- * 
+ *
  * Provides password hashing and verification using bcrypt.
  * Follows .NET Core's IPasswordHasher pattern.
- * 
+ *
  * @class PasswordHasher
  * @implements {IPasswordHasher}
  */
@@ -27,10 +27,15 @@ export class PasswordHasher implements IPasswordHasher {
     return bcrypt.hash(password, this.SALT_ROUNDS);
   }
 
+  async hash(password: string): Promise<string> {
+    return bcrypt.hash(password, this.SALT_ROUNDS);
+  }
+
   async verifyPassword(password: string, hash: string): Promise<boolean> {
     return bcrypt.compare(password, hash);
   }
+
+  async verify(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
 }
-
-
-

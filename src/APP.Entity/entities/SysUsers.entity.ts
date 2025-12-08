@@ -1,11 +1,11 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
   ManyToMany,
   JoinTable,
   OneToMany,
   OneToOne,
+  Index,
 } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
@@ -13,26 +13,26 @@ import { SysRoles } from './SysRoles.entity';
 import { SysPermissions } from './SysPermissions.entity';
 import { UserSessions } from './UserSessions.entity';
 import { SysLeadProfiles } from './SysLeadProfiles.entity';
+import { AccountStatus } from '@shared/enums/AccountStatus.enum';
+import { UserType } from '@shared/enums/UserType.enum';
 
 /**
  * @class SysUsers
  * @extends {BaseEntity}
  */
+@Index('IX_SysUsers_email', ['email'], { unique: true })
+@Index('IX_SysUsers_phone', ['phone'], { unique: true })
 @Entity('sys_Users')
 export class SysUsers extends BaseEntity {
-  @PrimaryGeneratedColumn('uuid', { name: 'user_id' })
-  @AutoMap()
-  override id!: string;
-
   @Column({
     name: 'email',
     type: 'varchar',
     length: 255,
-    nullable: false,
+    nullable: true,
     unique: true,
   })
   @AutoMap()
-  email!: string;
+  email?: string;
 
   @Column({
     name: 'phone',
@@ -58,9 +58,20 @@ export class SysUsers extends BaseEntity {
     type: 'varchar',
     length: 50,
     nullable: false,
+    default: AccountStatus.NotValid,
   })
   @AutoMap()
-  accountStatus!: string;
+  accountStatus!: AccountStatus;
+
+  @Column({
+    name: 'userType',
+    type: 'varchar',
+    length: 50,
+    nullable: false,
+    default: UserType.Lead,
+  })
+  @AutoMap()
+  userType!: UserType;
 
   @Column({
     name: 'passResetTokenHash',
@@ -89,13 +100,21 @@ export class SysUsers extends BaseEntity {
   isPhoneVerified!: boolean;
 
   @Column({
-    name: 'totalOtpAttempt',
+    name: 'failedLoginAttempts',
     type: 'int',
     nullable: false,
     default: 0,
   })
   @AutoMap()
-  totalOtpAttempt!: number;
+  failedLoginAttempts!: number;
+
+  @Column({
+    name: 'lockedUntil',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  @AutoMap()
+  lockedUntil?: Date;
 
   // ========================================
   // Navigation Properties (EF Core style)

@@ -39,7 +39,54 @@ export class InfrastructureConfig implements IInfrastructureConfig {
   };
 
   cache = {
-    redisUrl: this._config.get<string>('REDIS_URL'),
+    redisUrl:
+      this._config.get<string>('REDIS_URL') ||
+      this._buildRedisUrl(
+        this._config.get<string>('REDIS_HOST'),
+        this._config.get<number>('REDIS_PORT'),
+        this._config.get<string>('REDIS_PASSWORD'),
+        this._config.get<number>('REDIS_DB'),
+      ),
+  };
+
+  /**
+   * Build Redis URL from individual components
+   * @param host Redis host (default: localhost)
+   * @param port Redis port (default: 6379)
+   * @param password Redis password (optional)
+   * @param db Redis database number (default: 0)
+   * @returns Redis connection URL or undefined if host not provided
+   */
+  private _buildRedisUrl(
+    host?: string,
+    port?: number,
+    password?: string,
+    db?: number,
+  ): string | undefined {
+    if (!host) {
+      return undefined;
+    }
+
+    const _port = port || 6379;
+    const _db = db || 0;
+    const auth = password ? `:${password}@` : '';
+
+    return `redis://${auth}${host}:${_port}/${_db}`;
+  }
+
+  sms = {
+    provider: (this._config.get<string>('SMS_PROVIDER') ||
+      (this._config.get<string>('NODE_ENV') === 'development'
+        ? 'console'
+        : 'api')) as 'console' | 'api',
+    api: {
+      url:
+        this._config.get<string>('SMS_API_URL') ||
+        'https://api.sms.net.bd/sendsms',
+      apiKey: this._config.get<string>('SMS_API_KEY') || '',
+      throwOnFailure:
+        this._config.get<string>('SMS_THROW_ON_FAILURE') === 'true',
+    },
   };
 
   constructor(private readonly _config: ConfigService) {}

@@ -41,6 +41,17 @@ async function bootstrap() {
       },
       'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
     )
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'OTP',
+        description: 'Enter OTP access token from /auth/register',
+        in: 'header',
+      },
+      'OTP-auth',
+    )
     .build();
   const doc = SwaggerModule.createDocument(app, swaggerCfg);
   SwaggerModule.setup('/swagger', app, doc);

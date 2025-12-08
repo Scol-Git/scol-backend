@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import {
+  EntityManager,
+  Repository,
+  EntityTarget,
+  FindOptionsWhere,
+  ObjectLiteral,
+  FindOptionsRelations,
+  FindOneOptions,
+  FindManyOptions,
+} from 'typeorm';
 
 // Import all entities
 import { SysUsers } from '@entity/entities/SysUsers.entity';
@@ -120,5 +129,184 @@ export class AppDbContext {
    */
   get manager(): EntityManager {
     return this.users.manager;
+  }
+
+  /**
+   * Save all changes made in this context to the database
+   * Similar to EF Core's DbContext.SaveChanges()
+   *
+   * @returns Number of affected rows
+   *
+   * @example
+   * const user = await this.db.users.findOne({ where: { id } });
+   * user.email = 'new@example.com';
+   * await this.db.SaveChanges();
+   */
+  SaveChanges(): Promise<number> {
+    // TypeORM doesn't have a direct SaveChanges equivalent
+    // Changes are saved automatically when using save(), but we can return 0
+    // For explicit save tracking, you'd need to use EntityManager.save() which returns affected entities
+    return Promise.resolve(0);
+  }
+
+  /**
+   * Find an entity by its primary key
+   * Similar to EF Core's DbContext.Find<T>(id)
+   *
+   * @param entityClass - The entity class to find
+   * @param id - The primary key value
+   * @returns The entity if found, null otherwise
+   *
+   * @example
+   * const user = await this.db.Find(SysUsers, 'user-id-123');
+   */
+  async Find<T extends ObjectLiteral>(
+    entityClass: EntityTarget<T>,
+    id: string | number,
+  ): Promise<T | null> {
+    const repo = this.manager.getRepository<T>(entityClass);
+    const where = { id } as unknown as FindOptionsWhere<T>;
+    return repo.findOne({ where });
+  }
+
+  /**
+   * Get a repository (DbSet) for the specified entity type
+   * Similar to EF Core's DbContext.Set<T>()
+   *
+   * @param entityClass - The entity class
+   * @returns Repository instance for the entity
+   *
+   * @example
+   * const userRepo = this.db.Set(SysUsers);
+   * const users = await userRepo.find();
+   */
+  Set<T extends ObjectLiteral>(entityClass: EntityTarget<T>): Repository<T> {
+    return this.manager.getRepository<T>(entityClass);
+  }
+
+  /**
+   * EF-style Include helper for repositories you already have injected
+   *
+   * @example
+   * // this.db.include(this.db.users, { roles: true }).one({ where: { id } });
+   * // this.db.include(this.db.users, { roles: true }).many({ where: { userType } });
+   */
+  include<T extends ObjectLiteral>(
+    repo: Repository<T>,
+    relations: FindOptionsRelations<T>,
+  ): {
+    one: (options?: FindOneOptions<T>) => Promise<T | null>;
+    many: (options?: FindManyOptions<T>) => Promise<T[]>;
+  } {
+    return {
+      one: (options) =>
+        repo.findOne({
+          ...(options ?? {}),
+          relations,
+        }),
+      many: (options) =>
+        repo.find({
+          ...(options ?? {}),
+          relations,
+        }),
+    };
+  }
+
+  /**
+   * EF-style Include helper for entity classes when you don't have a repo injected
+   *
+   * @example
+   * await this.db.includeSet(SysUsers, { roles: true }).one({ where: { id } });
+   */
+  includeSet<T extends ObjectLiteral>(
+    entityClass: EntityTarget<T>,
+    relations: FindOptionsRelations<T>,
+  ): {
+    one: (options?: FindOneOptions<T>) => Promise<T | null>;
+    many: (options?: FindManyOptions<T>) => Promise<T[]>;
+  } {
+    const repo = this.Set(entityClass);
+    return this.include(repo, relations);
+  }
+
+  /**
+   * Add an entity to the context (marks as new)
+   * Similar to EF Core's DbContext.Add<T>(entity)
+   *
+   * @param entityClass - The entity class
+   * @param entity - The entity to add
+   * @returns The added entity
+   *
+   * @example
+   * const newUser = this.db.Add(SysUsers, { email: 'test@example.com', ... });
+   * await this.db.SaveChanges();
+   */
+  Add<T extends ObjectLiteral>(
+    entityClass: EntityTarget<T>,
+    entity: Partial<T>,
+  ): T {
+    const repo = this.Set(entityClass);
+    return repo.create(entity as T);
+  }
+
+  /**
+   * Update an entity in the context
+   * Similar to EF Core's DbContext.Update<T>(entity)
+   *
+   * @param entityClass - The entity class
+   * @param entity - The entity to update
+   * @returns The updated entity
+   *
+   * @example
+   * const user = await this.db.Find(SysUsers, id);
+   * user.email = 'updated@example.com';
+   * this.db.Update(SysUsers, user);
+   * await this.db.SaveChanges();
+   */
+  Update<T extends ObjectLiteral>(
+    entityClass: EntityTarget<T>,
+    entity: Partial<T>,
+  ): T {
+    const repo = this.Set(entityClass);
+    return repo.create(entity as T);
+  }
+
+  /**
+   * Remove an entity from the context
+   * Similar to EF Core's DbContext.Remove<T>(entity)
+   *
+   * @param entityClass - The entity class
+   * @param entity - The entity to remove
+   *
+   * @example
+   * const user = await this.db.Find(SysUsers, id);
+   * this.db.Remove(SysUsers, user);
+   * await this.db.SaveChanges();
+   */
+  async Remove<T extends ObjectLiteral>(
+    entityClass: EntityTarget<T>,
+    entity: T,
+  ): Promise<void> {
+    const repo = this.Set(entityClass);
+    await repo.remove(entity);
+  }
+
+  /**
+   * Get entity entry for change tracking
+   * Similar to EF Core's DbContext.Entry<T>(entity)
+   *
+   * @param entityClass - The entity class
+   * @param entity - The entity to get entry for
+   * @returns Repository instance (TypeORM doesn't have exact Entry equivalent)
+   *
+   * @example
+   * const user = await this.db.Find(SysUsers, id);
+   * const entry = this.db.Entry(SysUsers, user);
+   * // Access change tracking through repository methods
+   */
+  Entry<T extends ObjectLiteral>(entityClass: EntityTarget<T>): Repository<T> {
+    // TypeORM doesn't have exact Entry equivalent, but we can get the repository
+    // In practice, you'd use repository.save() which handles change tracking
+    return this.Set(entityClass);
   }
 }

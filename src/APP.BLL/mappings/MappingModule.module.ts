@@ -3,8 +3,8 @@ import { createMapper, Mapper } from '@automapper/core';
 import { classes } from '@automapper/classes';
 
 import { MAPPER, IMapper } from './mapping.tokens';
-
-// example : import { UserMapper } from './mappers/UserMapper.mapper';
+import { UserResponseMapper } from './auth/UserResponseMapper';
+import { AuthResponseMapper } from './auth/AuthResponseMapper';
 
 // Create a single global mapper instance to be shared across all tokens.
 // This ensures mappings configured in OrganizationMapper (using MAPPER)
@@ -38,8 +38,9 @@ const iMapperFactory = {
     iMapperFactory, // New IMapper token (recommended)
 
     // Injectable mappers
-    // example : UserMapper,
+    UserResponseMapper,
+    AuthResponseMapper,
   ],
-  exports: [MAPPER, IMapper],
+  exports: [MAPPER, IMapper, UserResponseMapper, AuthResponseMapper],
 })
 export class MappingModule {}

@@ -1,14 +1,14 @@
 /**
  * Interface for JWT token service.
- * 
+ *
  * Provides abstraction for JWT token generation and validation.
- * 
+ *
  * @interface IJwtService
  */
 export interface IJwtService {
   /**
    * Generate an access token.
-   * 
+   *
    * @param payload - Token payload (user ID, org ID, roles, permissions, claims)
    * @returns JWT access token
    */
@@ -16,7 +16,7 @@ export interface IJwtService {
 
   /**
    * Generate a refresh token.
-   * 
+   *
    * @param payload - Token payload
    * @returns JWT refresh token
    */
@@ -24,16 +24,42 @@ export interface IJwtService {
 
   /**
    * Verify and decode a token.
-   * 
+   *
    * @param token - JWT token
+   * @param type - Token type ('access' or 'refresh')
    * @returns Decoded token payload
    * @throws Error if token is invalid or expired
    */
   verifyToken(token: string, type?: 'access' | 'refresh'): JwtPayload;
 
   /**
+   * Generate an OTP verification token (short-lived).
+   *
+   * @param payload - OTP token payload (userId, phone, purpose)
+   * @returns JWT OTP token
+   */
+  generateOtpToken(payload: {
+    userId: string;
+    phone: string;
+    purpose: string;
+  }): string;
+
+  /**
+   * Verify and decode an OTP token.
+   *
+   * @param token - JWT OTP token
+   * @returns Decoded OTP token payload
+   * @throws Error if token is invalid or expired
+   */
+  verifyOtpToken(token: string): {
+    userId: string;
+    phone: string;
+    purpose: string;
+  };
+
+  /**
    * Decode token without verification (for inspection only).
-   * 
+   *
    * @param token - JWT token
    * @returns Decoded token payload or null if invalid
    */
@@ -68,6 +94,3 @@ export interface JwtPayload {
   /** Expiration timestamp */
   exp?: number;
 }
-
-
-

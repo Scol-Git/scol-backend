@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToMany } from 'typeorm';
+import { Entity, Column, ManyToMany, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysUsers } from './SysUsers.entity';
@@ -8,12 +8,9 @@ import { SysPermissions } from './SysPermissions.entity';
  * @class SysRoles
  * @extends {BaseEntity}
  */
+@Index('IX_SysRoles_name', ['name'], { unique: true })
 @Entity('sys_Roles')
 export class SysRoles extends BaseEntity {
-  @PrimaryGeneratedColumn('uuid', { name: 'role_id' })
-  @AutoMap()
-  override id!: string;
-
   @Column({
     name: 'name',
     type: 'varchar',

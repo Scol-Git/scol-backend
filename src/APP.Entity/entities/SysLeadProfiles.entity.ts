@@ -1,10 +1,10 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
-  ManyToOne,
+  OneToOne,
   JoinColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
@@ -18,12 +18,9 @@ import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
  * @class SysLeadProfiles
  * @extends {BaseEntity}
  */
+@Index('IX_SysLeadProfiles_user', ['userId'], { unique: true })
 @Entity('sys_LeadProfiles')
 export class SysLeadProfiles extends BaseEntity {
-  @PrimaryGeneratedColumn('uuid', { name: 'lead_id' })
-  @AutoMap()
-  override id!: string;
-
   @Column({
     name: 'user_id',
     type: 'uuid',
@@ -90,10 +87,10 @@ export class SysLeadProfiles extends BaseEntity {
   // ========================================
 
   /**
-   * Many-to-One: Associated user
+   * One-to-One: Associated user
    * Each lead profile belongs to one user
    */
-  @ManyToOne(() => SysUsers, (user) => user.leadProfile)
+  @OneToOne(() => SysUsers, (user) => user.leadProfile)
   @JoinColumn({ name: 'user_id' })
   user!: SysUsers;
 

@@ -116,6 +116,12 @@ export const IJwtService = Symbol('IJwtService');
  */
 export const IPasswordHasher = Symbol('IPasswordHasher');
 
+/**
+ * Token for ISmsService
+ * Provides SMS sending abstraction (external provider implementation)
+ */
+export const ISmsService = Symbol('ISmsService');
+
 // ============================================================================
 // Configuration Tokens
 // ============================================================================

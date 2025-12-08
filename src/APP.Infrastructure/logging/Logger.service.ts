@@ -4,7 +4,7 @@ import { ILogger } from '@shared/interfaces/logging';
 
 /**
  * Logger service implementing structured logging.
- * 
+ *
  * Implements ILogger interface following .NET's ILogger<T> pattern.
  * Uses Pino for high-performance JSON logging.
  */
@@ -16,6 +16,10 @@ export class Logger implements ILogger, LoggerService {
 
   // --- .NET-style methods ---
   LogInfo(message: string, meta?: Record<string, unknown>): void {
+    this.pino.info(meta ?? {}, message);
+  }
+
+  info(message: string, meta?: Record<string, unknown>): void {
     this.pino.info(meta ?? {}, message);
   }
 

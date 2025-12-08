@@ -1,0 +1,22 @@
+import { AutoMap } from '@automapper/classes';
+
+/**
+ * Token Refresh Response DTO
+ *
+ * Response after successfully refreshing access token.
+ */
+export class TokenRefreshResponseDto {
+  /**
+   * New access token (JWT)
+   * @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+   */
+  @AutoMap()
+  accessToken!: string;
+
+  /**
+   * Access token expiration time in seconds
+   * @example 900
+   */
+  @AutoMap()
+  expiresIn!: number;
+}
