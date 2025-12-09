@@ -36,7 +36,7 @@ export class OtpJwtGuard implements CanActivate {
 
       // Attach OTP payload to request
       (request as Request & { otpUser: OtpUserPayload }).otpUser = {
-        userId: payload.userId,
+        pendingId: payload.pendingId,
         phone: payload.phone,
         purpose: payload.purpose,
       };

@@ -125,12 +125,12 @@ export class JwtService implements IJwtService {
    * @returns JWT token string
    */
   generateOtpToken(payload: {
-    userId: string;
+    pendingId: string;
     phone: string;
     purpose: 'phone_verify';
   }): string {
     const tokenPayload: Record<string, any> = {
-      sub: payload.userId,
+      sub: payload.pendingId,
       phone: payload.phone,
       purpose: payload.purpose,
       aud: 'otp', // Audience for OTP tokens
@@ -149,7 +149,7 @@ export class JwtService implements IJwtService {
    * @throws Error if token is invalid or not an OTP token
    */
   verifyOtpToken(token: string): {
-    userId: string;
+    pendingId: string;
     phone: string;
     purpose: string;
     aud: string;
@@ -168,7 +168,7 @@ export class JwtService implements IJwtService {
       }
 
       return {
-        userId: decoded.sub as string,
+        pendingId: decoded.sub as string,
         phone: decoded.phone as string,
         purpose: decoded.purpose as string,
         aud: decoded.aud as string,

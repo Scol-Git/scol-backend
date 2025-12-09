@@ -33,3 +33,6 @@ Write-Host "`nRate limit cache cleared!" -ForegroundColor Green
 Write-Host "`nRemaining rate limit keys:" -ForegroundColor Cyan
 docker exec $CONTAINER_NAME redis-cli --no-auth-warning -a $REDIS_PASSWORD --scan --pattern "ip:*"
 docker exec $CONTAINER_NAME redis-cli --no-auth-warning -a $REDIS_PASSWORD --scan --pattern "user:*"
+
+
+

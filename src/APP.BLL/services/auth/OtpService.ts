@@ -14,7 +14,7 @@ import { ResendCooldownException } from '@shared/exceptions/auth/ResendCooldownE
 import { BusinessException } from '@shared/exceptions/BusinessException';
 
 interface OtpCacheData {
-  userId: string;
+  pendingId: string;
   otpHash: string;
   attempts: number;
   createdAt: number;
@@ -63,16 +63,16 @@ export class OtpService {
 
   /**
    * Generate and store OTP in cache
-   * @param userId User ID
+   * @param pendingId Pending Registration ID
    * @param phone Phone number
    * @returns Plain OTP string (for sending via SMS)
    */
-  async generateAndStoreOtp(userId: string, phone: string): Promise<string> {
+  async generateAndStoreOtp(pendingId: string, phone: string): Promise<string> {
     const otp = this.generateOtp();
     const otpHash = await this.hasher.hash(otp);
 
     const cacheData: OtpCacheData = {
-      userId,
+      pendingId,
       otpHash,
       attempts: 0,
       createdAt: Date.now(),
@@ -88,10 +88,10 @@ export class OtpService {
    * Verify OTP
    * @param phone Phone number
    * @param otp OTP to verify
-   * @returns User ID if verification successful
+   * @returns Pending Registration ID if verification successful
    * @throws InvalidOtpException, OtpExpiredException, OtpAttemptsExceededException
    */
-  async verifyOtp(phone: string, otp: string): Promise<{ userId: string }> {
+  async verifyOtp(phone: string, otp: string): Promise<{ pendingId: string }> {
     const key = this.getOtpCacheKey(phone);
     const cached = await this.cache.get(key);
 
@@ -120,7 +120,7 @@ export class OtpService {
     // Success - delete OTP from cache
     await this.cache.remove(key);
 
-    return { userId: data.userId };
+    return { pendingId: data.pendingId };
   }
 
   /**

@@ -1,16 +1,16 @@
 /**
  * OTP User Payload
  *
- * Represents the user information extracted from an OTP verification token.
+ * Represents the pending registration information extracted from an OTP verification token.
  * This payload is attached to the request by OtpJwtGuard after token validation.
  *
  * @interface OtpUserPayload
  */
 export interface OtpUserPayload {
   /**
-   * User ID
+   * Pending Registration ID
    */
-  userId: string;
+  pendingId: string;
 
   /**
    * Phone number associated with OTP

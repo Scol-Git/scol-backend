@@ -24,6 +24,7 @@ import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.en
 import { UserSessions } from '@entity/entities/UserSessions.entity';
 import { UserPermissions } from '@entity/entities/UserPermissions.entity';
 import { UserRoles } from '@entity/entities/UserRoles.entity';
+import { PendingRegistration } from '@entity/entities/PendingRegistration.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -65,6 +66,7 @@ import { AppDbContext } from './AppDbContext';
             UserSessions,
             UserPermissions,
             UserRoles,
+            PendingRegistration,
           ],
           synchronize: false,
           logging:
@@ -91,6 +93,7 @@ import { AppDbContext } from './AppDbContext';
       UserSessions,
       UserPermissions,
       UserRoles,
+      PendingRegistration,
     ]),
   ],
   providers: [AppDbContext],

@@ -5,7 +5,7 @@ import {
   IInfrastructureConfig,
 } from '@shared/tokens/injection.tokens';
 import { RedisConnectionService } from './RedisConnectionService.service';
-import { FallbackCacheService } from './FallbackCacheService.service';
+import { CacheService as RedisCacheService } from './redis/CacheService.service';
 import { LoggingModule } from '../logging/LoggingModule.module';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@shared/interfaces/config/IInfrastructureConfig.interface';
@@ -14,10 +14,9 @@ import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@s
  * Cache Module
  *
  * **Architecture:**
- * - Redis-first implementation (distributed, production-ready)
- * - Automatic in-memory fallback when Redis is unavailable
+ * - Redis-only implementation (distributed, production-ready)
  * - Fail-open behavior (never throws, always serves)
- * - Throttled logging (avoids log spam)
+ * - App starts even if Redis is temporarily down
  *
  * **Features:**
  * - Thread-safe getOrSet() to prevent cache stampede
@@ -26,11 +25,10 @@ import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@s
  * - Key namespacing support via CacheKeyBuilder
  * - Pipeline operations for bulk sets
  *
- * **Fallback Behavior:**
- * 1. Always tries Redis first
- * 2. On Redis unavailable: auto-switches to in-memory
- * 3. Logs warning once (throttled)
- * 4. Continues serving with in-memory cache
+ * **Fail-Open Behavior:**
+ * - If Redis is unavailable at startup: logs warning, continues
+ * - If Redis fails at runtime: cache.get returns null, cache.set no-op, cache.getOrSet executes factory
+ * - Never blocks application from starting or running
  *
  * **Usage:**
  * ```typescript
@@ -62,8 +60,8 @@ import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@s
         logger: ILoggerInterface,
         redisConnection: RedisConnectionService,
       ) => {
-        // Use FallbackCacheService which automatically handles Redis → In-Memory fallback
-        return new FallbackCacheService(redisConnection, logger);
+        // Use Redis-only cache service with fail-open behavior
+        return new RedisCacheService(redisConnection, logger);
       },
       inject: [IInfrastructureConfig, ILogger, RedisConnectionService],
     },

@@ -35,6 +35,8 @@ import { CompressionHelper } from '../utils/CompressionHelper';
 export class CacheService implements ICacheService, OnModuleInit {
   private _client: Redis | null = null;
   private readonly _compression: CompressionHelper;
+  private _lastConnectionCheckTime = 0;
+  private readonly _connectionCheckCooldownMs = 5000; // 5 seconds cooldown
 
   constructor(
     private readonly _redisConnection: RedisConnectionService,
@@ -47,7 +49,7 @@ export class CacheService implements ICacheService, OnModuleInit {
     });
   }
 
-  async onModuleInit(): Promise<void> {
+  onModuleInit(): void {
     this._client = this._redisConnection.getClient();
 
     if (this._client && this._redisConnection.isAvailable) {
@@ -56,13 +58,24 @@ export class CacheService implements ICacheService, OnModuleInit {
       );
     } else {
       this._logger.LogWarning(
-        'Redis connection not available, cache operations will fail-open',
+        'Redis connection not available, cache operations will fail-open (get=null, set=no-op, getOrSet=compute)',
       );
     }
   }
 
+  /**
+   * Check if Redis is available with cooldown to reduce log spam.
+   * Throws error only once per cooldown period.
+   */
   private _ensureConnected(): void {
     if (!this._client || !this._redisConnection.isAvailable) {
+      const now = Date.now();
+      if (
+        now - this._lastConnectionCheckTime >
+        this._connectionCheckCooldownMs
+      ) {
+        this._lastConnectionCheckTime = now;
+      }
       throw new Error('Redis cache is not available');
     }
   }
@@ -359,4 +372,3 @@ export class CacheService implements ICacheService, OnModuleInit {
     return this._redisConnection.isAvailable && this._client !== null;
   }
 }
-

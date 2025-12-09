@@ -42,7 +42,7 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     if (!this._redisUrl) {
       if (this._logger) {
         this._logger.LogWarning(
-          'REDIS_URL not configured, Redis connection service will not be available',
+          'REDIS_URL not configured, Redis connection service will not be available. App will continue with fail-open behavior.',
         );
       }
       return;
@@ -91,11 +91,12 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       if (this._logger) {
         this._logger.LogError(
-          'Failed to connect to Redis connection service',
+          'Failed to connect to Redis connection service. App will continue with fail-open behavior.',
           error,
         );
       }
       this._isConnected = false;
+      // Do not throw - allow app to start even if Redis is down
     }
   }
 

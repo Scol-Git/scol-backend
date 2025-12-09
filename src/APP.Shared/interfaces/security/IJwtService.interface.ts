@@ -35,11 +35,11 @@ export interface IJwtService {
   /**
    * Generate an OTP verification token (short-lived).
    *
-   * @param payload - OTP token payload (userId, phone, purpose)
+   * @param payload - OTP token payload (pendingId, phone, purpose)
    * @returns JWT OTP token
    */
   generateOtpToken(payload: {
-    userId: string;
+    pendingId: string;
     phone: string;
     purpose: string;
   }): string;
@@ -52,7 +52,7 @@ export interface IJwtService {
    * @throws Error if token is invalid or expired
    */
   verifyOtpToken(token: string): {
-    userId: string;
+    pendingId: string;
     phone: string;
     purpose: string;
   };

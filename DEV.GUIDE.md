@@ -495,7 +495,7 @@ const event = new TodoCreated(this.id, this.projectId, this.assignedTo);
 - **Node.js**: 18.x or higher
 - **npm**: 9.x or higher (or yarn)
 - **PostgreSQL**: 14.x or higher
-- **Redis**: 7.x or higher (optional, falls back to in-memory)
+- **Redis**: 7.x or higher (required for caching and rate limiting)
 - **RabbitMQ**: 3.12.x or higher (optional)
 
 ### Installation Steps
@@ -554,7 +554,7 @@ PORT=3000
 #### Optional Variables
 
 ```bash
-# Redis (optional - falls back to in-memory cache)
+# Redis (required for caching and rate limiting - app starts without it but features fail-open)
 REDIS_URL=redis://localhost:6379
 
 # RabbitMQ (optional)
@@ -1551,15 +1551,22 @@ constructor(
 
 ### Caching Strategy
 
-The application uses Redis for caching with in-memory fallback.
+The application uses Redis for caching with fail-open behavior.
 
 #### Cache Service Interface
 
 **Location**: `src/APP.Shared/interfaces/infrastructure/ICacheService.interface.ts`
 
 **Implementation**: 
-- `src/APP.Infrastructure/cache/redis/CacheService.service.ts` (Redis)
-- `src/APP.Infrastructure/cache/memory/CacheService.service.ts` (Fallback)
+- `src/APP.Infrastructure/cache/redis/CacheService.service.ts` (Redis-only)
+
+#### Fail-Open Behavior
+
+When Redis is unavailable:
+- `cache.get()` returns `null`
+- `cache.set()` becomes no-op (silent)
+- `cache.getOrSet()` executes factory function directly
+- Application continues to function without caching
 
 #### Using Cache
 
@@ -1596,7 +1603,14 @@ Large cache values are automatically compressed:
 
 ### Rate Limiting
 
-Rate limiting uses a sliding window algorithm with Redis storage.
+Rate limiting uses a sliding window algorithm with Redis storage. When Redis is unavailable, rate limiting fails open (allows all requests).
+
+#### Fail-Open Behavior
+
+When Redis is unavailable:
+- `increment()` returns allow-all values: `{ count: 0, remaining: limit }`
+- No requests are blocked due to rate limiting
+- Application continues to function without rate limiting protection
 
 #### Configuration
 
@@ -1613,8 +1627,8 @@ RATE_LIMIT_USER_WINDOW_SECONDS=60
 #### How It Works
 
 1. **Identifier**: User ID (if authenticated) or IP address (if anonymous)
-2. **Storage**: Redis (falls back to in-memory)
-3. **Algorithm**: Sliding window
+2. **Storage**: Redis-only (fails open if unavailable)
+3. **Algorithm**: Sliding window (Lua script for atomicity)
 4. **Headers**: Sets `X-RateLimit-*` headers on response
 
 #### Rate Limit Headers
@@ -2373,7 +2387,7 @@ describe('ProductController', () => {
 1. Check `REDIS_URL` in `.env.local`
 2. Verify Redis is running: `docker-compose ps redis`
 3. Test connection: `redis-cli -u $REDIS_URL ping`
-4. Application will fall back to in-memory cache if Redis is unavailable
+4. Application will continue with fail-open behavior (cache returns null, rate limiting allows all)
 
 #### Migration Errors
 
@@ -2391,9 +2405,10 @@ describe('ProductController', () => {
 
 **Solutions**:
 1. Check `RATE_LIMIT_ENABLED=true` in `.env.local`
-2. Verify Redis is running (rate limiting uses Redis)
+2. Verify Redis is running (rate limiting requires Redis, fails open without it)
 3. Check guard is applied: `@UseGuards(RateLimitGuard)`
 4. Review rate limit configuration in environment variables
+5. If Redis is down, rate limiting will be disabled (fail-open behavior)
 
 #### SMTP Email Not Sending
 

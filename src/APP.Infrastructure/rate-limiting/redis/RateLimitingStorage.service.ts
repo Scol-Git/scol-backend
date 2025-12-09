@@ -93,6 +93,8 @@ return count
 export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
   private _client: Redis | null = null;
   private _luaScriptSha: string | null = null;
+  private _lastConnectionCheckTime = 0;
+  private readonly _connectionCheckCooldownMs = 5000; // 5 seconds cooldown
 
   constructor(
     private readonly _redisConnection: RedisConnectionService,
@@ -123,13 +125,24 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
       }
     } else {
       this._logger.LogWarning(
-        'Redis connection not available, rate limiting will fail-open',
+        'Redis connection not available, rate limiting will fail-open (allow-all: count=0, remaining=limit)',
       );
     }
   }
 
+  /**
+   * Check if Redis is available with cooldown to reduce log spam.
+   * Throws error only once per cooldown period.
+   */
   private _ensureConnected(): void {
     if (!this._client || !this._redisConnection.isAvailable) {
+      const now = Date.now();
+      if (
+        now - this._lastConnectionCheckTime >
+        this._connectionCheckCooldownMs
+      ) {
+        this._lastConnectionCheckTime = now;
+      }
       throw new Error('Redis rate limiting storage is not available');
     }
   }

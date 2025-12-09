@@ -122,3 +122,4 @@ export const UserPermissionsConfig = {
  * configureEntities(dataSource);
  * ```
  */
+
