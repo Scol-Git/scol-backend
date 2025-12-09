@@ -5,7 +5,7 @@ import { SysUsers } from '@entity/entities/SysUsers.entity';
 import { AccountStatus } from '@shared/enums/AccountStatus.enum';
 import { UserType } from '@shared/enums/UserType.enum';
 import { ValidationException } from '@shared/exceptions/ValidationException';
-import { LoginRequestDto } from '@shared/dtos/auth/Login.dto';
+import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { PhoneNumberUtil } from '@shared/utils/PhoneNumberUtil';
 
 /**

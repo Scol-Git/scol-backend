@@ -1,3 +1,5 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
+
 /**
  * Resend OTP DTO
  *
@@ -6,7 +8,10 @@
  * No body parameters required.
  */
 export class ResendOtpDto {
-  // No properties needed - phone and userId come from JWT token
-  // This class exists for consistency and potential future expansion
+  @ApiPropertyOptional({
+    description:
+      'No body required; phone/user derived from OTP access token in Authorization header',
+  })
+  _?: unknown;
 }
 

@@ -1,4 +1,5 @@
 import { AutoMap } from '@automapper/classes';
+import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Token Refresh Response DTO
@@ -10,6 +11,10 @@ export class TokenRefreshResponseDto {
    * New access token (JWT)
    * @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
    */
+  @ApiProperty({
+    description: 'New access token (JWT)',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  })
   @AutoMap()
   accessToken!: string;
 
@@ -17,6 +22,10 @@ export class TokenRefreshResponseDto {
    * Access token expiration time in seconds
    * @example 900
    */
+  @ApiProperty({
+    description: 'Access token expiration time in seconds',
+    example: 900,
+  })
   @AutoMap()
   expiresIn!: number;
 }

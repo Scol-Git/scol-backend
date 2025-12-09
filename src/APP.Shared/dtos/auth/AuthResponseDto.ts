@@ -1,5 +1,5 @@
 import { AutoMap } from '@automapper/classes';
-import { UserDto } from './UserDto';
+import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Auth Response DTO
@@ -12,6 +12,10 @@ export class AuthResponseDto {
    * User ID (UUID)
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
+  @ApiProperty({
+    description: 'User ID (UUID)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @AutoMap()
   userId!: string;
 
@@ -19,6 +23,10 @@ export class AuthResponseDto {
    * Access token (JWT)
    * @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
    */
+  @ApiProperty({
+    description: 'Access token (JWT)',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  })
   @AutoMap()
   accessToken!: string;
 
@@ -26,6 +34,10 @@ export class AuthResponseDto {
    * Refresh token (JWT)
    * @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
    */
+  @ApiProperty({
+    description: 'Refresh token (JWT)',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  })
   @AutoMap()
   refreshToken!: string;
 
@@ -33,6 +45,10 @@ export class AuthResponseDto {
    * Access token expiration time in seconds
    * @example 900
    */
+  @ApiProperty({
+    description: 'Access token expiration time in seconds',
+    example: 900,
+  })
   @AutoMap()
   expiresIn!: number;
 }

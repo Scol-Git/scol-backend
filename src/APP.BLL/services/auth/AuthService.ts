@@ -18,10 +18,11 @@ import { TokenService } from './TokenService';
 import { AuthValidationService } from './AuthValidationService';
 import { AuthResponseMapper } from '@bll/mappings/auth/AuthResponseMapper';
 import { UserResponseMapper } from '@bll/mappings/auth/UserResponseMapper';
-import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLead.dto';
-import { RegisterLeadResponseDto } from '@shared/dtos/auth/OtpVerificationResponse.dto';
-import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtp.dto';
-import { LoginRequestDto } from '@shared/dtos/auth/Login.dto';
+import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
+import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
+import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
+import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
+import { ResendOtpCredentialsDto } from '@shared/dtos/auth/ResendOtpCredentialsDto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
 import { UserDto } from '@shared/dtos/auth/UserDto';
@@ -133,8 +134,7 @@ export class AuthService {
     });
 
     const newLeadProfile = this.db.leadProfiles.create({
-      userId: newUser.id,
-      fullName: dto.fullName,
+      userId: newUser.id
     });
 
     newUser.leadProfile = newLeadProfile;
@@ -432,6 +432,60 @@ export class AuthService {
     return {
       accessToken: newAccessToken,
       expiresIn: 900,
+    };
+  }
+
+  /**
+   * Resend OTP using credentials (phone + password) to issue a new OTP access token
+   */
+  async resendOtpWithCredentials(
+    dto: ResendOtpCredentialsDto,
+    ip?: string,
+  ): Promise<RegisterLeadResponseDto> {
+    const user = await this.db.users.findOne({
+      where: { phone: dto.phone },
+      relations: { roles: true, permissions: true },
+    });
+
+    if (!user) {
+      throw new InvalidCredentialsException();
+    }
+
+    // Only allow if not yet verified
+    if (user.accountStatus !== AccountStatus.NotValid) {
+      throw new InvalidCredentialsException();
+    }
+
+    const passwordValid = await this.hasher.verify(
+      dto.password,
+      user.passwordHash,
+    );
+    if (!passwordValid) {
+      throw new InvalidCredentialsException();
+    }
+
+    const plainOtp = await this.otp.generateAndStoreOtp(user.id, user.phone);
+    await this.sms.sendOtp(user.phone, plainOtp);
+
+    const otpToken = this.jwt.generateOtpToken({
+      userId: user.id,
+      phone: user.phone,
+      purpose: 'phone_verify',
+    });
+
+    this.logger.info('OTP resent via credentials', {
+      context: 'AuthService.resendOtpWithCredentials',
+      userId: user.id,
+      phone: PhoneNumberUtil.mask(user.phone),
+      action: 'RESEND_OTP_CREDENTIALS_SUCCESS',
+      ip,
+    });
+
+    return {
+      otpAccessToken: otpToken,
+      expiresIn: 300,
+      message: 'OTP sent successfully. Please verify your phone.',
+      ...(this.isDevelopment && { devOtp: plainOtp }),
     };
   }
 

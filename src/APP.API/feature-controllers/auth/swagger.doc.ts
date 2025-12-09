@@ -5,22 +5,25 @@ import {
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
   ApiTooManyRequestsResponse,
+  ApiConflictResponse,
   ApiBody,
+  ApiBearerAuth,
   getSchemaPath,
 } from '@nestjs/swagger';
 import {
   SwaggerDocSet,
   registerSwaggerDocs,
 } from '@api/common/swagger/swagger-docs.registry';
-import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLead.dto';
-import { RegisterLeadResponseDto } from '@shared/dtos/auth/OtpVerificationResponse.dto';
-import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtp.dto';
-import { LoginRequestDto } from '@shared/dtos/auth/Login.dto';
+import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
+import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
+import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
+import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
 import { LogoutRequestDto } from '@shared/dtos/auth/LogoutRequestDto';
 import { UserDto } from '@shared/dtos/auth/UserDto';
+import { ResendOtpCredentialsDto } from '@shared/dtos/auth/ResendOtpCredentialsDto';
 
 const docs: Record<string, SwaggerDocSet> = {
   // ============================================
@@ -49,6 +52,21 @@ const docs: Record<string, SwaggerDocSet> = {
       description:
         'Registration successful. OTP sent via SMS. Use otpAccessToken for verify-otp endpoint.',
       schema: { $ref: getSchemaPath(RegisterLeadResponseDto) },
+    }),
+    ApiConflictResponse({
+      description: 'Phone already exists',
+      schema: {
+        example: {
+          type: 'about:blank',
+          title: 'Domain Error',
+          status: 409,
+          detail:
+            'Phone number 01837917991 is already registered. Please use a different phone number or login.',
+          instance: '/auth/register',
+          timestamp: '2025-12-08T00:00:00.000Z',
+          code: 'PHONE_ALREADY_EXISTS',
+        },
+      },
     }),
     ApiBadRequestResponse({
       description: 'Invalid input (phone format, password strength, etc.)',
@@ -108,6 +126,39 @@ const docs: Record<string, SwaggerDocSet> = {
     }),
     ApiUnauthorizedResponse({
       description: 'Invalid or expired OTP access token',
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded (3 resends per 5 minutes)',
+    }),
+  ],
+
+  'auth.resendOtpCredentials': [
+    ApiOperation({
+      summary: 'Resend OTP using credentials',
+      description:
+        'Request a new OTP code using phone + password when OTP access token has expired. Subject to the same rate limits as resend-otp.',
+    }),
+    ApiBody({
+      schema: { $ref: getSchemaPath(ResendOtpCredentialsDto) },
+      examples: {
+        default: {
+          summary: 'Resend OTP with credentials',
+          value: {
+            phone: '01837917991',
+            password: 'SecureP@ss123',
+          },
+        },
+      },
+    }),
+    ApiOkResponse({
+      description: 'New OTP sent successfully via SMS',
+      schema: { $ref: getSchemaPath(RegisterLeadResponseDto) },
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid input (phone format, password strength, etc.)',
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Invalid credentials or account not eligible for OTP resend',
     }),
     ApiTooManyRequestsResponse({
       description: 'Rate limit exceeded (3 resends per 5 minutes)',
@@ -196,6 +247,7 @@ const docs: Record<string, SwaggerDocSet> = {
       description:
         'Revoke refresh token session. If sessionId provided, revokes that session. Otherwise revokes current session.',
     }),
+    ApiBearerAuth(),
     ApiBody({
       schema: { $ref: getSchemaPath(LogoutRequestDto) },
       required: false,
@@ -230,6 +282,7 @@ const docs: Record<string, SwaggerDocSet> = {
       description:
         'Revoke all refresh token sessions for the current user. Useful for security purposes.',
     }),
+    ApiBearerAuth(),
     ApiOkResponse({
       description: 'All sessions logged out successfully',
       schema: {

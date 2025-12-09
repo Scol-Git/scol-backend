@@ -1,4 +1,5 @@
 import { AutoMap } from '@automapper/classes';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Register Lead Response DTO
@@ -11,6 +12,11 @@ export class RegisterLeadResponseDto {
    * OTP verification JWT token (short-lived, aud=otp, purpose=phone_verify)
    * Use this token in Authorization header for /verify-otp and /resend-otp endpoints
    */
+  @ApiProperty({
+    description:
+      'OTP verification JWT token (short-lived, aud=otp, purpose=phone_verify)',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  })
   @AutoMap()
   otpAccessToken!: string;
 
@@ -18,6 +24,10 @@ export class RegisterLeadResponseDto {
    * Token expiration time in seconds
    * @example 300
    */
+  @ApiProperty({
+    description: 'Token expiration time in seconds',
+    example: 300,
+  })
   @AutoMap()
   expiresIn!: number;
 
@@ -25,6 +35,10 @@ export class RegisterLeadResponseDto {
    * Success message
    * @example "OTP sent successfully. Please verify your phone."
    */
+  @ApiProperty({
+    description: 'Success message',
+    example: 'OTP sent successfully. Please verify your phone.',
+  })
   @AutoMap()
   message!: string;
 
@@ -33,6 +47,11 @@ export class RegisterLeadResponseDto {
    * NEVER present in production
    * @example "123456"
    */
+  @ApiPropertyOptional({
+    description: 'OTP code (development only, never in production responses)',
+    example: '123456',
+  })
   @AutoMap()
   devOtp?: string;
 }
+

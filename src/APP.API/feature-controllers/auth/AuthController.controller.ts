@@ -20,15 +20,17 @@ import {
   ReqInfoPayload,
 } from '@api/common/decorators/ReqInfo.decorator';
 import { AuthService } from '@bll/services/auth/AuthService';
-import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLead.dto';
-import { RegisterLeadResponseDto } from '@shared/dtos/auth/OtpVerificationResponse.dto';
-import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtp.dto';
-import { ResendOtpDto } from '@shared/dtos/auth/ResendOtp.dto';
-import { LoginRequestDto } from '@shared/dtos/auth/Login.dto';
+
+import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
+import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
+import { ResendOtpDto } from '@shared/dtos/auth/ResendOtpDto';
+import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
+import { ResendOtpCredentialsDto } from '@shared/dtos/auth/ResendOtpCredentialsDto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
 import { LogoutRequestDto } from '@shared/dtos/auth/LogoutRequestDto';
+import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { UserDto } from '@shared/dtos/auth/UserDto';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 import type { OtpUserPayload } from '@shared/interfaces/auth/OtpUserPayload.interface';
@@ -48,10 +50,11 @@ import { UserContextAccessor } from '@shared/context/UserContextAccessor';
  */
 @ApiTags('auth')
 @ApiExtraModels(
-  RegisterLeadRequestDto,
   RegisterLeadResponseDto,
+  RegisterLeadRequestDto,
   VerifyOtpDto,
   ResendOtpDto,
+  ResendOtpCredentialsDto,
   LoginRequestDto,
   AuthResponseDto,
   RefreshTokenRequestDto,
@@ -118,6 +121,20 @@ export class AuthController {
   }
 
   /**
+   * Resend OTP using credentials (phone + password) to get a new OTP access token
+   */
+  @Post('resend-otp-credentials')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 3, windowSeconds: 300 }) // align with resend-otp limits
+  @AddSwaggerDoc('auth', 'resendOtpCredentials')
+  async resendOtpCredentials(
+    @Body() dto: ResendOtpCredentialsDto,
+    @ReqInfo() reqInfo: ReqInfoPayload,
+  ): Promise<RegisterLeadResponseDto> {
+    return await this.authService.resendOtpWithCredentials(dto, reqInfo.ip);
+  }
+
+  /**
    * Login
    * POST /auth/login
    * Leads login with phone, others with email
@@ -168,21 +185,6 @@ export class AuthController {
     return { message: 'Logged out successfully' };
   }
 
-  /**
-   * Logout all sessions
-   * POST /auth/logout-all
-   * Requires: Access JWT token in Authorization header
-   */
-  @Post('logout-all')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @AddSwaggerDoc('auth', 'logoutAll')
-  async logoutAll(
-    @CurrentUser() user: ICurrentUser,
-  ): Promise<{ message: string }> {
-    await this.authService.logoutAll(user.userId);
-    return { message: 'All sessions logged out successfully' };
-  }
 
   /**
    * Get current user info

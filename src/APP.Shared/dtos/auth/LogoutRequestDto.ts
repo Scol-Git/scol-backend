@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsUUID } from 'class-validator';
+import { IsOptional, IsUUID } from 'class-validator';
 import { AutoMap } from '@automapper/classes';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Logout Request DTO
@@ -16,6 +17,10 @@ export class LogoutRequestDto {
    */
   @IsOptional()
   @IsUUID('4', { message: 'Session ID must be a valid UUID' })
+  @ApiPropertyOptional({
+    description: 'Session ID to logout (optional); defaults to current session',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @AutoMap()
   sessionId?: string;
 }

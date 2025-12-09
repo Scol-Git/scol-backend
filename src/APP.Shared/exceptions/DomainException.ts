@@ -1,4 +1,5 @@
 import { BusinessException } from './BusinessException';
+import { ErrorCode } from '@shared/enums/ErrorCode.enum';
 
 /**
  * Represents a domain logic violation or business rule failure.
@@ -25,7 +26,7 @@ export class DomainException extends BusinessException {
    * @param message - Human-readable error message describing the domain violation
    * @param code - Machine-readable error code (defaults to 'DOMAIN_ERROR')
    */
-  constructor(message: string, code: string = 'DOMAIN_ERROR') {
+  constructor(message: string, code: ErrorCode | string = ErrorCode.DOMAIN_ERROR) {
     super(message, code);
   }
 }
