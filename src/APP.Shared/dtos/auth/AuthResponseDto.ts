@@ -40,15 +40,4 @@ export class AuthResponseDto {
   })
   @AutoMap()
   refreshToken!: string;
-
-  /**
-   * Access token expiration time in seconds
-   * @example 900
-   */
-  @ApiProperty({
-    description: 'Access token expiration time in seconds',
-    example: 900,
-  })
-  @AutoMap()
-  expiresIn!: number;
 }

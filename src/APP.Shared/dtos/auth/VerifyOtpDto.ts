@@ -18,4 +18,3 @@ export class VerifyOtpDto {
   @AutoMap()
   otp!: string;
 }
-
