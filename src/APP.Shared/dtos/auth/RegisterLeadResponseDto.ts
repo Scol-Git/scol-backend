@@ -53,5 +53,17 @@ export class RegisterLeadResponseDto {
   })
   @AutoMap()
   devOtp?: string;
+
+  /**
+   * Retry after time in seconds
+   * Wait this many seconds before requesting a new OTP
+   * @example 60
+   */
+  @ApiProperty({
+    description: 'Retry after time in seconds. Wait this long before requesting a new OTP.',
+    example: 60,
+  })
+  @AutoMap()
+  retryAfter!: number;
 }
 

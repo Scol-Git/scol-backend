@@ -11,18 +11,9 @@ import type { Request, Response } from 'express';
 import type { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import { BusinessException } from '@shared/exceptions/BusinessException';
-import { DomainException } from '@shared/exceptions/DomainException';
+import { ValidationException } from '@shared/exceptions/ValidationException';
 import { ErrorCode } from '@shared/enums/ErrorCode.enum';
-
-interface ProblemDetails {
-  type: string;
-  title: string;
-  status: number;
-  detail: string;
-  instance: string;
-  timestamp: string;
-  code?: string;
-}
+import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
 
 @Catch()
 @Injectable()
@@ -35,23 +26,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const req = http.getRequest<Request>();
 
     const isHttp = exception instanceof HttpException;
-    const isDomain =
-      exception instanceof DomainException ||
-      exception instanceof BusinessException;
+    const isValidation = exception instanceof ValidationException;
+    const isBusiness = exception instanceof BusinessException;
 
     const status = isHttp
       ? exception.getStatus()
-      : isDomain
-        ? HttpStatus.BAD_REQUEST
-        : HttpStatus.SERVICE_UNAVAILABLE;
+      : isValidation
+        ? HttpStatus.BAD_REQUEST // Client-side validation errors
+        : isBusiness
+          ? HttpStatus.INTERNAL_SERVER_ERROR // Server-side business errors
+          : HttpStatus.SERVICE_UNAVAILABLE;
 
     // Prefer the "response body" from HttpException, if provided
     let detail = 'Internal server error';
     let code: string | undefined;
 
-    if (isDomain) {
-      detail = (exception as DomainException).message;
-      code = (exception as BusinessException).code ?? ErrorCode.DOMAIN_ERROR;
+    if (isValidation || isBusiness) {
+      detail = (exception as ValidationException | BusinessException).message;
+      if (isBusiness) {
+        code = (exception as BusinessException).code ?? ErrorCode.DOMAIN_ERROR;
+      }
     }
 
     if (isHttp) {
@@ -93,20 +87,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
       reqId: req.headers['x-request-id'],
     });
 
-    const problem: ProblemDetails = {
-      type: 'about:blank',
-      title: isHttp
-        ? 'HTTP Error'
-        : isDomain
-          ? 'Domain Error'
-          : 'Service Unavailable',
-      status,
-      detail,
-      instance: req.url,
-      timestamp: new Date().toISOString(),
-      ...(code ? { code } : {}),
-    };
+    // Build error response using BaseResponseDto structure
+    const errorResponse = new ErrorResponseDto();
+    errorResponse.status = 'error';
+    errorResponse.message = detail;
+    errorResponse.statusCode = status;
 
-    res.status(status).type('application/problem+json').json(problem);
+    // Add error details if available
+    if (code || isValidation) {
+      errorResponse.error = {};
+
+      if (code) {
+        errorResponse.error.code = code;
+      }
+
+      // Add validation field errors if present
+      if (exception instanceof ValidationException && exception.errors) {
+        errorResponse.error.details = exception.errors;
+      }
+    }
+
+    res.status(status).json(errorResponse);
   }
 }

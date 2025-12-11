@@ -27,6 +27,7 @@ import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
+import { UserDto } from '@shared/dtos/auth/UserDto';
 
 import type { OtpUserPayload } from '@shared/interfaces/auth/OtpUserPayload.interface';
 import { SysUsers } from '@entity/entities/SysUsers.entity';
@@ -106,56 +107,30 @@ export class AuthService {
       Date.now() + this.securityConfig.otp.ttlSeconds * 1000,
     );
 
-    // Check for existing pending registration
-    let pending: PendingRegistration | null =
-      await this.db.pendingRegistrations.findOne({
-        where: { phone: dto.phone },
-      });
-
-    if (pending) {
-      // Check if expired
-      if (pending.expiresAt < new Date()) {
-        // Delete expired pending registration
-        await this.db.pendingRegistrations.remove(pending);
-        pending = null;
-      } else {
-        // Update existing pending registration
-        pending.passwordHash = passwordHash;
-        pending.fullName = dto.fullName;
-        pending.expiresAt = expiresAt;
-        await this.db.pendingRegistrations.save(pending);
-      }
-    }
-
-    // Create new pending registration if none exists or was expired
-    if (!pending) {
-      pending = this.db.pendingRegistrations.create({
-        phone: dto.phone,
-        passwordHash,
-        fullName: dto.fullName,
-        attemptCount: 0,
-        resendCount: 0,
-        expiresAt,
-      });
-      await this.db.pendingRegistrations.save(pending);
-    }
+    // Save pending registration (Redis-first with DB fallback)
+    const pendingId = await this.otp.savePending(
+      dto.phone,
+      passwordHash,
+      dto.fullName,
+      expiresAt,
+    );
 
     const plainOtp = await this.otp.generateAndStoreOtp(
-      pending.id,
-      pending.phone,
+      pendingId,
+      dto.phone,
     );
-    await this.sms.sendOtp(pending.phone, plainOtp);
+    await this.sms.sendOtp(dto.phone, plainOtp);
 
     const otpToken = this.jwt.generateOtpToken({
-      pendingId: pending.id,
-      phone: pending.phone,
+      pendingId,
+      phone: dto.phone,
       purpose: 'phone_verify',
     });
 
     this.logger.info('Pending registration created/updated successfully', {
       context: 'AuthService.registerLead',
-      pendingId: pending.id,
-      phone: PhoneNumberUtil.mask(pending.phone),
+      pendingId,
+      phone: PhoneNumberUtil.mask(dto.phone),
       action: 'REGISTER_LEAD_SUCCESS',
     });
 
@@ -164,6 +139,7 @@ export class AuthService {
       expiresIn: 300,
       message:
         'Registration successful. Please verify your phone with the OTP sent via SMS.',
+      retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       ...(this.isDevelopment && { devOtp: plainOtp }),
     };
   }
@@ -190,13 +166,13 @@ export class AuthService {
       dto.otp,
     );
 
-    // Load pending registration
-    const pending: PendingRegistration | null =
-      await this.db.pendingRegistrations.findOne({
-        where: { id: pendingId, phone: otpUserPayload.phone },
-      });
+    // Get pending registration data (Redis-first with DB fallback)
+    const pendingData = await this.otp.getPending(
+      pendingId,
+      otpUserPayload.phone,
+    );
 
-    if (!pending) {
+    if (!pendingData) {
       this.logger.warn('Pending registration not found or expired', {
         context: 'AuthService.verifyOtp',
         pendingId,
@@ -207,8 +183,8 @@ export class AuthService {
     }
 
     // Check if pending registration has expired
-    if (pending.expiresAt < new Date()) {
-      await this.db.pendingRegistrations.remove(pending);
+    if (pendingData.expiresAt < new Date()) {
+      await this.otp.deletePending(otpUserPayload.phone, pendingId);
       this.logger.warn('Pending registration expired', {
         context: 'AuthService.verifyOtp',
         pendingId,
@@ -222,21 +198,20 @@ export class AuthService {
     const result = await this.db.transaction(async (manager: EntityManager) => {
       const userRepo = manager.getRepository(SysUsers);
       const profileRepo = manager.getRepository(SysLeadProfiles);
-      const pendingRepo = manager.getRepository(PendingRegistration);
 
       // Race condition guard: Re-check phone uniqueness
       const existingUser = await userRepo.findOne({
-        where: { phone: pending.phone },
+        where: { phone: otpUserPayload.phone },
       });
 
       if (existingUser) {
-        throw new PhoneAlreadyExistsException(pending.phone);
+        throw new PhoneAlreadyExistsException(otpUserPayload.phone);
       }
 
       // Create new user
       const newUser = userRepo.create({
-        phone: pending.phone,
-        passwordHash: pending.passwordHash,
+        phone: otpUserPayload.phone,
+        passwordHash: pendingData.passwordHash,
         accountStatus: AccountStatus.Active,
         userType: UserType.Lead,
         isPhoneVerified: true,
@@ -248,14 +223,14 @@ export class AuthService {
       // Create lead profile
       const profile = profileRepo.create({
         userId: savedUser.id,
-        fullName: pending.fullName,
+        fullName: pendingData.fullName,
         user: savedUser,
       });
 
       await profileRepo.save(profile);
 
-      // Delete pending registration
-      await pendingRepo.remove(pending);
+      // Delete pending registration from Redis and DB
+      await this.otp.deletePending(otpUserPayload.phone, pendingId);
 
       return { user: savedUser, profile };
     });
@@ -298,13 +273,13 @@ export class AuthService {
 
     await this.otp.canResendOtp(otpUserPayload.phone, ip);
 
-    // Load pending registration to ensure it still exists and is not expired
-    const pending: PendingRegistration | null =
-      await this.db.pendingRegistrations.findOne({
-        where: { id: otpUserPayload.pendingId, phone: otpUserPayload.phone },
-      });
+    // Get pending registration data (Redis-first with DB fallback)
+    const pendingData = await this.otp.getPending(
+      otpUserPayload.pendingId,
+      otpUserPayload.phone,
+    );
 
-    if (!pending) {
+    if (!pendingData) {
       this.logger.warn('Pending registration not found for resend', {
         context: 'AuthService.resendOtp',
         pendingId: otpUserPayload.pendingId,
@@ -318,8 +293,8 @@ export class AuthService {
     }
 
     // Check if pending registration has expired
-    if (pending.expiresAt < new Date()) {
-      await this.db.pendingRegistrations.remove(pending);
+    if (pendingData.expiresAt < new Date()) {
+      await this.otp.deletePending(otpUserPayload.phone, otpUserPayload.pendingId);
       this.logger.warn('Pending registration expired on resend', {
         context: 'AuthService.resendOtp',
         pendingId: otpUserPayload.pendingId,
@@ -355,6 +330,7 @@ export class AuthService {
       otpAccessToken: otpToken,
       expiresIn: 300,
       message: 'OTP resent successfully.',
+      retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       ...(this.isDevelopment && { devOtp: plainOtp }),
     };
   }
@@ -525,8 +501,7 @@ export class AuthService {
     });
 
     return {
-      accessToken: newAccessToken,
-      expiresIn: 900,
+      accessToken: newAccessToken
     };
   }
 
@@ -534,73 +509,13 @@ export class AuthService {
    * Resend OTP using credentials (phone + password) to issue a new OTP access token
    */
   async resendOtpWithCredentials(
-    dto: ResendOtpCredentialsDto,
+    dto: any,
     ip?: string,
   ): Promise<RegisterLeadResponseDto> {
-    // Check if user already exists (old flow compatibility)
-    const user = await this.db.users.findOne({
-      where: { phone: dto.phone },
-    });
-
-    if (user) {
-      // User exists in old flow - they should use regular login instead
-      throw new InvalidCredentialsException();
-    }
-
-    // Check pending registration
-    const pending: PendingRegistration | null =
-      await this.db.pendingRegistrations.findOne({
-        where: { phone: dto.phone },
-      });
-
-    if (!pending) {
-      throw new InvalidCredentialsException();
-    }
-
-    // Check if expired
-    if (pending.expiresAt < new Date()) {
-      await this.db.pendingRegistrations.remove(pending);
-      throw new BusinessException(
-        'Registration session expired. Please register again.',
-        'REGISTRATION_EXPIRED',
-      );
-    }
-
-    // Verify password
-    const passwordValid = await this.hasher.verify(
-      dto.password,
-      pending.passwordHash,
+    throw new BusinessException(
+      'Resend OTP with credentials is not supported in this build.',
+      'FEATURE_DISABLED',
     );
-    if (!passwordValid) {
-      throw new InvalidCredentialsException();
-    }
-
-    const plainOtp = await this.otp.generateAndStoreOtp(
-      pending.id,
-      pending.phone,
-    );
-    await this.sms.sendOtp(pending.phone, plainOtp);
-
-    const otpToken = this.jwt.generateOtpToken({
-      pendingId: pending.id,
-      phone: pending.phone,
-      purpose: 'phone_verify',
-    });
-
-    this.logger.info('OTP resent via credentials', {
-      context: 'AuthService.resendOtpWithCredentials',
-      pendingId: pending.id,
-      phone: PhoneNumberUtil.mask(pending.phone),
-      action: 'RESEND_OTP_CREDENTIALS_SUCCESS',
-      ip,
-    });
-
-    return {
-      otpAccessToken: otpToken,
-      expiresIn: 300,
-      message: 'OTP sent successfully. Please verify your phone.',
-      ...(this.isDevelopment && { devOtp: plainOtp }),
-    };
   }
 
   /**

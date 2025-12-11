@@ -8,6 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './AppModule.module';
 import { HttpExceptionFilter } from '@api/common/filters/HttpExceptionFilter.filter';
 import { UserContextInterceptor } from '@api/common/interceptors/UserContextInterceptor.interceptor';
+import { ResponseInterceptor } from '@api/common/interceptors/ResponseInterceptor.interceptor';
 
 function getLanIp(): string {
   const nets = networkInterfaces();
@@ -41,7 +42,10 @@ async function bootstrap() {
   // ✅ Let Nest inject AppLogger into the filter
   app.useGlobalFilters(app.get(HttpExceptionFilter));
 
-  // ✅ Register UserContextInterceptor globally (runs after guards, before controllers)
+  // ✅ Register interceptors globally
+  // ResponseInterceptor wraps all success responses with base structure
+  app.useGlobalInterceptors(new ResponseInterceptor());
+  // UserContextInterceptor extracts user context (runs after guards, before controllers)
   app.useGlobalInterceptors(new UserContextInterceptor());
 
   const swaggerCfg = new DocumentBuilder()

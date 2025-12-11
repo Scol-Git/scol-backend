@@ -30,7 +30,6 @@ export class AuthResponseMapper {
     authResponse.userId = user.id;
     authResponse.accessToken = tokens.accessToken;
     authResponse.refreshToken = tokens.refreshToken;
-    authResponse.expiresIn = tokens.expiresIn;
 
     return authResponse;
   }

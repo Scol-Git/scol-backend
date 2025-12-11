@@ -7,6 +7,8 @@ import {
   Ip,
   Headers,
   Req,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiExtraModels, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AddSwaggerDoc } from '@api/common/swagger/add-swagger-doc.decorator';
@@ -23,15 +25,15 @@ import { AuthService } from '@bll/services/auth/AuthService';
 
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
 import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
-import { ResendOtpDto } from '@shared/dtos/auth/ResendOtpDto';
 import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
-import { ResendOtpCredentialsDto } from '@shared/dtos/auth/ResendOtpCredentialsDto';
+
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
-import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
-import { LogoutRequestDto } from '@shared/dtos/auth/LogoutRequestDto';
+
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { UserDto } from '@shared/dtos/auth/UserDto';
+import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
+import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 import type { OtpUserPayload } from '@shared/interfaces/auth/OtpUserPayload.interface';
 import type { Request } from 'express';
@@ -53,14 +55,12 @@ import { UserContextAccessor } from '@shared/context/UserContextAccessor';
   RegisterLeadResponseDto,
   RegisterLeadRequestDto,
   VerifyOtpDto,
-  ResendOtpDto,
-  ResendOtpCredentialsDto,
   LoginRequestDto,
   AuthResponseDto,
-  RefreshTokenRequestDto,
   TokenRefreshResponseDto,
-  LogoutRequestDto,
   UserDto,
+  SuccessResponseDto,
+  ErrorResponseDto,
 )
 @Controller('auth')
 export class AuthController {
@@ -106,10 +106,10 @@ export class AuthController {
 
   /**
    * Resend OTP
-   * POST /auth/resend-otp
+   * GET /auth/resend-otp
    * Requires: OTP JWT token in Authorization header
    */
-  @Post('resend-otp')
+  @Get('resend-otp')
   @UseGuards(OtpJwtGuard)
   @ApiBearerAuth('OTP-auth')
   @AddSwaggerDoc('auth', 'resendOtp')
@@ -120,19 +120,8 @@ export class AuthController {
     return await this.authService.resendOtp(otpUserPayload, reqInfo.ip);
   }
 
-  /**
-   * Resend OTP using credentials (phone + password) to get a new OTP access token
-   */
-  @Post('resend-otp-credentials')
-  @UseGuards(RateLimitGuard)
-  @RateLimit({ limit: 3, windowSeconds: 300 }) // align with resend-otp limits
-  @AddSwaggerDoc('auth', 'resendOtpCredentials')
-  async resendOtpCredentials(
-    @Body() dto: ResendOtpCredentialsDto,
-    @ReqInfo() reqInfo: ReqInfoPayload,
-  ): Promise<RegisterLeadResponseDto> {
-    return await this.authService.resendOtpWithCredentials(dto, reqInfo.ip);
-  }
+ 
+ 
 
   /**
    * Login
@@ -152,51 +141,42 @@ export class AuthController {
 
   /**
    * Refresh access token
-   * POST /auth/refresh
+   * GET /auth/refresh?refreshToken=...
    */
-  @Post('refresh')
+  @Get('refresh')
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 20, windowSeconds: 300 }) // 20 refresh requests per 5 minutes
   @AddSwaggerDoc('auth', 'refresh')
   async refresh(
-    @Body() dto: RefreshTokenRequestDto,
+    @Query('refreshToken') refreshToken: string | undefined,
     @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<TokenRefreshResponseDto> {
+    if (!refreshToken) {
+      throw new BadRequestException('Refresh token is required');
+    }
     return await this.authService.refreshAccessToken(
-      dto.refreshToken,
+      refreshToken,
       reqInfo.ip,
     );
   }
 
   /**
-   * Logout current or specific session
-   * POST /auth/logout
+   * Logout current session
+   * GET /auth/logout
    * Requires: Access JWT token in Authorization header
    */
-  @Post('logout')
+  @Get('logout')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @AddSwaggerDoc('auth', 'logout')
   async logout(
     @CurrentUser() user: ICurrentUser,
-    @Body() dto: LogoutRequestDto,
   ): Promise<{ message: string }> {
-    await this.authService.logout(user.userId, dto.sessionId);
+    await this.authService.logout(user.userId);
     return { message: 'Logged out successfully' };
   }
 
 
-  /**
-   * Get current user info
-   * GET /auth/me
-   * Requires: Access JWT token in Authorization header
-   */
-  @Get('me')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @AddSwaggerDoc('auth', 'me')
-  async me(): Promise<UserDto> {
-    const user = UserContextAccessor.userContext;
-    return await this.authService.getCurrentUser(user.userId);
-  }
+  
+ 
 }

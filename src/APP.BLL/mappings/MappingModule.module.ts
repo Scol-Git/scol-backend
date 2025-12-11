@@ -3,8 +3,9 @@ import { createMapper, Mapper } from '@automapper/core';
 import { classes } from '@automapper/classes';
 
 import { MAPPER, IMapper } from './mapping.tokens';
-import { UserResponseMapper } from './auth/UserResponseMapper';
+
 import { AuthResponseMapper } from './auth/AuthResponseMapper';
+import { UserResponseMapper } from './auth/UserResponseMapper';
 
 // Create a single global mapper instance to be shared across all tokens.
 // This ensures mappings configured in OrganizationMapper (using MAPPER)
