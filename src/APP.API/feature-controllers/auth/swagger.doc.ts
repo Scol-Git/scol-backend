@@ -7,7 +7,6 @@ import {
   ApiTooManyRequestsResponse,
   ApiConflictResponse,
   ApiBody,
-  ApiQuery,
   ApiBearerAuth,
   getSchemaPath,
 } from '@nestjs/swagger';
@@ -209,7 +208,7 @@ const docs: Record<string, SwaggerDocSet> = {
     ApiOperation({
       summary: 'Resend OTP',
       description:
-        'Request a new OTP code. Subject to cooldown (60 seconds) and daily limits. Requires OTP JWT token in Authorization header.',
+        'Request a new OTP code. Subject to strict cooldown (1 resend per 60 seconds) and hourly limit (maximum 3 resends per hour). Requires OTP JWT token in Authorization header. Returns 429 Too Many Requests with Retry-After header when limits are exceeded.',
     }),
     ApiBearerAuth('OTP-auth'),
     ApiOkResponse({
@@ -227,57 +226,53 @@ const docs: Record<string, SwaggerDocSet> = {
         ],
       },
     }),
-    ApiBadRequestResponse({
-      description:
-        'Resend cooldown active or daily limit exceeded (5 OTPs per phone, 20 per IP)',
-      schema: {
-        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
-        examples: {
-          cooldown: {
-            summary: 'Resend cooldown active',
-            value: {
-              status: 'error',
-              message: 'Please wait 45 seconds before requesting a new OTP.',
-              statusCode: 400,
-              error: {
-                code: 'RESEND_COOLDOWN_ACTIVE',
-              },
-            },
-          },
-          dailyLimitPhone: {
-            summary: 'Daily limit exceeded per phone',
-            value: {
-              status: 'error',
-              message:
-                'Daily OTP limit exceeded for this phone number. Please try again tomorrow.',
-              statusCode: 400,
-              error: {
-                code: 'OTP_DAILY_LIMIT_PHONE',
-              },
-            },
-          },
-          dailyLimitIp: {
-            summary: 'Daily limit exceeded per IP',
-            value: {
-              status: 'error',
-              message:
-                'Daily OTP limit exceeded from your IP address. Please try again tomorrow.',
-              statusCode: 400,
-              error: {
-                code: 'OTP_DAILY_LIMIT_IP',
-              },
-            },
-          },
-        },
-      },
-    }),
     ApiUnauthorizedResponse({
       description: 'Invalid or expired OTP access token',
       schema: { $ref: getSchemaPath(ErrorResponseDto) },
     }),
     ApiTooManyRequestsResponse({
-      description: 'Rate limit exceeded (3 resends per 5 minutes)',
-      schema: { $ref: getSchemaPath(ErrorResponseDto) },
+      description:
+        'Rate limit exceeded. Returns 429 with Retry-After header indicating seconds to wait. Applies to: (1) Cooldown: 1 resend per 60 seconds, (2) Hourly limit: maximum 3 resends per hour.',
+      schema: {
+        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
+        examples: {
+          cooldown: {
+            summary: 'Resend cooldown active (60 seconds)',
+            value: {
+              status: 'error',
+              message: 'Please wait 45 seconds before requesting a new OTP.',
+              statusCode: 429,
+              error: {
+                code: 'RATE_LIMIT_EXCEEDED',
+              },
+            },
+            headers: {
+              'Retry-After': {
+                description: 'Seconds to wait before retrying',
+                schema: { type: 'integer', example: 45 },
+              },
+            },
+          },
+          hourlyLimit: {
+            summary: 'Hourly limit exceeded (3 per hour)',
+            value: {
+              status: 'error',
+              message:
+                'You have exceeded the hourly OTP resend limit (3 per hour). Please wait 1800 seconds.',
+              statusCode: 429,
+              error: {
+                code: 'RATE_LIMIT_EXCEEDED',
+              },
+            },
+            headers: {
+              'Retry-After': {
+                description: 'Seconds to wait before retrying',
+                schema: { type: 'integer', example: 1800 },
+              },
+            },
+          },
+        },
+      },
     }),
   ],
 
@@ -400,14 +395,9 @@ const docs: Record<string, SwaggerDocSet> = {
     ApiOperation({
       summary: 'Refresh access token',
       description:
-        'Get a new access token using refresh token. Refresh tokens are valid for 7 days. Pass refresh token as query parameter.',
+        'Get a new access token using refresh token. Refresh tokens are valid for 7 days. Pass refresh token in Authorization header as Bearer token.',
     }),
-    ApiQuery({
-      name: 'refreshToken',
-      required: true,
-      description: 'Refresh token (JWT)',
-      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-    }),
+    ApiBearerAuth('Refresh-auth'),
     ApiOkResponse({
       description: 'New access token issued successfully',
       schema: {
@@ -424,7 +414,7 @@ const docs: Record<string, SwaggerDocSet> = {
       },
     }),
     ApiBadRequestResponse({
-      description: 'Refresh token is required',
+      description: 'Refresh token is required in Authorization header',
       schema: { $ref: getSchemaPath(ErrorResponseDto) },
     }),
     ApiUnauthorizedResponse({

@@ -9,7 +9,8 @@ export class PhoneAlreadyExistsException extends ValidationException {
   constructor(phone: string) {
     super(
       `Phone number ${phone} is already registered. Please use a different phone number or login.`,
-      { phone: ['PHONE_ALREADY_EXISTS'] },
+      undefined,
+      'PHONE_ALREADY_EXISTS',
     );
   }
 }

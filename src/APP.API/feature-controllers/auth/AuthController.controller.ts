@@ -7,7 +7,6 @@ import {
   Ip,
   Headers,
   Req,
-  Query,
   BadRequestException,
 } from '@nestjs/common';
 import { ApiExtraModels, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -141,19 +140,22 @@ export class AuthController {
 
   /**
    * Refresh access token
-   * GET /auth/refresh?refreshToken=...
+   * GET /auth/refresh
+   * Requires: Refresh JWT token in Authorization header
    */
   @Get('refresh')
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 20, windowSeconds: 300 }) // 20 refresh requests per 5 minutes
+  @ApiBearerAuth('Refresh-auth')
   @AddSwaggerDoc('auth', 'refresh')
   async refresh(
-    @Query('refreshToken') refreshToken: string | undefined,
+    @Headers('authorization') authHeader: string | undefined,
     @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<TokenRefreshResponseDto> {
-    if (!refreshToken) {
-      throw new BadRequestException('Refresh token is required');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new BadRequestException('Refresh token is required in Authorization header');
     }
+    const refreshToken = authHeader.substring(7);
     return await this.authService.refreshAccessToken(
       refreshToken,
       reqInfo.ip,

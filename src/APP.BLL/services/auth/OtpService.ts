@@ -13,7 +13,7 @@ import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import { InvalidOtpException } from '@shared/exceptions/auth/InvalidOtpException';
 import { OtpExpiredException } from '@shared/exceptions/auth/OtpExpiredException';
 import { OtpAttemptsExceededException } from '@shared/exceptions/auth/OtpAttemptsExceededException';
-import { ResendCooldownException } from '@shared/exceptions/auth/ResendCooldownException';
+import { OtpResendRateLimitException } from '@shared/exceptions/auth/OtpResendRateLimitException';
 import { BusinessException } from '@shared/exceptions/BusinessException';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { PendingRegistration } from '@entity/entities/PendingRegistration.entity';
@@ -150,52 +150,52 @@ export class OtpService {
 
   /**
    * Check if OTP can be resent (rate limiting)
-   * Uses IRateLimitingStorage for distributed rate limiting
-   * @param phone Phone number
-   * @param ip Client IP address
-   * @throws ResendCooldownException, BusinessException
+   * Uses IRateLimitingStorage for distributed rate limiting with sliding window.
+   * 
+   * Rules:
+   * - 1 resend per 60 seconds (strict cooldown)
+   * - Maximum 3 resends per hour
+   * 
+   * @param phone Phone number (used as user identifier)
+   * @param ip Client IP address (not used for rate limiting, kept for logging)
+   * @throws OtpResendRateLimitException with 429 status and Retry-After header
    */
   async canResendOtp(phone: string, ip: string): Promise<void> {
-    // 1. Check resend cooldown (e.g., 60 seconds between resends)
-    const cooldownKey = `otp:resend:${phone}`;
+    // 1. Check resend cooldown: 1 resend per 60 seconds
+    const cooldownKey = `otp:cooldown:${phone}`;
     const cooldownResult = await this.rateLimiter.increment(
       cooldownKey,
-      this.resendCooldown,
+      60, // 60 seconds window
       1, // Allow only 1 resend per window
     );
 
     if (cooldownResult.count > 1) {
-      const retryAfter = cooldownResult.reset - Math.floor(Date.now() / 1000);
-      throw new ResendCooldownException(retryAfter);
-    }
-
-    // 2. Check daily limit per phone (e.g., 5 OTPs per day per phone)
-    const phoneDailyKey = `otp:daily:phone:${phone}`;
-    const phoneResult = await this.rateLimiter.increment(
-      phoneDailyKey,
-      86400, // 24 hours
-      this.dailyLimitPerPhone,
-    );
-
-    if (phoneResult.count > this.dailyLimitPerPhone) {
-      throw new BusinessException(
-        `Daily OTP limit exceeded for this phone number. Please try again tomorrow.`,
-        'OTP_DAILY_LIMIT_PHONE',
+      const retryAfter = Math.max(
+        1,
+        cooldownResult.reset - Math.floor(Date.now() / 1000),
+      );
+      throw new OtpResendRateLimitException(
+        `Please wait ${retryAfter} seconds before requesting a new OTP.`,
+        retryAfter,
       );
     }
 
-    // 3. Check daily limit per IP (e.g., 20 OTPs per day per IP)
-    const ipDailyKey = `otp:daily:ip:${ip}`;
-    const ipResult = await this.rateLimiter.increment(
-      ipDailyKey,
-      86400,
-      this.dailyLimitPerIp,
+    // 2. Check hourly limit: maximum 3 resends per hour
+    const hourlyKey = `otp:hourly:${phone}`;
+    const hourlyResult = await this.rateLimiter.increment(
+      hourlyKey,
+      3600, // 1 hour window
+      3, // Maximum 3 resends per hour
     );
 
-    if (ipResult.count > this.dailyLimitPerIp) {
-      throw new BusinessException(
-        `Daily OTP limit exceeded from your IP address. Please try again tomorrow.`,
-        'OTP_DAILY_LIMIT_IP',
+    if (hourlyResult.count > 3) {
+      const retryAfter = Math.max(
+        1,
+        hourlyResult.reset - Math.floor(Date.now() / 1000),
+      );
+      throw new OtpResendRateLimitException(
+        `You have exceeded the hourly OTP resend limit (3 per hour). Please wait ${retryAfter} seconds.`,
+        retryAfter,
       );
     }
   }

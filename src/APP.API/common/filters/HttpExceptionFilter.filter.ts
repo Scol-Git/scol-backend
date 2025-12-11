@@ -93,16 +93,40 @@ export class HttpExceptionFilter implements ExceptionFilter {
     errorResponse.message = detail;
     errorResponse.statusCode = status;
 
-    // Add error details if available
-    if (code || isValidation) {
+    // Handle 429 Too Many Requests - set Retry-After header and error code
+    if (status === HttpStatus.TOO_MANY_REQUESTS && isHttp) {
+      const payload = exception.getResponse();
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'retryAfter' in payload
+      ) {
+        const retryAfter = (payload as { retryAfter?: number }).retryAfter;
+        if (retryAfter !== undefined && retryAfter > 0) {
+          res.setHeader('Retry-After', retryAfter.toString());
+        }
+      }
+      // Set error code for rate limit errors
+      errorResponse.error = {
+        code: 'RATE_LIMIT_EXCEEDED',
+      };
+    } else if (code || isValidation) {
+      // Add error details if available
       errorResponse.error = {};
 
-      if (code) {
+      // Prioritize code from ValidationException if available
+      if (exception instanceof ValidationException && exception.code) {
+        errorResponse.error.code = exception.code;
+      } else if (code) {
         errorResponse.error.code = code;
       }
 
-      // Add validation field errors if present
-      if (exception instanceof ValidationException && exception.errors) {
+      // Add validation field errors if present (only if no code is set)
+      if (
+        exception instanceof ValidationException &&
+        exception.errors &&
+        !exception.code
+      ) {
         errorResponse.error.details = exception.errors;
       }
     }
