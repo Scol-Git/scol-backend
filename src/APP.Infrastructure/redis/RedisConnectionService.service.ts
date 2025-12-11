@@ -19,8 +19,21 @@ import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
  * Provides a shared Redis connection that can be reused by multiple services
  * (CacheModule, RateLimitingModule, etc.) to avoid creating duplicate connections.
  *
- * Uses connection pooling internally - each service can request a client with
- * its own configuration (keyPrefix, etc.) while sharing the underlying connection pool.
+ * **Features:**
+ * - Single shared connection with automatic reconnection
+ * - Event-driven connection state tracking (ready, error, close)
+ * - Dynamic availability checking via isAvailable getter
+ * - Fail-open behavior (app starts even if Redis is down)
+ *
+ * **Connection State Management:**
+ * - `_isConnected` flag updated by Redis event listeners
+ * - `isAvailable` getter provides real-time connection status
+ * - Consumers can dynamically check availability on every operation
+ *
+ * **Reconnection Strategy:**
+ * - Automatic reconnection with exponential backoff
+ * - Max delay: 2 seconds
+ * - Max retries per request: 3
  *
  * @class RedisConnectionService
  */
@@ -126,6 +139,7 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Check if Redis is available and connected
+   * This getter is dynamically evaluated and reflects real-time connection state
    */
   get isAvailable(): boolean {
     return (
@@ -142,3 +156,4 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     return this._redisUrl;
   }
 }
+

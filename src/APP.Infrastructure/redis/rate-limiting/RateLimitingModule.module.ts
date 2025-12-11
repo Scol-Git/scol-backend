@@ -4,10 +4,10 @@ import {
   ILogger,
   IInfrastructureConfig,
 } from '@shared/tokens/injection.tokens';
-import { RedisConnectionService } from '../cache/RedisConnectionService.service';
-import { RateLimitingStorage as RedisRateLimitingStorage } from './redis/RateLimitingStorage.service';
-import { LoggingModule } from '../logging/LoggingModule.module';
-import { CacheModule } from '../cache/CacheModule.module';
+import { RateLimitingStorage as RedisRateLimitingStorage } from './RateLimitingStorage.service';
+import { LoggingModule } from '../../logging/LoggingModule.module';
+import { RedisModule } from '../RedisModule.module';
+import { RedisConnectionService } from '../RedisConnectionService.service';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@shared/interfaces/config/IInfrastructureConfig.interface';
 
@@ -18,20 +18,29 @@ import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@s
  * - Redis-only implementation (distributed, production-ready)
  * - Fail-open behavior (never blocks requests on errors)
  * - App starts even if Redis is temporarily down
+ * - Dynamic recovery (auto-reconnects without restart)
  *
  * **Features:**
  * - Atomic sliding window via Lua script (Redis)
  * - No sorting overhead (append-only arrays)
  * - Limit array growth (max 10k timestamps per key)
  * - Key namespacing support via RateLimitKeyBuilder
+ * - Automatic Redis reconnection detection
  *
  * **Fail-Open Behavior:**
  * - If Redis is unavailable at startup: logs warning, continues
  * - If Redis fails at runtime: increment returns allow-all (count=0, remaining=limit)
+ * - When Redis reconnects: automatically starts using Redis again
  * - Never blocks application from starting or running
  *
+ * **Dynamic Recovery:**
+ * - Checks Redis availability on every operation
+ * - No restart required when Redis comes back online
+ * - Seamless transition between fail-open and Redis-backed modes
+ * - Lua script reloads automatically on Redis restart
+ *
  * **Shared Redis Connection:**
- * - Uses RedisConnectionService from CacheModule
+ * - Uses RedisConnectionService from RedisModule
  * - Avoids duplicate connections
  * - Improves resource usage
  *
@@ -55,7 +64,7 @@ import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@s
  */
 @Global()
 @Module({
-  imports: [LoggingModule, CacheModule], // Import CacheModule to access RedisConnectionService
+  imports: [LoggingModule, RedisModule],
   providers: [
     {
       provide: IRateLimitingStorage,
@@ -64,7 +73,7 @@ import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@s
         logger: ILoggerInterface,
         redisConnection: RedisConnectionService,
       ) => {
-        // Use Redis-only rate limiting storage with fail-open behavior
+        // Use Redis-only rate limiting storage with fail-open behavior and dynamic recovery
         return new RedisRateLimitingStorage(redisConnection, logger);
       },
       inject: [IInfrastructureConfig, ILogger, RedisConnectionService],
@@ -73,3 +82,4 @@ import type { IInfrastructureConfig as IInfrastructureConfigInterface } from '@s
   exports: [IRateLimitingStorage],
 })
 export class RateLimitingModule {}
+

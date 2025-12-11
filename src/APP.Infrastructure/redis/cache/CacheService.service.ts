@@ -4,7 +4,7 @@ import type { ICacheService } from '@shared/interfaces/infrastructure';
 import { ILogger } from '@shared/tokens/injection.tokens';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
 import { RedisConnectionService } from '../RedisConnectionService.service';
-import { CompressionHelper } from '../utils/CompressionHelper';
+import { CompressionHelper } from './utils/CompressionHelper';
 
 /**
  * Cache Service Implementation (Redis)
@@ -16,6 +16,7 @@ import { CompressionHelper } from '../utils/CompressionHelper';
  * - Fail-open behavior (never throws, returns null)
  * - Prefix-based clearing using SCAN (non-blocking)
  * - Automatic compression for large values (> 1KB)
+ * - Dynamic Redis recovery (auto-reconnects without restart)
  *
  * **Best Practices:**
  * - Uses shared Redis connection
@@ -27,6 +28,12 @@ import { CompressionHelper } from '../utils/CompressionHelper';
  * **Thread Safety:**
  * - getOrSet() uses Redis SET NX + GET pattern (atomic)
  * - Prevents duplicate expensive operations across distributed instances
+ *
+ * **Dynamic Recovery:**
+ * - Checks Redis availability on every operation
+ * - Automatically uses Redis when it becomes available
+ * - No restart required for Redis reconnection
+ * - Fails open gracefully when Redis is unavailable
  *
  * @class CacheService
  * @implements {ICacheService}
@@ -50,34 +57,54 @@ export class CacheService implements ICacheService, OnModuleInit {
   }
 
   onModuleInit(): void {
-    this._client = this._redisConnection.getClient();
-
-    if (this._client && this._redisConnection.isAvailable) {
-      this._logger.LogInfo(
-        'Cache service (Redis) initialized with compression enabled',
-      );
-    } else {
+    if (!this._redisConnection.redisUrl) {
       this._logger.LogWarning(
-        'Redis connection not available, cache operations will fail-open (get=null, set=no-op, getOrSet=compute)',
+        'REDIS_URL not configured, cache will stay fail-open',
       );
+      return;
     }
+
+    this._logger.LogInfo(
+      'Cache service registered; will use Redis when available.',
+    );
   }
 
   /**
-   * Check if Redis is available with cooldown to reduce log spam.
-   * Throws error only once per cooldown period.
+   * Ensure Redis is connected and return the client.
+   * Dynamically checks Redis availability on every call.
+   * Throws error if Redis is not available (caught by fail-open handlers).
    */
-  private _ensureConnected(): void {
-    if (!this._client || !this._redisConnection.isAvailable) {
+  private _ensureConnected(): Redis {
+    if (!this._redisConnection.isAvailable) {
       const now = Date.now();
       if (
         now - this._lastConnectionCheckTime >
         this._connectionCheckCooldownMs
       ) {
         this._lastConnectionCheckTime = now;
+        this._logger.LogWarning('Redis cache is not available');
       }
-      throw new Error('Redis cache is not available');
+      throw new Error('Redis cache unavailable');
     }
+
+    const client = this._redisConnection.getClient();
+
+    if (!client) {
+      const now = Date.now();
+      if (
+        now - this._lastConnectionCheckTime >
+        this._connectionCheckCooldownMs
+      ) {
+        this._lastConnectionCheckTime = now;
+        this._logger.LogWarning(
+          'Redis cache client is null while Redis is marked available',
+        );
+      }
+      throw new Error('Redis cache unavailable');
+    }
+
+    this._client = client; // Update cached reference
+    return client;
   }
 
   /**
@@ -98,8 +125,8 @@ export class CacheService implements ICacheService, OnModuleInit {
 
   async get<T>(key: string): Promise<T | null> {
     try {
-      this._ensureConnected();
-      const value = await this._client!.get(key);
+      const client = this._ensureConnected();
+      const value = await client.get(key);
 
       if (value === null) {
         return null;
@@ -114,13 +141,13 @@ export class CacheService implements ICacheService, OnModuleInit {
 
   async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
     try {
-      this._ensureConnected();
+      const client = this._ensureConnected();
       const serialized = this._serialize(value);
 
       if (ttlSeconds) {
-        await this._client!.setex(key, ttlSeconds, serialized);
+        await client.setex(key, ttlSeconds, serialized);
       } else {
-        await this._client!.set(key, serialized);
+        await client.set(key, serialized);
       }
     } catch (error) {
       this._logger.LogError(`Redis cache set error for key: ${key}`, error);
@@ -153,7 +180,7 @@ export class CacheService implements ICacheService, OnModuleInit {
     ttlSeconds?: number,
   ): Promise<T> {
     try {
-      this._ensureConnected();
+      const client = this._ensureConnected();
 
       // 1. Fast path: check cache first
       const cached = await this.get<T>(key);
@@ -164,13 +191,7 @@ export class CacheService implements ICacheService, OnModuleInit {
       // 2. Try to acquire lock using SET NX
       const lockKey = `${key}:lock`;
       const lockTtl = 30; // 30 seconds lock TTL
-      const lockAcquired = await this._client!.set(
-        lockKey,
-        '1',
-        'EX',
-        lockTtl,
-        'NX',
-      );
+      const lockAcquired = await client.set(lockKey, '1', 'EX', lockTtl, 'NX');
 
       if (lockAcquired === 'OK') {
         // We acquired the lock, execute factory
@@ -183,7 +204,7 @@ export class CacheService implements ICacheService, OnModuleInit {
           return value;
         } finally {
           // Release lock
-          await this._client!.del(lockKey);
+          await client.del(lockKey);
         }
       } else {
         // Another instance is computing, wait and retry GET with backoff
@@ -227,8 +248,8 @@ export class CacheService implements ICacheService, OnModuleInit {
 
   async remove(key: string): Promise<void> {
     try {
-      this._ensureConnected();
-      await this._client!.del(key);
+      const client = this._ensureConnected();
+      await client.del(key);
     } catch (error) {
       this._logger.LogError(`Redis cache remove error for key: ${key}`, error);
       // Fail-open: don't throw
@@ -237,8 +258,8 @@ export class CacheService implements ICacheService, OnModuleInit {
 
   async exists(key: string): Promise<boolean> {
     try {
-      this._ensureConnected();
-      const result = await this._client!.exists(key);
+      const client = this._ensureConnected();
+      const result = await client.exists(key);
       return result === 1;
     } catch (error) {
       this._logger.LogError(`Redis cache exists error for key: ${key}`, error);
@@ -261,7 +282,7 @@ export class CacheService implements ICacheService, OnModuleInit {
    */
   async clearByPrefix(prefix: string): Promise<void> {
     try {
-      this._ensureConnected();
+      const client = this._ensureConnected();
 
       let cursor = '0';
       let totalDeleted = 0;
@@ -269,7 +290,7 @@ export class CacheService implements ICacheService, OnModuleInit {
 
       do {
         // Use SCAN to find keys (non-blocking)
-        const [nextCursor, keys] = await this._client!.scan(
+        const [nextCursor, keys] = await client.scan(
           cursor,
           'MATCH',
           `${prefix}*`,
@@ -281,7 +302,7 @@ export class CacheService implements ICacheService, OnModuleInit {
 
         if (keys.length > 0) {
           // Delete in batch using pipeline
-          const pipeline = this._client!.pipeline();
+          const pipeline = client.pipeline();
           for (const key of keys) {
             pipeline.del(key);
           }
@@ -306,13 +327,13 @@ export class CacheService implements ICacheService, OnModuleInit {
 
   async getMany<T>(keys: string[]): Promise<(T | null)[]> {
     try {
-      this._ensureConnected();
+      const client = this._ensureConnected();
 
       if (keys.length === 0) {
         return [];
       }
 
-      const values = await this._client!.mget(...keys);
+      const values = await client.mget(...keys);
       return values.map((value) => {
         if (value === null) {
           return null;
@@ -340,14 +361,14 @@ export class CacheService implements ICacheService, OnModuleInit {
     ttlSeconds?: number,
   ): Promise<void> {
     try {
-      this._ensureConnected();
+      const client = this._ensureConnected();
 
       if (entries.length === 0) {
         return;
       }
 
       // Use pipeline for efficiency
-      const pipeline = this._client!.pipeline();
+      const pipeline = client.pipeline();
 
       for (const { key, value } of entries) {
         const serialized = this._serialize(value);
@@ -369,6 +390,7 @@ export class CacheService implements ICacheService, OnModuleInit {
    * Check if Redis is connected and available
    */
   get isConnected(): boolean {
-    return this._redisConnection.isAvailable && this._client !== null;
+    return this._redisConnection.isAvailable;
   }
 }
+

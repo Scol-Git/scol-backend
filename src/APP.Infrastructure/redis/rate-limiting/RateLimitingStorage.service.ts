@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import type { IRateLimitingStorage } from '@shared/interfaces/infrastructure/IRateLimitingStorage.interface';
 import { ILogger } from '@shared/tokens/injection.tokens';
 import type { ILogger as ILoggerInterface } from '@shared/interfaces/logging';
-import { RedisConnectionService } from '../../cache/RedisConnectionService.service';
+import { RedisConnectionService } from '../RedisConnectionService.service';
 
 /**
  * Lua script for atomic sliding window rate limiting using Redis Sorted Set.
@@ -68,6 +68,7 @@ return count
  * - Sorted set-based implementation (efficient)
  * - Fail-open behavior (never blocks on errors)
  * - Automatic key expiration
+ * - Dynamic Redis recovery (auto-reconnects without restart)
  *
  * **Algorithm:**
  * - Uses Redis Sorted Set (ZSET)
@@ -80,6 +81,12 @@ return count
  * - No race conditions (atomic operations)
  * - Automatic cleanup (ZREMRANGEBYSCORE in script)
  * - Efficient for high-throughput scenarios
+ *
+ * **Dynamic Recovery:**
+ * - Checks Redis availability on every operation
+ * - Automatically uses Redis when it becomes available
+ * - No restart required for Redis reconnection
+ * - Fails open gracefully when Redis is unavailable
  *
  * **Behavior:**
  * - On Redis error: fails open (returns { count: 0, remaining: limit })
@@ -102,49 +109,74 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    this._client = this._redisConnection.getClient();
+    if (!this._redisConnection.redisUrl) {
+      this._logger.LogWarning(
+        'REDIS_URL not configured, rate limiting will fail-open',
+      );
+      return;
+    }
 
-    if (this._client && this._redisConnection.isAvailable) {
-      try {
-        // Load Lua script into Redis (stored as SHA for efficiency)
-        const scriptSha = await this._client.script(
-          'LOAD',
-          RATE_LIMIT_LUA_SCRIPT,
-        );
-        this._luaScriptSha = String(scriptSha);
-
-        this._logger.LogInfo(
-          `Rate limiting storage (Redis) initialized with Lua script (SHA: ${this._luaScriptSha.substring(0, 8)}...)`,
-        );
-      } catch (error) {
-        this._logger.LogWarning(
-          'Failed to load Lua script for rate limiting, will use inline script',
-          { error },
-        );
-        // Don't fail initialization, we'll use inline script as fallback
+    // Try to pre-load Lua script if Redis is available now
+    if (this._redisConnection.isAvailable) {
+      const client = this._redisConnection.getClient();
+      if (client) {
+        try {
+          this._luaScriptSha = String(
+            await client.script('LOAD', RATE_LIMIT_LUA_SCRIPT),
+          );
+          this._logger.LogInfo(
+            `Rate limiting registered with Lua script (SHA: ${this._luaScriptSha.substring(0, 8)}...)`,
+          );
+        } catch (error) {
+          this._logger.LogWarning(
+            'Failed to pre-load Lua script, will use inline script',
+            { error },
+          );
+        }
       }
     } else {
-      this._logger.LogWarning(
-        'Redis connection not available, rate limiting will fail-open (allow-all: count=0, remaining=limit)',
+      this._logger.LogInfo(
+        'Rate limiting registered; will use Redis when available.',
       );
     }
   }
 
   /**
-   * Check if Redis is available with cooldown to reduce log spam.
-   * Throws error only once per cooldown period.
+   * Ensure Redis is connected and return the client.
+   * Dynamically checks Redis availability on every call.
+   * Throws error if Redis is not available (caught by fail-open handlers).
    */
-  private _ensureConnected(): void {
-    if (!this._client || !this._redisConnection.isAvailable) {
+  private _ensureConnected(): Redis {
+    if (!this._redisConnection.isAvailable) {
       const now = Date.now();
       if (
         now - this._lastConnectionCheckTime >
         this._connectionCheckCooldownMs
       ) {
         this._lastConnectionCheckTime = now;
+        this._logger.LogWarning('Redis rate limiting unavailable');
       }
-      throw new Error('Redis rate limiting storage is not available');
+      throw new Error('Redis rate limiting unavailable');
     }
+
+    const client = this._redisConnection.getClient();
+
+    if (!client) {
+      const now = Date.now();
+      if (
+        now - this._lastConnectionCheckTime >
+        this._connectionCheckCooldownMs
+      ) {
+        this._lastConnectionCheckTime = now;
+        this._logger.LogWarning(
+          'Rate limit client is null while Redis is marked available',
+        );
+      }
+      throw new Error('Redis rate limiting unavailable');
+    }
+
+    this._client = client; // Update cached reference
+    return client;
   }
 
   /**
@@ -178,7 +210,7 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
     remaining: number;
   }> {
     try {
-      this._ensureConnected();
+      const client = this._ensureConnected();
 
       const now = Date.now() / 1000; // Unix timestamp in seconds with decimals
       const windowStart = now - windowSeconds;
@@ -190,7 +222,7 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
       try {
         // Try to use pre-loaded script (faster)
         if (this._luaScriptSha) {
-          const result = await this._client!.evalsha(
+          const result = await client.evalsha(
             this._luaScriptSha,
             1,
             key,
@@ -202,7 +234,7 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
           count = Number(result);
         } else {
           // Fallback to inline script
-          const result = await this._client!.eval(
+          const result = await client.eval(
             RATE_LIMIT_LUA_SCRIPT,
             1,
             key,
@@ -225,14 +257,14 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
             'Lua script not found in Redis, reloading...',
           );
 
-          const loadResult = await this._client!.script(
+          const loadResult = await client.script(
             'LOAD',
             RATE_LIMIT_LUA_SCRIPT,
           );
           this._luaScriptSha = String(loadResult);
 
           // Retry with newly loaded script
-          const result = await this._client!.evalsha(
+          const result = await client.evalsha(
             this._luaScriptSha,
             1,
             key,
@@ -275,8 +307,8 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
    */
   async reset(key: string): Promise<void> {
     try {
-      this._ensureConnected();
-      await this._client!.del(key);
+      const client = this._ensureConnected();
+      await client.del(key);
     } catch (error) {
       this._logger.LogError(
         `Redis rate limiting reset error for key: ${key}`,
@@ -295,13 +327,13 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
    */
   async getCurrentCount(key: string, windowSeconds: number): Promise<number> {
     try {
-      this._ensureConnected();
+      const client = this._ensureConnected();
 
       const now = Math.floor(Date.now() / 1000);
       const windowStart = now - windowSeconds;
 
       // Use pipeline for atomic operations
-      const pipeline = this._client!.pipeline();
+      const pipeline = client.pipeline();
       pipeline.zremrangebyscore(key, '-inf', windowStart);
       pipeline.zcard(key);
 
@@ -321,3 +353,4 @@ export class RateLimitingStorage implements IRateLimitingStorage, OnModuleInit {
     }
   }
 }
+

@@ -4,7 +4,7 @@ import { PermissionGuard } from './PermissionGuard.guard';
 import { RoleGuard } from './RoleGuard.guard';
 import { RateLimitGuard } from './RateLimitGuard.guard';
 import { OtpJwtGuard } from './OtpJwtGuard.guard';
-import { RateLimitingModule } from '@infra/rate-limiting/RateLimitingModule.module';
+import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModule.module';
 
 /**
  * Guards Module

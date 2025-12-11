@@ -36,3 +36,4 @@ docker exec $CONTAINER_NAME redis-cli --no-auth-warning -a $REDIS_PASSWORD --sca
 
 
 
+

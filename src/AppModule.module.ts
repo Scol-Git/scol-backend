@@ -7,8 +7,8 @@ import { SecurityModule } from '@infra/security/SecurityModule.module';
 import { MappingModule } from '@bll/mappings/MappingModule.module';
 import { TypeOrmModule } from '@infra/db/typeorm/TypeOrmModule.module';
 import { AppConfigModule } from '@infra/config/AppConfigModule.module';
-import { CacheModule } from '@infra/cache/CacheModule.module';
-import { RateLimitingModule } from '@infra/rate-limiting/RateLimitingModule.module';
+import { CacheModule } from '@infra/redis/cache/CacheModule.module';
+import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModule.module';
 
 /**
  * Root Application Module
