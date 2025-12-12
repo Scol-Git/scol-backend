@@ -32,7 +32,6 @@ import { UserDto } from '@shared/dtos/auth/UserDto';
 import type { OtpUserPayload } from '@shared/interfaces/auth/OtpUserPayload.interface';
 import { SysUsers } from '@entity/entities/SysUsers.entity';
 import { SysLeadProfiles } from '@entity/entities/SysLeadProfiles.entity';
-import { PendingRegistration } from '@entity/entities/PendingRegistration.entity';
 import { AccountStatus } from '@shared/enums/AccountStatus.enum';
 import { UserType } from '@shared/enums/UserType.enum';
 import { PhoneAlreadyExistsException } from '@shared/exceptions/auth/PhoneAlreadyExistsException';
@@ -107,18 +106,23 @@ export class AuthService {
       Date.now() + this.securityConfig.otp.ttlSeconds * 1000,
     );
 
-    // Save pending registration (Redis-first with DB fallback)
-    const pendingId = await this.otp.savePending(
+    // Generate OTP first
+    const plainOtp = this.otp.generateOtp();
+
+    // Save pending registration WITH OTP (Redis-first with DB fallback)
+    // This ensures cache and DB have the SAME data structure
+    const pendingId = await this.otp.savePendingWithOtp(
       dto.phone,
       passwordHash,
       dto.fullName,
+      plainOtp,
       expiresAt,
     );
 
-    const plainOtp = await this.otp.generateAndStoreOtp(
-      pendingId,
-      dto.phone,
-    );
+    // Check session limits (first OTP in this registration session)
+    await this.otp.ensureCanSendOtpForSession(dto.phone, pendingId);
+
+    // Send OTP via SMS
     await this.sms.sendOtp(dto.phone, plainOtp);
 
     const otpToken = this.jwt.generateOtpToken({
@@ -136,7 +140,7 @@ export class AuthService {
 
     return {
       otpAccessToken: otpToken,
-      expiresIn: 300,
+      expiresIn: this.securityConfig.otp.ttlSeconds,
       message:
         'Registration successful. Please verify your phone with the OTP sent via SMS.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
@@ -271,7 +275,10 @@ export class AuthService {
       action: 'RESEND_OTP_START',
     });
 
-    await this.otp.canResendOtp(otpUserPayload.phone, ip);
+    await this.otp.ensureCanSendOtpForSession(
+      otpUserPayload.phone,
+      otpUserPayload.pendingId,
+    );
 
     // Get pending registration data (Redis-first with DB fallback)
     const pendingData = await this.otp.getPending(
@@ -294,7 +301,10 @@ export class AuthService {
 
     // Check if pending registration has expired
     if (pendingData.expiresAt < new Date()) {
-      await this.otp.deletePending(otpUserPayload.phone, otpUserPayload.pendingId);
+      await this.otp.deletePending(
+        otpUserPayload.phone,
+        otpUserPayload.pendingId,
+      );
       this.logger.warn('Pending registration expired on resend', {
         context: 'AuthService.resendOtp',
         pendingId: otpUserPayload.pendingId,
@@ -307,11 +317,17 @@ export class AuthService {
       );
     }
 
-    const plainOtp = await this.otp.generateAndStoreOtp(
-      otpUserPayload.pendingId,
+    // Generate new OTP
+    const plainOtp = this.otp.generateOtp();
+
+    // Update OTP in pending registration (keeps cache and DB in sync)
+    await this.otp.updateOtpInPending(
       otpUserPayload.phone,
+      otpUserPayload.pendingId,
+      plainOtp,
     );
 
+    // Send OTP via SMS
     await this.sms.sendOtp(otpUserPayload.phone, plainOtp);
 
     const otpToken = this.jwt.generateOtpToken({
@@ -328,7 +344,7 @@ export class AuthService {
 
     return {
       otpAccessToken: otpToken,
-      expiresIn: 300,
+      expiresIn: this.securityConfig.otp.ttlSeconds,
       message: 'OTP resent successfully.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       ...(this.isDevelopment && { devOtp: plainOtp }),
@@ -501,7 +517,7 @@ export class AuthService {
     });
 
     return {
-      accessToken: newAccessToken
+      accessToken: newAccessToken,
     };
   }
 

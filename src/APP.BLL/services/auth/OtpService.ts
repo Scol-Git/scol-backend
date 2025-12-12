@@ -6,8 +6,6 @@ import { IPasswordHasher } from '@shared/interfaces/security';
 import { IPasswordHasher as IPasswordHasherToken } from '@shared/tokens/injection.tokens';
 import { ISecurityConfig } from '@shared/interfaces/config/ISecurityConfig.interface';
 import { ISecurityConfig as ISecurityConfigToken } from '@shared/tokens/injection.tokens';
-import { IRateLimitingStorage } from '@shared/interfaces/infrastructure';
-import { IRateLimitingStorage as IRateLimitingStorageToken } from '@shared/tokens/injection.tokens';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import { InvalidOtpException } from '@shared/exceptions/auth/InvalidOtpException';
@@ -18,27 +16,26 @@ import { BusinessException } from '@shared/exceptions/BusinessException';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { PendingRegistration } from '@entity/entities/PendingRegistration.entity';
 
-interface OtpCacheData {
-  pendingId: string;
-  otpHash: string;
-  attempts: number;
-  createdAt: number;
-}
-
-interface PendingRegistrationData {
-  pendingId: string;
-  passwordHash: string;
-  fullName: string;
-  attemptCount: number;
-  resendCount: number;
-  expiresAt: number; // Unix timestamp in milliseconds
-}
+type PendingRegistrationCache = Pick<
+  PendingRegistration,
+  | 'id'
+  | 'phone'
+  | 'passwordHash'
+  | 'fullName'
+  | 'attemptCount'
+  | 'resendCount'
+  | 'expiresAt'
+  | 'lastOtpSentAt'
+  | 'otpHash'
+  | 'otpAttempts'
+  | 'otpCreatedAt'
+>;
 
 /**
  * OTP Service
  *
- * Manages OTP generation, verification, and rate limiting.
- * Uses cache for OTP storage and rate limiting storage for cooldowns and daily limits.
+ * Manages OTP generation, verification, and per-session rate limiting.
+ * Simple approach: Always save to BOTH Redis and DB to keep them in sync.
  */
 @Injectable()
 export class OtpService {
@@ -46,16 +43,14 @@ export class OtpService {
   private readonly otpTtl: number;
   private readonly maxAttempts: number;
   private readonly resendCooldown: number;
-  private readonly dailyLimitPerPhone: number;
-  private readonly dailyLimitPerIp: number;
+  private readonly maxResendPerSession: number;
   private readonly redisPrefix: string;
+  private readonly maxTotalOtps: number;
 
   constructor(
     @Inject(ICacheServiceToken) private readonly cache: ICacheService,
     @Inject(IPasswordHasherToken) private readonly hasher: IPasswordHasher,
     @Inject(ISecurityConfigToken) private readonly config: ISecurityConfig,
-    @Inject(IRateLimitingStorageToken)
-    private readonly rateLimiter: IRateLimitingStorage,
     @Inject(ILoggerToken) private readonly logger: ILogger,
     private readonly db: AppDbContext,
   ) {
@@ -63,338 +58,204 @@ export class OtpService {
     this.otpTtl = config.otp.ttlSeconds;
     this.maxAttempts = config.otp.maxAttempts;
     this.resendCooldown = config.otp.resendCooldownSeconds;
-    this.dailyLimitPerPhone = config.otp.dailyLimitPerPhone;
-    this.dailyLimitPerIp = config.otp.dailyLimitPerIp;
+    this.maxResendPerSession = config.otp.maxResendPerSession;
     this.redisPrefix = config.otp.redisPrefix;
+    this.maxTotalOtps = this.maxResendPerSession + 1;
   }
 
   /**
    * Generate random numeric OTP
    */
-  private generateOtp(): string {
+  public generateOtp(): string {
     const min = Math.pow(10, this.otpLength - 1);
     const max = Math.pow(10, this.otpLength) - 1;
     return Math.floor(Math.random() * (max - min + 1) + min).toString();
   }
 
   /**
-   * Generate and store OTP in cache
-   * @param pendingId Pending Registration ID
-   * @param phone Phone number
-   * @returns Plain OTP string (for sending via SMS)
+   * Save pending registration WITH OTP
+   * Saves to BOTH Redis and DB to keep them in sync
    */
-  async generateAndStoreOtp(pendingId: string, phone: string): Promise<string> {
-    const otp = this.generateOtp();
-    const otpHash = await this.hasher.hash(otp);
+  async savePendingWithOtp(
+    phone: string,
+    passwordHash: string,
+    fullName: string,
+    plainOtp: string,
+    expiresAt: Date,
+  ): Promise<string> {
+    const otpHash = await this.hasher.hash(plainOtp);
+    const existingPending = await this.getPendingByPhone(phone);
 
-    const cacheData: OtpCacheData = {
-      pendingId,
+    // If existing and not expired, update it
+    if (existingPending && this.isNotExpired(existingPending.expiresAt)) {
+      const updated: PendingRegistrationCache = {
+        ...existingPending,
+        passwordHash,
+        fullName,
+        expiresAt,
+        otpHash,
+        otpAttempts: 0,
+        otpCreatedAt: new Date(),
+      };
+
+      await this.savePendingToCacheAndDb(phone, updated);
+      this.logPendingOperation('updated', phone, existingPending.id);
+      return existingPending.id;
+    }
+
+    // Create new registration
+    const newPendingId = randomUUID();
+    const newData: PendingRegistrationCache = {
+      id: newPendingId,
+      phone,
+      passwordHash,
+      fullName,
+      attemptCount: 0,
+      resendCount: 0,
+      expiresAt,
+      lastOtpSentAt: undefined,
       otpHash,
-      attempts: 0,
-      createdAt: Date.now(),
+      otpAttempts: 0,
+      otpCreatedAt: new Date(),
     };
 
-    const key = this.getOtpCacheKey(phone);
-    await this.cache.set(key, JSON.stringify(cacheData), this.otpTtl);
-
-    return otp;
+    await this.savePendingToCacheAndDb(phone, newData);
+    this.logPendingOperation('created', phone, newPendingId);
+    return newPendingId;
   }
 
   /**
    * Verify OTP
-   * @param phone Phone number
-   * @param otp OTP to verify
-   * @returns Pending Registration ID if verification successful
-   * @throws InvalidOtpException, OtpExpiredException, OtpAttemptsExceededException
+   * Reads from Redis first, falls back to DB
    */
   async verifyOtp(phone: string, otp: string): Promise<{ pendingId: string }> {
-    const key = this.getOtpCacheKey(phone);
-    const cached = await this.cache.get(key);
+    const pendingData = await this.getPendingByPhone(phone);
 
-    if (!cached) {
+    if (!pendingData?.otpHash) {
       throw new OtpExpiredException();
     }
 
-    const data: OtpCacheData = JSON.parse(cached as string);
+    // Check if OTP expired
+    if (pendingData.otpCreatedAt) {
+      const otpAge = Date.now() - this.toTimestamp(pendingData.otpCreatedAt);
+      if (otpAge > this.otpTtl * 1000) {
+        throw new OtpExpiredException();
+      }
+    }
 
     // Check attempts
-    if (data.attempts >= this.maxAttempts) {
-      await this.cache.remove(key);
+    if (pendingData.otpAttempts >= this.maxAttempts) {
+      await this.deletePending(phone, pendingData.id);
       throw new OtpAttemptsExceededException(this.maxAttempts);
     }
 
     // Verify OTP
-    const isValid = await this.hasher.verify(otp, data.otpHash);
+    const isValid = await this.hasher.verify(otp, pendingData.otpHash);
 
     if (!isValid) {
-      // Increment attempts
-      data.attempts++;
-      await this.cache.set(key, JSON.stringify(data), this.otpTtl);
+      await this.incrementOtpAttempts(phone, pendingData.id);
       throw new InvalidOtpException();
     }
 
-    // Success - delete OTP from cache
-    await this.cache.remove(key);
-
-    return { pendingId: data.pendingId };
+    return { pendingId: pendingData.id };
   }
 
   /**
-   * Delete OTP from cache
-   * @param phone Phone number
+   * Check if we can send (or resend) OTP for this registration session
+   * Updates resendCount and lastOtpSentAt in both Redis and DB
    */
-  async deleteOtp(phone: string): Promise<void> {
-    const key = this.getOtpCacheKey(phone);
-    await this.cache.remove(key);
-  }
-
-  /**
-   * Check if OTP can be resent (rate limiting)
-   * Uses IRateLimitingStorage for distributed rate limiting with sliding window.
-   * 
-   * Rules:
-   * - 1 resend per 60 seconds (strict cooldown)
-   * - Maximum 3 resends per hour
-   * 
-   * @param phone Phone number (used as user identifier)
-   * @param ip Client IP address (not used for rate limiting, kept for logging)
-   * @throws OtpResendRateLimitException with 429 status and Retry-After header
-   */
-  async canResendOtp(phone: string, ip: string): Promise<void> {
-    // 1. Check resend cooldown: 1 resend per 60 seconds
-    const cooldownKey = `otp:cooldown:${phone}`;
-    const cooldownResult = await this.rateLimiter.increment(
-      cooldownKey,
-      60, // 60 seconds window
-      1, // Allow only 1 resend per window
-    );
-
-    if (cooldownResult.count > 1) {
-      const retryAfter = Math.max(
-        1,
-        cooldownResult.reset - Math.floor(Date.now() / 1000),
-      );
-      throw new OtpResendRateLimitException(
-        `Please wait ${retryAfter} seconds before requesting a new OTP.`,
-        retryAfter,
-      );
-    }
-
-    // 2. Check hourly limit: maximum 3 resends per hour
-    const hourlyKey = `otp:hourly:${phone}`;
-    const hourlyResult = await this.rateLimiter.increment(
-      hourlyKey,
-      3600, // 1 hour window
-      3, // Maximum 3 resends per hour
-    );
-
-    if (hourlyResult.count > 3) {
-      const retryAfter = Math.max(
-        1,
-        hourlyResult.reset - Math.floor(Date.now() / 1000),
-      );
-      throw new OtpResendRateLimitException(
-        `You have exceeded the hourly OTP resend limit (3 per hour). Please wait ${retryAfter} seconds.`,
-        retryAfter,
-      );
-    }
-  }
-
-  /**
-   * Get OTP cache key
-   */
-  private getOtpCacheKey(phone: string): string {
-    return `${this.redisPrefix}phone_verify:${phone}`;
-  }
-
-  /**
-   * Get pending registration cache key
-   */
-  private getPendingCacheKey(phone: string): string {
-    return `pending:${phone}`;
-  }
-
-  /**
-   * Save or update pending registration (Redis-first with DB fallback)
-   *
-   * Strategy:
-   * 1. Try Redis first - check for existing pending registration
-   * 2. If Redis data exists and not expired → update it
-   * 3. If Redis data exists but expired → delete it, treat as new
-   * 4. If Redis fails or returns null → fallback to DB
-   * 5. Return pendingId (from Redis UUID or DB id)
-   *
-   * @param phone Phone number
-   * @param passwordHash Hashed password
-   * @param fullName User's full name
-   * @param expiresAt Expiration timestamp (Date object)
-   * @returns Pending registration ID (UUID for Redis, DB id for fallback)
-   */
-  async savePending(
+  async ensureCanSendOtpForSession(
     phone: string,
-    passwordHash: string,
-    fullName: string,
-    expiresAt: Date,
-  ): Promise<string> {
-    const redisKey = this.getPendingCacheKey(phone);
-    const expiresAtTimestamp = expiresAt.getTime();
-    const now = Date.now();
-    const ttlSeconds = 300; // 5 minutes (EX 300)
+    pendingId: string,
+  ): Promise<void> {
+    const pending = await this.getPendingByIdAndPhone(phone, pendingId);
 
-    // Try Redis first
-    try {
-      const cached = await this.cache.get<string>(redisKey);
-
-      if (cached) {
-        const data: PendingRegistrationData = JSON.parse(cached);
-
-        // Check if expired
-        if (data.expiresAt > now) {
-          // Update existing (not expired)
-          const updated: PendingRegistrationData = {
-            pendingId: data.pendingId, // Keep existing pendingId
-            passwordHash,
-            fullName,
-            attemptCount: data.attemptCount,
-            resendCount: data.resendCount,
-            expiresAt: expiresAtTimestamp,
-          };
-
-          await this.cache.set(redisKey, JSON.stringify(updated), ttlSeconds);
-
-          this.logger.LogInfo('Pending registration updated in Redis', {
-            context: 'OtpService.savePending',
-            phone: phone.substring(0, 3) + '***',
-            pendingId: data.pendingId,
-            action: 'PENDING_UPDATED_REDIS',
-          });
-
-          return data.pendingId;
-        } else {
-          // Expired - delete from Redis
-          await this.cache.remove(redisKey);
-          this.logger.LogInfo('Expired pending registration removed from Redis', {
-            context: 'OtpService.savePending',
-            phone: phone.substring(0, 3) + '***',
-            action: 'PENDING_EXPIRED_REDIS',
-          });
-        }
-      }
-
-      // Create new in Redis
-      const newPendingId = randomUUID();
-      const newData: PendingRegistrationData = {
-        pendingId: newPendingId,
-        passwordHash,
-        fullName,
-        attemptCount: 0,
-        resendCount: 0,
-        expiresAt: expiresAtTimestamp,
-      };
-
-      await this.cache.set(redisKey, JSON.stringify(newData), ttlSeconds);
-
-      this.logger.LogInfo('Pending registration created in Redis', {
-        context: 'OtpService.savePending',
-        phone: phone.substring(0, 3) + '***',
-        pendingId: newPendingId,
-        action: 'PENDING_CREATED_REDIS',
-      });
-
-      return newPendingId;
-    } catch (error) {
-      // Redis failed - fallback to DB
-      this.logger.LogError(
-        'Redis operation failed, falling back to database',
-        error as Error,
-        {
-          context: 'OtpService.savePending',
-          phone: phone.substring(0, 3) + '***',
-          action: 'REDIS_FALLBACK_DB',
-        },
-      );
-
-      return await this.savePendingToDb(phone, passwordHash, fullName, expiresAt);
-    }
-  }
-
-  /**
-   * Fallback: Save pending registration to database
-   * Mirrors the same logic as Redis but uses PostgreSQL
-   */
-  private async savePendingToDb(
-    phone: string,
-    passwordHash: string,
-    fullName: string,
-    expiresAt: Date,
-  ): Promise<string> {
-    // Check for existing pending registration in DB
-    let pending: PendingRegistration | null =
-      await this.db.pendingRegistrations.findOne({
-        where: { phone },
-      });
-
-    if (pending) {
-      // Check if expired
-      if (pending.expiresAt < new Date()) {
-        // Delete expired pending registration
-        await this.db.pendingRegistrations.remove(pending);
-        pending = null;
-        this.logger.LogInfo('Expired pending registration removed from DB', {
-          context: 'OtpService.savePendingToDb',
-          phone: phone.substring(0, 3) + '***',
-          action: 'PENDING_EXPIRED_DB',
-        });
-      } else {
-        // Update existing pending registration
-        pending.passwordHash = passwordHash;
-        pending.fullName = fullName;
-        pending.expiresAt = expiresAt;
-        await this.db.pendingRegistrations.save(pending);
-
-        this.logger.LogInfo('Pending registration updated in DB', {
-          context: 'OtpService.savePendingToDb',
-          phone: phone.substring(0, 3) + '***',
-          pendingId: pending.id,
-          action: 'PENDING_UPDATED_DB',
-        });
-
-        return pending.id;
-      }
-    }
-
-    // Create new pending registration if none exists or was expired
     if (!pending) {
-      pending = this.db.pendingRegistrations.create({
-        phone,
-        passwordHash,
-        fullName,
-        attemptCount: 0,
-        resendCount: 0,
-        expiresAt,
-      });
-      await this.db.pendingRegistrations.save(pending);
-
-      this.logger.LogInfo('Pending registration created in DB', {
-        context: 'OtpService.savePendingToDb',
-        phone: phone.substring(0, 3) + '***',
-        pendingId: pending.id,
-        action: 'PENDING_CREATED_DB',
-      });
-
-      return pending.id;
+      throw new BusinessException(
+        'Registration session expired. Please register again.',
+        'REGISTRATION_EXPIRED',
+      );
     }
 
-    // This should never happen, but TypeScript needs it
-    throw new Error('Unexpected state: pending registration should exist');
+    // Check if expired
+    if (!this.isNotExpired(pending.expiresAt)) {
+      await this.deletePending(phone, pendingId);
+      throw new BusinessException(
+        'Registration session expired. Please register again.',
+        'REGISTRATION_EXPIRED',
+      );
+    }
+
+    // Check max OTPs per session
+    const currentCount = pending.resendCount ?? 0;
+    if (currentCount >= this.maxTotalOtps) {
+      throw new OtpResendRateLimitException(
+        'You have reached the maximum number of OTPs for this registration.',
+        0,
+      );
+    }
+
+    // Check cooldown
+    if (pending.lastOtpSentAt) {
+      const elapsedSeconds = this.getElapsedSeconds(
+        pending.lastOtpSentAt,
+        Date.now(),
+      );
+      if (elapsedSeconds < this.resendCooldown) {
+        const retryAfter = this.resendCooldown - elapsedSeconds;
+        throw new OtpResendRateLimitException(
+          `Please wait ${retryAfter} seconds before requesting a new OTP.`,
+          retryAfter,
+        );
+      }
+    }
+
+    // Update counters
+    await this.updateResendCounters(phone, pending, currentCount + 1);
   }
 
   /**
-   * Get pending registration data by pendingId (checks Redis first, then DB)
-   *
-   * @param pendingId Pending registration ID (UUID from Redis or DB id)
-   * @param phone Phone number (for Redis lookup)
-   * @returns Pending registration data or null if not found
+   * Update OTP in existing pending registration (for resends)
+   * Updates both Redis and DB
+   */
+  async updateOtpInPending(
+    phone: string,
+    pendingId: string,
+    plainOtp: string,
+  ): Promise<void> {
+    const otpHash = await this.hasher.hash(plainOtp);
+    const redisKey = this.getPendingCacheKey(phone);
+
+    // Try to update Redis
+    const cached =
+      await this.safeGetFromCache<PendingRegistrationCache>(redisKey);
+    if (cached && cached.id === pendingId) {
+      cached.otpHash = otpHash;
+      cached.otpAttempts = 0;
+      cached.otpCreatedAt = new Date();
+      await this.safeSetToCache(redisKey, cached, this.otpTtl);
+    }
+
+    // Always update DB
+    await this.db.pendingRegistrations.update(
+      { id: pendingId, phone },
+      {
+        otpHash,
+        otpAttempts: 0,
+        otpCreatedAt: new Date(),
+      },
+    );
+
+    this.logger.LogInfo('OTP updated in pending registration', {
+      context: 'OtpService.updateOtpInPending',
+      phone: this.maskPhone(phone),
+      pendingId,
+    });
+  }
+
+  /**
+   * Get pending registration data
+   * Tries Redis first, falls back to DB
    */
   async getPending(
     pendingId: string,
@@ -407,50 +268,14 @@ export class OtpService {
     resendCount: number;
     expiresAt: Date;
   } | null> {
-    const redisKey = this.getPendingCacheKey(phone);
-    const now = Date.now();
-
-    // Try Redis first
-    try {
-      const cached = await this.cache.get<string>(redisKey);
-      if (cached) {
-        const data: PendingRegistrationData = JSON.parse(cached);
-        if (data.pendingId === pendingId && data.expiresAt > now) {
-          return {
-            pendingId: data.pendingId,
-            passwordHash: data.passwordHash,
-            fullName: data.fullName,
-            attemptCount: data.attemptCount,
-            resendCount: data.resendCount,
-            expiresAt: new Date(data.expiresAt),
-          };
-        }
-      }
-    } catch (error) {
-      this.logger.LogError(
-        'Redis get failed, falling back to database',
-        error as Error,
-        {
-          context: 'OtpService.getPending',
-          phone: phone.substring(0, 3) + '***',
-          pendingId,
-          action: 'REDIS_FALLBACK_DB',
-        },
-      );
-    }
-
-    // Fallback to DB
-    const pending = await this.db.pendingRegistrations.findOne({
-      where: { id: pendingId, phone },
-    });
+    const pending = await this.getPendingByIdAndPhone(phone, pendingId);
 
     if (!pending) {
       return null;
     }
 
-    // Check if expired
-    if (pending.expiresAt < new Date()) {
-      await this.db.pendingRegistrations.remove(pending);
+    if (!this.isNotExpired(pending.expiresAt)) {
+      await this.deletePending(phone, pendingId);
       return null;
     }
 
@@ -466,29 +291,14 @@ export class OtpService {
 
   /**
    * Delete pending registration from both Redis and DB
-   *
-   * @param phone Phone number
-   * @param pendingId Pending registration ID (optional, for DB lookup)
    */
   async deletePending(phone: string, pendingId?: string): Promise<void> {
     const redisKey = this.getPendingCacheKey(phone);
 
     // Delete from Redis
-    try {
-      await this.cache.remove(redisKey);
-    } catch (error) {
-      this.logger.LogError(
-        'Failed to delete pending registration from Redis',
-        error as Error,
-        {
-          context: 'OtpService.deletePending',
-          phone: phone.substring(0, 3) + '***',
-          action: 'REDIS_DELETE_FAILED',
-        },
-      );
-    }
+    await this.safeRemoveFromCache(redisKey);
 
-    // Delete from DB (if pendingId provided)
+    // Delete from DB
     if (pendingId) {
       try {
         const pending = await this.db.pendingRegistrations.findOne({
@@ -498,17 +308,247 @@ export class OtpService {
           await this.db.pendingRegistrations.remove(pending);
         }
       } catch (error) {
-        this.logger.LogError(
-          'Failed to delete pending registration from DB',
-          error as Error,
-          {
-            context: 'OtpService.deletePending',
-            phone: phone.substring(0, 3) + '***',
-            pendingId,
-            action: 'DB_DELETE_FAILED',
-          },
-        );
+        this.logger.LogError('DB delete failed', error as Error, {
+          context: 'OtpService.deletePending',
+          phone: this.maskPhone(phone),
+          pendingId,
+        });
       }
     }
+  }
+
+  // ============================================
+  // PRIVATE HELPER METHODS
+  // ============================================
+
+  /**
+   * Get pending registration by phone (Redis-first with DB fallback)
+   */
+  private async getPendingByPhone(
+    phone: string,
+  ): Promise<PendingRegistrationCache | null> {
+    const redisKey = this.getPendingCacheKey(phone);
+
+    // Try Redis first
+    const cached =
+      await this.safeGetFromCache<PendingRegistrationCache>(redisKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fallback to DB
+    const dbPending = await this.db.pendingRegistrations.findOne({
+      where: { phone },
+    });
+
+    return dbPending ?? null;
+  }
+
+  /**
+   * Get pending registration by ID and phone (Redis-first with DB fallback)
+   */
+  private async getPendingByIdAndPhone(
+    phone: string,
+    pendingId: string,
+  ): Promise<PendingRegistrationCache | null> {
+    const redisKey = this.getPendingCacheKey(phone);
+
+    // Try Redis first
+    const cached =
+      await this.safeGetFromCache<PendingRegistrationCache>(redisKey);
+    if (cached && cached.id === pendingId) {
+      return cached;
+    }
+
+    // Fallback to DB
+    const dbPending = await this.db.pendingRegistrations.findOne({
+      where: { id: pendingId, phone },
+    });
+
+    return dbPending ?? null;
+  }
+
+  /**
+   * Save pending registration to both Redis and DB
+   */
+  private async savePendingToCacheAndDb(
+    phone: string,
+    data: PendingRegistrationCache,
+  ): Promise<void> {
+    const redisKey = this.getPendingCacheKey(phone);
+
+    // Save to Redis
+    await this.safeSetToCache(redisKey, data, this.otpTtl);
+
+    // Save to DB
+    if (data.id) {
+      const existing = await this.db.pendingRegistrations.findOne({
+        where: { id: data.id },
+      });
+
+      if (existing) {
+        await this.db.pendingRegistrations.update({ id: data.id }, data);
+      } else {
+        const pending = this.db.pendingRegistrations.create(data);
+        await this.db.pendingRegistrations.save(pending);
+      }
+    }
+  }
+
+  /**
+   * Update resend counters in both Redis and DB
+   */
+  private async updateResendCounters(
+    phone: string,
+    pending: PendingRegistrationCache,
+    newResendCount: number,
+  ): Promise<void> {
+    const redisKey = this.getPendingCacheKey(phone);
+    const newLastOtpSentAt = new Date();
+
+    pending.resendCount = newResendCount;
+    pending.lastOtpSentAt = newLastOtpSentAt;
+
+    await this.safeSetToCache(redisKey, pending, this.otpTtl);
+
+    await this.db.pendingRegistrations.update(
+      { id: pending.id },
+      {
+        resendCount: newResendCount,
+        lastOtpSentAt: newLastOtpSentAt,
+      },
+    );
+  }
+
+  /**
+   * Increment OTP attempt counter in both Redis and DB
+   */
+  private async incrementOtpAttempts(
+    phone: string,
+    pendingId: string,
+  ): Promise<void> {
+    const redisKey = this.getPendingCacheKey(phone);
+
+    // Try to increment in Redis
+    const cached =
+      await this.safeGetFromCache<PendingRegistrationCache>(redisKey);
+    if (cached) {
+      cached.otpAttempts = (cached.otpAttempts ?? 0) + 1;
+      await this.safeSetToCache(redisKey, cached, this.otpTtl);
+    }
+
+    // Always increment in DB
+    await this.db.pendingRegistrations.increment(
+      { id: pendingId, phone },
+      'otpAttempts',
+      1,
+    );
+  }
+
+  /**
+   * Safe get from cache with error handling
+   */
+  private async safeGetFromCache<T>(key: string): Promise<T | null> {
+    try {
+      const cached = await this.cache.get<string>(key);
+      if (!cached) {
+        return null;
+      }
+      return JSON.parse(cached) as T;
+    } catch (error) {
+      this.logger.LogError('Redis get failed', error as Error, {
+        context: 'OtpService',
+        key: key.substring(0, 20) + '...',
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Safe set to cache with error handling
+   */
+  private async safeSetToCache<T>(
+    key: string,
+    value: T,
+    ttlSeconds: number,
+  ): Promise<void> {
+    try {
+      await this.cache.set(key, JSON.stringify(value), ttlSeconds);
+    } catch (error) {
+      this.logger.LogError('Redis set failed', error as Error, {
+        context: 'OtpService',
+        key: key.substring(0, 20) + '...',
+      });
+    }
+  }
+
+  /**
+   * Safe remove from cache with error handling
+   */
+  private async safeRemoveFromCache(key: string): Promise<void> {
+    try {
+      await this.cache.remove(key);
+    } catch (error) {
+      this.logger.LogError('Redis delete failed', error as Error, {
+        context: 'OtpService',
+        key: key.substring(0, 20) + '...',
+      });
+    }
+  }
+
+  /**
+   * Convert date to timestamp (handles both Date objects and strings)
+   */
+  private toTimestamp(date: Date | string | undefined): number {
+    if (!date) {
+      return 0;
+    }
+    if (date instanceof Date) {
+      return date.getTime();
+    }
+    return new Date(date).getTime();
+  }
+
+  /**
+   * Check if date is not expired
+   */
+  private isNotExpired(expiresAt: Date | string): boolean {
+    return this.toTimestamp(expiresAt) > Date.now();
+  }
+
+  /**
+   * Get elapsed seconds between two timestamps
+   */
+  private getElapsedSeconds(from: Date | string, to: number): number {
+    return Math.floor((to - this.toTimestamp(from)) / 1000);
+  }
+
+  /**
+   * Mask phone number for logging
+   */
+  private maskPhone(phone: string): string {
+    return phone.substring(0, 3) + '***';
+  }
+
+  /**
+   * Log pending operation
+   */
+  private logPendingOperation(
+    operation: 'created' | 'updated',
+    phone: string,
+    pendingId: string,
+  ): void {
+    this.logger.LogInfo(`Pending registration with OTP ${operation}`, {
+      context: 'OtpService.savePendingWithOtp',
+      phone: this.maskPhone(phone),
+      pendingId,
+    });
+  }
+
+  /**
+   * Get pending registration cache key
+   */
+  private getPendingCacheKey(phone: string): string {
+    return `${this.redisPrefix}pending:${phone}`;
   }
 }
