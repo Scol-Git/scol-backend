@@ -20,6 +20,9 @@ import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
+import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
+import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto';
+import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTokenResponseDto';
 
 import { UserDto } from '@shared/dtos/auth/UserDto';
 import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
@@ -119,9 +122,9 @@ const docs: Record<string, SwaggerDocSet> = {
 
   'auth.verifyOtp': [
     ApiOperation({
-      summary: 'Verify OTP after registration',
+      summary: 'Verify OTP after registration or for password reset',
       description:
-        'Verify phone number with OTP code. Activates account and returns access/refresh tokens.',
+        'Verify phone number with OTP code. Supports two flows: (1) Registration (purpose=phone_verify): Activates account and returns access/refresh tokens. (2) Password reset (purpose=password_reset): Returns password reset token for /reset-password endpoint.',
     }),
     ApiBody({
       schema: { $ref: getSchemaPath(VerifyOtpDto) },
@@ -136,16 +139,34 @@ const docs: Record<string, SwaggerDocSet> = {
     }),
     ApiOkResponse({
       description:
-        'OTP verified successfully. Account activated. Returns auth tokens and user info.',
+        'OTP verified successfully. For registration: Returns auth tokens and user info. For password reset: Returns password reset token.',
       schema: {
-        allOf: [
-          { $ref: getSchemaPath(SuccessResponseDto) },
+        oneOf: [
           {
-            properties: {
-              data: {
-                $ref: getSchemaPath(AuthResponseDto),
+            allOf: [
+              { $ref: getSchemaPath(SuccessResponseDto) },
+              {
+                properties: {
+                  data: {
+                    $ref: getSchemaPath(AuthResponseDto),
+                  },
+                },
               },
-            },
+            ],
+            description: 'Registration flow response',
+          },
+          {
+            allOf: [
+              { $ref: getSchemaPath(SuccessResponseDto) },
+              {
+                properties: {
+                  data: {
+                    $ref: getSchemaPath(PasswordResetTokenResponseDto),
+                  },
+                },
+              },
+            ],
+            description: 'Password reset flow response',
           },
         ],
       },
@@ -489,6 +510,273 @@ const docs: Record<string, SwaggerDocSet> = {
     }),
     ApiUnauthorizedResponse({
       description: 'Invalid or expired access token',
+      schema: { $ref: getSchemaPath(ErrorResponseDto) },
+    }),
+  ],
+
+  // ============================================
+  // PASSWORD RESET FLOW
+  // ============================================
+  'auth.forgotPassword': [
+    ApiOperation({
+      summary: 'Forgot password - Initiate password reset',
+      description:
+        'Request password reset for an existing user. Verifies user exists and sends OTP to phone. Returns OTP verification token. Use this token with /verify-otp endpoint to verify OTP, then use the returned password reset token with /reset-password endpoint.',
+    }),
+    ApiBody({
+      schema: { $ref: getSchemaPath(ForgotPasswordRequestDto) },
+      examples: {
+        default: {
+          summary: 'Forgot password request',
+          value: {
+            phone: '01837917991',
+          },
+        },
+      },
+    }),
+    ApiOkResponse({
+      description:
+        'OTP sent successfully. Use otpAccessToken with /verify-otp endpoint to verify OTP and get password reset token.',
+      schema: {
+        allOf: [
+          { $ref: getSchemaPath(SuccessResponseDto) },
+          {
+            properties: {
+              data: {
+                $ref: getSchemaPath(RegisterLeadResponseDto),
+              },
+            },
+          },
+        ],
+      },
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid phone format',
+      schema: {
+        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
+        examples: {
+          validationError: {
+            summary: 'Invalid phone format',
+            value: {
+              status: 'error',
+              message:
+                'Phone must be a valid 11-digit Bangladesh number starting with 01',
+              statusCode: 400,
+              error: {
+                details: {
+                  phone: [
+                    'Phone must be a valid 11-digit Bangladesh number starting with 01',
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'User not found or account locked/suspended',
+      schema: {
+        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
+        examples: {
+          userNotFound: {
+            summary: 'User not found',
+            value: {
+              status: 'error',
+              message: 'Invalid email or password',
+              statusCode: 401,
+              error: {
+                code: 'INVALID_CREDENTIALS',
+              },
+            },
+          },
+          accountLocked: {
+            summary: 'Account locked',
+            value: {
+              status: 'error',
+              message:
+                'Account locked due to multiple failed login attempts. Try again in 15 minute(s).',
+              statusCode: 401,
+              error: {
+                code: 'ACCOUNT_LOCKED',
+              },
+            },
+          },
+          accountSuspended: {
+            summary: 'Account suspended',
+            value: {
+              status: 'error',
+              message: 'Account is suspended. Please contact support.',
+              statusCode: 500,
+              error: {
+                code: 'ACCOUNT_SUSPENDED',
+              },
+            },
+          },
+        },
+      },
+    }),
+    ApiTooManyRequestsResponse({
+      description:
+        'Rate limit exceeded (cooldown active or hourly limit reached)',
+      schema: {
+        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
+        examples: {
+          cooldownActive: {
+            summary: 'Resend cooldown active',
+            value: {
+              status: 'error',
+              message: 'Please wait 45 seconds before requesting a new OTP.',
+              statusCode: 429,
+              error: {
+                code: 'RATE_LIMIT_EXCEEDED',
+              },
+            },
+          },
+          hourlyLimit: {
+            summary: 'Hourly limit exceeded',
+            value: {
+              status: 'error',
+              message:
+                'You have exceeded the hourly OTP resend limit (3 per hour). Please wait 1800 seconds.',
+              statusCode: 429,
+              error: {
+                code: 'RATE_LIMIT_EXCEEDED',
+              },
+            },
+          },
+        },
+      },
+    }),
+  ],
+
+  'auth.resetPassword': [
+    ApiOperation({
+      summary: 'Reset password - Update password after OTP verification',
+      description:
+        'Reset user password after OTP has been verified. Requires password reset token in Authorization header (obtained from /verify-otp endpoint after OTP verification). All existing sessions will be revoked for security. User is automatically logged in and receives new auth tokens.',
+    }),
+    ApiBearerAuth('OTP-auth'),
+    ApiBody({
+      schema: { $ref: getSchemaPath(ResetPasswordRequestDto) },
+      examples: {
+        default: {
+          summary: 'Reset password request',
+          value: {
+            newPassword: 'NewSecureP@ss123',
+            confirmPassword: 'NewSecureP@ss123',
+          },
+        },
+      },
+    }),
+    ApiOkResponse({
+      description:
+        'Password reset successfully. User is automatically logged in. Returns access token, refresh token, and user info.',
+      schema: {
+        allOf: [
+          { $ref: getSchemaPath(SuccessResponseDto) },
+          {
+            properties: {
+              data: {
+                $ref: getSchemaPath(AuthResponseDto),
+              },
+            },
+          },
+        ],
+      },
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid input (password mismatch, weak password, etc.)',
+      schema: {
+        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
+        examples: {
+          passwordMismatch: {
+            summary: 'Passwords do not match',
+            value: {
+              status: 'error',
+              message: 'Passwords do not match',
+              statusCode: 400,
+              error: {
+                details: {
+                  confirmPassword: ['Passwords do not match'],
+                },
+              },
+            },
+          },
+          weakPassword: {
+            summary: 'Weak password',
+            value: {
+              status: 'error',
+              message:
+                'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+              statusCode: 400,
+              error: {
+                details: {
+                  newPassword: [
+                    'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description:
+        'Invalid, expired, or wrong purpose token. User not found. Phone mismatch.',
+      schema: {
+        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
+        examples: {
+          invalidToken: {
+            summary: 'Invalid or expired token',
+            value: {
+              status: 'error',
+              message: 'Invalid or expired OTP verification token',
+              statusCode: 401,
+              error: {
+                code: 'UNAUTHORIZED',
+              },
+            },
+          },
+          wrongPurpose: {
+            summary: 'Wrong token purpose',
+            value: {
+              status: 'error',
+              message: 'Invalid token for password reset',
+              statusCode: 500,
+              error: {
+                code: 'INVALID_TOKEN',
+              },
+            },
+          },
+          userNotFound: {
+            summary: 'User not found',
+            value: {
+              status: 'error',
+              message: 'Invalid email or password',
+              statusCode: 401,
+              error: {
+                code: 'INVALID_CREDENTIALS',
+              },
+            },
+          },
+          phoneMismatch: {
+            summary: 'Phone number mismatch',
+            value: {
+              status: 'error',
+              message: 'Phone number mismatch',
+              statusCode: 500,
+              error: {
+                code: 'INVALID_TOKEN',
+              },
+            },
+          },
+        },
+      },
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded (5 attempts per 5 minutes)',
       schema: { $ref: getSchemaPath(ErrorResponseDto) },
     }),
   ],

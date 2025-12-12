@@ -30,6 +30,9 @@ import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
 
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
+import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
+import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto';
+import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTokenResponseDto';
 import { UserDto } from '@shared/dtos/auth/UserDto';
 import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
@@ -60,6 +63,9 @@ import { UserContextAccessor } from '@shared/context/UserContextAccessor';
   UserDto,
   SuccessResponseDto,
   ErrorResponseDto,
+  ForgotPasswordRequestDto,
+  ResetPasswordRequestDto,
+  PasswordResetTokenResponseDto,
 )
 @Controller('auth')
 export class AuthController {
@@ -80,9 +86,12 @@ export class AuthController {
   }
 
   /**
-   * Verify OTP after registration
+   * Verify OTP after registration or for password reset
    * POST /auth/verify-otp
    * Requires: OTP JWT token in Authorization header
+   * 
+   * For registration (purpose=phone_verify): Returns auth tokens and creates user account
+   * For password reset (purpose=password_reset): Returns password reset token
    */
   @Post('verify-otp')
   @UseGuards(OtpJwtGuard)
@@ -93,7 +102,7 @@ export class AuthController {
     @Body() dto: VerifyOtpDto,
     @OtpUser() otpUser: OtpUserPayload,
     @ReqInfo() reqInfo: ReqInfoPayload,
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthResponseDto | PasswordResetTokenResponseDto> {
     console.log('reqInfo', reqInfo);
     return await this.authService.verifyOtp(
       dto,
@@ -178,7 +187,43 @@ export class AuthController {
     return { message: 'Logged out successfully' };
   }
 
+  /**
+   * Forgot Password - Initiate password reset
+   * POST /auth/forgot-password
+   * Sends OTP to user's phone and returns password reset token
+   */
+  @Post('forgot-password')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 5, windowSeconds: 3600 }) // 5 requests per hour per IP
+  @AddSwaggerDoc('auth', 'forgotPassword')
+  async forgotPassword(
+    @Body() dto: ForgotPasswordRequestDto,
+    @ReqInfo() reqInfo: ReqInfoPayload,
+  ): Promise<RegisterLeadResponseDto> {
+    return await this.authService.forgotPassword(dto, reqInfo.ip);
+  }
 
-  
- 
+  /**
+   * Reset Password - Update password after OTP verification
+   * POST /auth/reset-password
+   * Requires: Password reset token in Authorization header (obtained after OTP verification)
+   * Returns: Auth tokens and user info (user is automatically logged in)
+   */
+  @Post('reset-password')
+  @UseGuards(OtpJwtGuard, RateLimitGuard)
+  @RateLimit({ limit: 5, windowSeconds: 300 }) // 5 attempts per 5 minutes
+  @ApiBearerAuth('OTP-auth')
+  @AddSwaggerDoc('auth', 'resetPassword')
+  async resetPassword(
+    @Body() dto: ResetPasswordRequestDto,
+    @OtpUser() otpUser: OtpUserPayload,
+    @ReqInfo() reqInfo: ReqInfoPayload,
+  ): Promise<AuthResponseDto> {
+    return await this.authService.resetPassword(
+      dto,
+      otpUser,
+      reqInfo.ip,
+      reqInfo.userAgent,
+    );
+  }
 }

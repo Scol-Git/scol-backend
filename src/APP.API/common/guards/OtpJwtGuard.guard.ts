@@ -14,7 +14,8 @@ import { IJwtService as IJwtServiceToken } from '@shared/tokens/injection.tokens
  * OTP JWT Guard
  *
  * Validates OTP verification tokens (short-lived tokens with aud=otp).
- * Used for /verify-otp and /resend-otp endpoints.
+ * Used for /verify-otp, /resend-otp, and /reset-password endpoints.
+ * Supports both 'phone_verify' (registration) and 'password_reset' purposes.
  * Attaches OTP user payload to request.otpUser
  */
 @Injectable()
@@ -37,8 +38,9 @@ export class OtpJwtGuard implements CanActivate {
       // Attach OTP payload to request
       (request as Request & { otpUser: OtpUserPayload }).otpUser = {
         pendingId: payload.pendingId,
+        userId: payload.userId,
         phone: payload.phone,
-        purpose: payload.purpose,
+        purpose: payload.purpose as 'phone_verify' | 'password_reset',
       };
 
       return true;

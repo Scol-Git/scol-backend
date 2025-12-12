@@ -24,6 +24,9 @@ import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
 import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
+import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
+import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto';
+import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTokenResponseDto';
 
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
@@ -40,6 +43,7 @@ import { InvalidCredentialsException } from '@shared/exceptions/auth/InvalidCred
 import { AccountLockedException } from '@shared/exceptions/auth/AccountLockedException';
 import { InvalidTokenException } from '@shared/exceptions/auth/InvalidTokenException';
 import { BusinessException } from '@shared/exceptions/BusinessException';
+import { ValidationException } from '@shared/exceptions/ValidationException';
 import { PhoneNumberUtil } from '@shared/utils/PhoneNumberUtil';
 import { EntityManager } from 'typeorm';
 
@@ -145,116 +149,192 @@ export class AuthService {
   }
 
   /**
-   * Verify OTP and activate account
+   * Verify OTP and activate account (for registration) or return password reset token (for password reset)
    */
   async verifyOtp(
     dto: VerifyOtpDto,
     otpUserPayload: OtpUserPayload,
     ip?: string,
     userAgent?: string,
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthResponseDto | PasswordResetTokenResponseDto> {
     this.logger.info('OTP verification started', {
       context: 'AuthService.verifyOtp',
       pendingId: otpUserPayload.pendingId,
+      userId: otpUserPayload.userId,
       phone: PhoneNumberUtil.mask(otpUserPayload.phone),
+      purpose: otpUserPayload.purpose,
       action: 'VERIFY_OTP_START',
     });
 
-    // Verify OTP and get pending registration ID
+    // Verify OTP and get identifier (pendingId for registration, userId for password reset)
     const { pendingId } = await this.otp.verifyOtp(
       otpUserPayload.phone,
       dto.otp,
     );
 
-    // Get pending registration data (Redis-first with DB fallback)
-    const pendingData = await this.otp.getPending(
-      pendingId,
-      otpUserPayload.phone,
-    );
-
-    if (!pendingData) {
-      this.logger.warn('Pending registration not found or expired', {
-        context: 'AuthService.verifyOtp',
-        pendingId,
-        phone: PhoneNumberUtil.mask(otpUserPayload.phone),
-        action: 'VERIFY_OTP_FAILED_NO_PENDING',
-      });
-      throw new InvalidCredentialsException();
-    }
-
-    // Check if pending registration has expired
-    if (pendingData.expiresAt < new Date()) {
-      await this.otp.deletePending(otpUserPayload.phone, pendingId);
-      this.logger.warn('Pending registration expired', {
-        context: 'AuthService.verifyOtp',
-        pendingId,
-        phone: PhoneNumberUtil.mask(otpUserPayload.phone),
-        action: 'VERIFY_OTP_FAILED_EXPIRED',
-      });
-      throw new InvalidCredentialsException();
-    }
-
-    // Create user and profile in a transaction
-    const result = await this.db.transaction(async (manager: EntityManager) => {
-      const userRepo = manager.getRepository(SysUsers);
-      const profileRepo = manager.getRepository(SysLeadProfiles);
-
-      // Race condition guard: Re-check phone uniqueness
-      const existingUser = await userRepo.findOne({
-        where: { phone: otpUserPayload.phone },
-      });
-
-      if (existingUser) {
-        throw new PhoneAlreadyExistsException(otpUserPayload.phone);
+    // Handle password reset flow
+    if (otpUserPayload.purpose === 'password_reset') {
+      if (!otpUserPayload.userId) {
+        throw new InvalidTokenException('User ID missing from token');
       }
 
-      // Create new user
-      const newUser = userRepo.create({
-        phone: otpUserPayload.phone,
-        passwordHash: pendingData.passwordHash,
-        accountStatus: AccountStatus.Active,
-        userType: UserType.Lead,
-        isPhoneVerified: true,
-        failedLoginAttempts: 0,
+      // Verify the OTP was issued for this user
+      if (pendingId !== otpUserPayload.userId) {
+        this.logger.warn('OTP userId mismatch in password reset', {
+          context: 'AuthService.verifyOtp',
+          tokenUserId: otpUserPayload.userId,
+          otpPendingId: pendingId,
+          action: 'VERIFY_OTP_FAILED_OTP_MISMATCH',
+        });
+        throw new InvalidTokenException('OTP does not match user');
+      }
+
+      // Verify user exists
+      const user = await this.db.users.findOne({
+        where: { id: otpUserPayload.userId },
       });
 
-      const savedUser = await userRepo.save(newUser);
+      if (!user) {
+        this.logger.warn('User not found for password reset', {
+          context: 'AuthService.verifyOtp',
+          userId: otpUserPayload.userId,
+          action: 'VERIFY_OTP_FAILED_USER_NOT_FOUND',
+        });
+        throw new InvalidCredentialsException();
+      }
 
-      // Create lead profile
-      const profile = profileRepo.create({
-        userId: savedUser.id,
-        fullName: pendingData.fullName,
-        user: savedUser,
+      // Verify phone matches
+      if (user.phone !== otpUserPayload.phone) {
+        this.logger.warn('Phone mismatch in password reset', {
+          context: 'AuthService.verifyOtp',
+          userId: user.id,
+          tokenPhone: PhoneNumberUtil.mask(otpUserPayload.phone),
+          userPhone: PhoneNumberUtil.mask(user.phone),
+          action: 'VERIFY_OTP_FAILED_PHONE_MISMATCH',
+        });
+        throw new InvalidTokenException('Phone number mismatch');
+      }
+
+      // Generate password reset token (after OTP verification)
+      const passwordResetToken = this.jwt.generateOtpToken({
+        userId: user.id,
+        phone: user.phone,
+        purpose: 'password_reset',
       });
 
-      await profileRepo.save(profile);
+      this.logger.info('OTP verified successfully for password reset', {
+        context: 'AuthService.verifyOtp',
+        userId: user.id,
+        phone: PhoneNumberUtil.mask(user.phone),
+        action: 'VERIFY_OTP_PASSWORD_RESET_SUCCESS',
+      });
 
-      // Delete pending registration from Redis and DB
-      await this.otp.deletePending(otpUserPayload.phone, pendingId);
-
-      return { user: savedUser, profile };
-    });
-
-    // Load user with relations for token generation
-    const user = await this.db.users.findOne({
-      where: { id: result.user.id },
-      relations: { roles: true, permissions: true },
-    });
-
-    if (!user) {
-      throw new InvalidCredentialsException();
+      return {
+        passwordResetToken,
+        expiresIn: 300,
+        message: 'OTP verified successfully. You can now reset your password.',
+      };
     }
 
-    const tokens = await this.token.issueTokenPair(user, ip, userAgent);
+    // Handle registration flow (phone_verify)
+    if (otpUserPayload.purpose === 'phone_verify') {
+      if (!otpUserPayload.pendingId) {
+        throw new InvalidTokenException('Pending ID missing from token');
+      }
 
-    this.logger.info('OTP verified successfully, user created', {
-      context: 'AuthService.verifyOtp',
-      userId: user.id,
-      phone: PhoneNumberUtil.mask(user.phone),
-      action: 'VERIFY_OTP_SUCCESS',
-    });
+      // Get pending registration data (Redis-first with DB fallback)
+      const pendingData = await this.otp.getPending(
+        pendingId,
+        otpUserPayload.phone,
+      );
 
-    return this.authResponseMapper.toAuthResponse(user, tokens, result.profile);
+      if (!pendingData) {
+        this.logger.warn('Pending registration not found or expired', {
+          context: 'AuthService.verifyOtp',
+          pendingId,
+          phone: PhoneNumberUtil.mask(otpUserPayload.phone),
+          action: 'VERIFY_OTP_FAILED_NO_PENDING',
+        });
+        throw new InvalidCredentialsException();
+      }
+
+      // Check if pending registration has expired
+      if (pendingData.expiresAt < new Date()) {
+        await this.otp.deletePending(otpUserPayload.phone, pendingId);
+        this.logger.warn('Pending registration expired', {
+          context: 'AuthService.verifyOtp',
+          pendingId,
+          phone: PhoneNumberUtil.mask(otpUserPayload.phone),
+          action: 'VERIFY_OTP_FAILED_EXPIRED',
+        });
+        throw new InvalidCredentialsException();
+      }
+
+      // Create user and profile in a transaction
+      const result = await this.db.transaction(async (manager: EntityManager) => {
+        const userRepo = manager.getRepository(SysUsers);
+        const profileRepo = manager.getRepository(SysLeadProfiles);
+
+        // Race condition guard: Re-check phone uniqueness
+        const existingUser = await userRepo.findOne({
+          where: { phone: otpUserPayload.phone },
+        });
+
+        if (existingUser) {
+          throw new PhoneAlreadyExistsException(otpUserPayload.phone);
+        }
+
+        // Create new user
+        const newUser = userRepo.create({
+          phone: otpUserPayload.phone,
+          passwordHash: pendingData.passwordHash,
+          accountStatus: AccountStatus.Active,
+          userType: UserType.Lead,
+          isPhoneVerified: true,
+          failedLoginAttempts: 0,
+        });
+
+        const savedUser = await userRepo.save(newUser);
+
+        // Create lead profile
+        const profile = profileRepo.create({
+          userId: savedUser.id,
+          fullName: pendingData.fullName,
+          user: savedUser,
+        });
+
+        await profileRepo.save(profile);
+
+        // Delete pending registration from Redis and DB
+        await this.otp.deletePending(otpUserPayload.phone, pendingId);
+
+        return { user: savedUser, profile };
+      });
+
+      // Load user with relations for token generation
+      const user = await this.db.users.findOne({
+        where: { id: result.user.id },
+        relations: { roles: true, permissions: true },
+      });
+
+      if (!user) {
+        throw new InvalidCredentialsException();
+      }
+
+      const tokens = await this.token.issueTokenPair(user, ip, userAgent);
+
+      this.logger.info('OTP verified successfully, user created', {
+        context: 'AuthService.verifyOtp',
+        userId: user.id,
+        phone: PhoneNumberUtil.mask(user.phone),
+        action: 'VERIFY_OTP_SUCCESS',
+      });
+
+      return this.authResponseMapper.toAuthResponse(user, tokens, result.profile);
+    }
+
+    // Unknown purpose
+    throw new InvalidTokenException('Invalid token purpose');
   }
 
   /**
@@ -270,6 +350,15 @@ export class AuthService {
       phone: PhoneNumberUtil.mask(otpUserPayload.phone),
       action: 'RESEND_OTP_START',
     });
+
+    // Validate this is for registration flow (phone_verify)
+    if (otpUserPayload.purpose !== 'phone_verify') {
+      throw new InvalidTokenException('Resend OTP is only available for registration flow');
+    }
+
+    if (!otpUserPayload.pendingId) {
+      throw new InvalidTokenException('Pending ID missing from token');
+    }
 
     await this.otp.canResendOtp(otpUserPayload.phone, ip);
 
@@ -574,6 +663,203 @@ export class AuthService {
       userId,
       action: 'LOGOUT_ALL_SUCCESS',
     });
+  }
+
+  /**
+   * Forgot Password - Initiate password reset flow
+   * Verifies user exists and sends OTP for password reset
+   */
+  async forgotPassword(
+    dto: ForgotPasswordRequestDto,
+    ip: string,
+  ): Promise<RegisterLeadResponseDto> {
+    this.logger.info('Forgot password requested', {
+      context: 'AuthService.forgotPassword',
+      phone: PhoneNumberUtil.mask(dto.phone),
+      ip,
+      action: 'FORGOT_PASSWORD_START',
+    });
+
+    PhoneNumberUtil.validate(dto.phone);
+
+    // Verify user exists
+    const user = await this.db.users.findOne({
+      where: { phone: dto.phone },
+    });
+
+    if (!user) {
+      // Don't reveal if user exists for security
+      this.logger.warn('Forgot password - user not found', {
+        context: 'AuthService.forgotPassword',
+        phone: PhoneNumberUtil.mask(dto.phone),
+        action: 'FORGOT_PASSWORD_FAILED_NOT_FOUND',
+      });
+      throw new InvalidCredentialsException();
+    }
+
+    // Check if account is locked or suspended
+    if (user.accountStatus === AccountStatus.Locked) {
+      this.logger.warn('Forgot password - account locked', {
+        context: 'AuthService.forgotPassword',
+        userId: user.id,
+        phone: PhoneNumberUtil.mask(dto.phone),
+        action: 'FORGOT_PASSWORD_FAILED_LOCKED',
+      });
+      throw new AccountLockedException(user.lockedUntil);
+    }
+
+    if (user.accountStatus === AccountStatus.Suspended) {
+      this.logger.warn('Forgot password - account suspended', {
+        context: 'AuthService.forgotPassword',
+        userId: user.id,
+        phone: PhoneNumberUtil.mask(dto.phone),
+        action: 'FORGOT_PASSWORD_FAILED_SUSPENDED',
+      });
+      throw new BusinessException(
+        'Account is suspended. Please contact support.',
+        'ACCOUNT_SUSPENDED',
+      );
+    }
+
+    // Check rate limiting for password reset
+    await this.otp.canResendOtp(dto.phone, ip);
+
+    // Generate and store OTP (use userId as identifier for password reset)
+    const plainOtp = await this.otp.generateAndStoreOtp(
+      user.id, // Use userId instead of pendingId for password reset
+      dto.phone,
+    );
+
+    await this.sms.sendOtp(dto.phone, plainOtp);
+
+    // Generate password reset token
+    const otpToken = this.jwt.generateOtpToken({
+      userId: user.id,
+      phone: dto.phone,
+      purpose: 'password_reset',
+    });
+
+    this.logger.info('Password reset OTP sent successfully', {
+      context: 'AuthService.forgotPassword',
+      userId: user.id,
+      phone: PhoneNumberUtil.mask(dto.phone),
+      action: 'FORGOT_PASSWORD_SUCCESS',
+    });
+
+    return {
+      otpAccessToken: otpToken,
+      expiresIn: 300,
+      message:
+        'OTP sent successfully. Please verify your phone to reset your password.',
+      retryAfter: this.securityConfig.otp.resendCooldownSeconds,
+      ...(this.isDevelopment && { devOtp: plainOtp }),
+    };
+  }
+
+  /**
+   * Reset Password - Update password after OTP verification
+   * Requires password reset token in Authorization header (obtained after OTP verification)
+   * Returns auth tokens to automatically log in the user
+   */
+  async resetPassword(
+    dto: ResetPasswordRequestDto,
+    otpUserPayload: OtpUserPayload,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
+    this.logger.info('Password reset requested', {
+      context: 'AuthService.resetPassword',
+      userId: otpUserPayload.userId,
+      phone: PhoneNumberUtil.mask(otpUserPayload.phone),
+      action: 'RESET_PASSWORD_START',
+    });
+
+    // Validate token purpose
+    if (otpUserPayload.purpose !== 'password_reset') {
+      this.logger.warn('Invalid token purpose for password reset', {
+        context: 'AuthService.resetPassword',
+        purpose: otpUserPayload.purpose,
+        action: 'RESET_PASSWORD_FAILED_INVALID_PURPOSE',
+      });
+      throw new InvalidTokenException('Invalid token for password reset');
+    }
+
+    if (!otpUserPayload.userId) {
+      throw new InvalidTokenException('User ID missing from token');
+    }
+
+    // Verify passwords match
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new ValidationException('Passwords do not match', {
+        confirmPassword: ['Passwords do not match'],
+      });
+    }
+
+    // Get user with relations
+    const user = await this.db.users.findOne({
+      where: { id: otpUserPayload.userId },
+      relations: { roles: true, permissions: true },
+    });
+
+    if (!user) {
+      this.logger.warn('User not found for password reset', {
+        context: 'AuthService.resetPassword',
+        userId: otpUserPayload.userId,
+        action: 'RESET_PASSWORD_FAILED_USER_NOT_FOUND',
+      });
+      throw new InvalidCredentialsException();
+    }
+
+    // Verify phone matches
+    if (user.phone !== otpUserPayload.phone) {
+      this.logger.warn('Phone mismatch in password reset', {
+        context: 'AuthService.resetPassword',
+        userId: user.id,
+        tokenPhone: PhoneNumberUtil.mask(otpUserPayload.phone),
+        userPhone: PhoneNumberUtil.mask(user.phone),
+        action: 'RESET_PASSWORD_FAILED_PHONE_MISMATCH',
+      });
+      throw new InvalidTokenException('Phone number mismatch');
+    }
+
+    // Hash new password
+    const newPasswordHash = await this.hasher.hash(dto.newPassword);
+
+    // Update password and reset failed login attempts
+    user.passwordHash = newPasswordHash;
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
+
+    // Auto-unlock if account was locked
+    if (user.accountStatus === AccountStatus.Locked) {
+      user.accountStatus = AccountStatus.Active;
+    }
+
+    await this.db.users.save(user);
+
+    // Revoke all existing sessions for security
+    await this.logoutAll(user.id);
+
+    // Issue new token pair (creates new session)
+    const tokens = await this.token.issueTokenPair(user, ip, userAgent);
+
+    // Get profile if user is Lead
+    let profile: SysLeadProfiles | undefined;
+    if (user.userType === UserType.Lead) {
+      profile =
+        (await this.db.leadProfiles.findOne({
+          where: { userId: user.id },
+        })) ?? undefined;
+    }
+
+    this.logger.info('Password reset successful', {
+      context: 'AuthService.resetPassword',
+      userId: user.id,
+      phone: PhoneNumberUtil.mask(user.phone),
+      action: 'RESET_PASSWORD_SUCCESS',
+    });
+
+    return this.authResponseMapper.toAuthResponse(user, tokens, profile);
   }
 
   // ============================================

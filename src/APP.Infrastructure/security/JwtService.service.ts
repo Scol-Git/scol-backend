@@ -119,18 +119,19 @@ export class JwtService implements IJwtService {
 
   /**
    * Generate OTP verification token
-   * Short-lived token used for phone verification flow
+   * Short-lived token used for phone verification flow or password reset
    *
    * @param payload OTP token payload
    * @returns JWT token string
    */
   generateOtpToken(payload: {
-    pendingId: string;
+    pendingId?: string;
+    userId?: string;
     phone: string;
-    purpose: 'phone_verify';
+    purpose: 'phone_verify' | 'password_reset';
   }): string {
     const tokenPayload: Record<string, any> = {
-      sub: payload.pendingId,
+      sub: payload.pendingId || payload.userId, // Use pendingId for registration, userId for password reset
       phone: payload.phone,
       purpose: payload.purpose,
       aud: 'otp', // Audience for OTP tokens
@@ -149,7 +150,8 @@ export class JwtService implements IJwtService {
    * @throws Error if token is invalid or not an OTP token
    */
   verifyOtpToken(token: string): {
-    pendingId: string;
+    pendingId?: string;
+    userId?: string;
     phone: string;
     purpose: string;
     aud: string;
@@ -163,16 +165,31 @@ export class JwtService implements IJwtService {
       }
 
       // Validate purpose
-      if (decoded.purpose !== 'phone_verify') {
+      const validPurposes = ['phone_verify', 'password_reset'];
+      if (!decoded.purpose || !validPurposes.includes(decoded.purpose as string)) {
         throw new Error('Invalid OTP token purpose.');
       }
 
-      return {
-        pendingId: decoded.sub as string,
+      const result: {
+        pendingId?: string;
+        userId?: string;
+        phone: string;
+        purpose: string;
+        aud: string;
+      } = {
         phone: decoded.phone as string,
         purpose: decoded.purpose as string,
         aud: decoded.aud as string,
       };
+
+      // Set pendingId or userId based on purpose
+      if (decoded.purpose === 'phone_verify') {
+        result.pendingId = decoded.sub as string;
+      } else if (decoded.purpose === 'password_reset') {
+        result.userId = decoded.sub as string;
+      }
+
+      return result;
     } catch (error) {
       throw new Error(
         `Invalid OTP token: ${error instanceof Error ? error.message : 'Unknown error'}`,
