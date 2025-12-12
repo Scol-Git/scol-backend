@@ -4,7 +4,7 @@ import { AuthService } from './AuthService';
 import { AuthValidationService } from './AuthValidationService';
 import { OtpService } from './OtpService';
 import { TokenService } from './TokenService';
-import { PendingCleanupService } from './PendingCleanupService';
+import { OtpSessionCleanupService } from './OtpSessionCleanupService';
 import { MappingModule } from '@bll/mappings/MappingModule.module';
 import { SmsModule } from '@infra/sms/SmsModule.module';
 
@@ -16,7 +16,7 @@ import { SmsModule } from '@infra/sms/SmsModule.module';
  * - AuthValidationService (business rule validation)
  * - OtpService (OTP management)
  * - TokenService (JWT token management)
- * - PendingCleanupService (cron job for cleaning expired pending registrations)
+ * - OtpSessionCleanupService (cron job for cleaning expired OTP sessions)
  *
  * Imports:
  * - ScheduleModule (for cron jobs)
@@ -30,7 +30,7 @@ import { SmsModule } from '@infra/sms/SmsModule.module';
     AuthValidationService,
     OtpService,
     TokenService,
-    PendingCleanupService,
+    OtpSessionCleanupService,
   ],
   exports: [AuthService],
 })

@@ -67,7 +67,7 @@ import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.en
 import { UserSessions } from '@entity/entities/UserSessions.entity';
 import { UserPermissions } from '@entity/entities/UserPermissions.entity';
 import { UserRoles } from '@entity/entities/UserRoles.entity';
-import { PendingRegistration } from '@entity/entities/PendingRegistration.entity';
+import { OtpSession } from '@entity/entities/OtpSession.entity';
 
 /**
  * AppDataSource - TypeORM DataSource for migrations and CLI operations
@@ -100,7 +100,7 @@ const AppDataSource = new DataSource({
     UserSessions,
     UserPermissions,
     UserRoles,
-    PendingRegistration,
+    OtpSession,
   ],
 
   migrations: [migrationPath],

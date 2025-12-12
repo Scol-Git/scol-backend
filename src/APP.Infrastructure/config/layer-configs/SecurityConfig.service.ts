@@ -4,10 +4,10 @@ import type { ISecurityConfig } from '@shared/interfaces/config/ISecurityConfig.
 
 /**
  * Security Configuration Service
- * 
+ *
  * Provides type-safe access to security layer configuration.
  * Implements ISecurityConfig interface for dependency injection.
- * 
+ *
  * @class SecurityConfig
  * @implements {ISecurityConfig}
  */
@@ -50,6 +50,8 @@ export class SecurityConfig implements ISecurityConfig {
     maxAttempts: this._config.get<number>('OTP_MAX_ATTEMPTS') ?? 3,
     resendCooldownSeconds:
       this._config.get<number>('OTP_RESEND_COOLDOWN_SECONDS') ?? 60,
+    maxResendPerSession:
+      this._config.get<number>('OTP_MAX_RESEND_PER_SESSION') ?? 2,
     dailyLimitPerPhone: this._config.get<number>('OTP_DAILY_PHONE_LIMIT') ?? 5,
     dailyLimitPerIp: this._config.get<number>('OTP_DAILY_IP_LIMIT') ?? 20,
     redisPrefix: this._config.get<string>('REDIS_KEY_PREFIX_AUTH') || 'auth:',
@@ -57,4 +59,3 @@ export class SecurityConfig implements ISecurityConfig {
 
   constructor(private readonly _config: ConfigService) {}
 }
-

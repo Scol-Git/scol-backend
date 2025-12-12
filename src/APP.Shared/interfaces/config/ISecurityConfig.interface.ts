@@ -53,6 +53,7 @@ export interface ISecurityConfig {
     ttlSeconds: number;
     maxAttempts: number;
     resendCooldownSeconds: number;
+    maxResendPerSession: number;
     dailyLimitPerPhone: number;
     dailyLimitPerIp: number;
     redisPrefix: string;

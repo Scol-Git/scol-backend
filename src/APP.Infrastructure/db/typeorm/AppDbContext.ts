@@ -27,7 +27,7 @@ import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.en
 import { UserSessions } from '@entity/entities/UserSessions.entity';
 import { UserRoles } from '@entity/entities/UserRoles.entity';
 import { UserPermissions } from '@entity/entities/UserPermissions.entity';
-import { PendingRegistration } from '@entity/entities/PendingRegistration.entity';
+import { OtpSession } from '@entity/entities/OtpSession.entity';
 
 /**
  * AppDbContext - EF Core-style DbContext for TypeORM
@@ -75,8 +75,8 @@ export class AppDbContext {
     @InjectRepository(UserSessions)
     public readonly userSessions: Repository<UserSessions>,
 
-    @InjectRepository(PendingRegistration)
-    public readonly pendingRegistrations: Repository<PendingRegistration>,
+    @InjectRepository(OtpSession)
+    public readonly otpSessions: Repository<OtpSession>,
 
     // Lead profile entities
     @InjectRepository(SysLeadProfiles)

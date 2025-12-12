@@ -125,7 +125,7 @@ export class AuthController {
     @OtpUser() otpUserPayload: OtpUserPayload,
     @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<RegisterLeadResponseDto> {
-    return await this.authService.resendOtp(otpUserPayload, reqInfo.ip);
+    return await this.authService.resendOtp(otpUserPayload);
   }
 
  
