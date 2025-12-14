@@ -160,7 +160,8 @@ export class AuthService {
       message:
         'Registration successful. Please verify your phone with the OTP sent via SMS.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
-      ...(this.isDevelopment && { devOtp: plainOtp }),
+      //...(this.isDevelopment && { devOtp: plainOtp }),
+      devOtp: plainOtp,
     };
   }
 
@@ -508,7 +509,8 @@ export class AuthService {
       expiresIn: this.securityConfig.otp.ttlSeconds,
       message: 'OTP resent successfully.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
-      ...(this.isDevelopment && { devOtp: plainOtp }),
+      //...(this.isDevelopment && { devOtp: plainOtp }),
+      devOtp: plainOtp,
     };
   }
 
