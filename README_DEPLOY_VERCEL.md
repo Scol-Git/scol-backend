@@ -13,14 +13,14 @@ This guide covers deploying the SCOL Backend API to Vercel as a serverless funct
 
 Configure these in Vercel Dashboard > Project Settings > Environment Variables:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | Neon PostgreSQL connection string (pooled) |
-| `JWT_SECRET` | Yes | Minimum 32 characters for signing JWTs |
-| `NODE_ENV` | Yes | Set to `production` |
-| `REDIS_URL` | No | Upstash Redis URL (rediss://...) |
-| `SENTRY_DSN` | No | Sentry DSN for error tracking |
-| `SENTRY_TRACES_SAMPLE_RATE` | No | Trace sample rate (default: 0.05) |
+| Variable                    | Required | Description                                |
+| --------------------------- | -------- | ------------------------------------------ |
+| `DATABASE_URL`              | Yes      | Neon PostgreSQL connection string (pooled) |
+| `JWT_SECRET`                | Yes      | Minimum 32 characters for signing JWTs     |
+| `NODE_ENV`                  | Yes      | Set to `production`                        |
+| `REDIS_URL`                 | No       | Upstash Redis URL (rediss://...)           |
+| `SENTRY_DSN`                | No       | Sentry DSN for error tracking              |
+| `SENTRY_TRACES_SAMPLE_RATE` | No       | Trace sample rate (default: 0.05)          |
 
 ### Additional Optional Variables
 
