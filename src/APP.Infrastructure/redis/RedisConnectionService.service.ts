@@ -62,26 +62,39 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      // Detect if TLS is required (Upstash uses rediss://)
-      const useTls = this._redisUrl.startsWith('rediss://');
+      // Parse the Redis URL to extract components
+      const url = new URL(this._redisUrl);
+      const useTls =
+        url.protocol === 'rediss:' || this._redisUrl.startsWith('rediss://');
 
-      // Create default connection (can be reused by services that don't need special config)
-      this._defaultClient = new Redis(this._redisUrl, {
+      // Build connection options explicitly for better compatibility with Upstash
+      const redisOptions: import('ioredis').RedisOptions = {
+        host: url.hostname,
+        port: parseInt(url.port, 10) || 6379,
+        username: url.username || 'default',
+        password: url.password ? decodeURIComponent(url.password) : undefined,
+        // TLS configuration for Upstash and other cloud Redis providers
+        tls: useTls ? {} : undefined,
+        // Retry strategy for serverless
         retryStrategy: (times) => {
-          // In serverless, limit retries to avoid timeout
           if (times > 3) return null; // Stop retrying after 3 attempts
-          const delay = Math.min(times * 100, 1000);
-          return delay;
+          return Math.min(times * 100, 1000);
         },
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         lazyConnect: true,
-        // TLS configuration for Upstash and other cloud Redis providers
-        tls: useTls ? { rejectUnauthorized: false } : undefined,
         // Connection timeouts for serverless environments
-        connectTimeout: 5000,
-        commandTimeout: 5000,
-      });
+        connectTimeout: 10000,
+      };
+
+      if (this._logger) {
+        this._logger.LogInfo(
+          `Redis connecting to ${url.hostname}:${url.port || 6379} (TLS: ${useTls})`,
+        );
+      }
+
+      // Create default connection
+      this._defaultClient = new Redis(redisOptions);
 
       this._defaultClient.on('connect', () => {
         if (this._logger) {
