@@ -62,15 +62,25 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
+      // Detect if TLS is required (Upstash uses rediss://)
+      const useTls = this._redisUrl.startsWith('rediss://');
+
       // Create default connection (can be reused by services that don't need special config)
       this._defaultClient = new Redis(this._redisUrl, {
         retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
+          // In serverless, limit retries to avoid timeout
+          if (times > 3) return null; // Stop retrying after 3 attempts
+          const delay = Math.min(times * 100, 1000);
           return delay;
         },
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         lazyConnect: true,
+        // TLS configuration for Upstash and other cloud Redis providers
+        tls: useTls ? { rejectUnauthorized: false } : undefined,
+        // Connection timeouts for serverless environments
+        connectTimeout: 5000,
+        commandTimeout: 5000,
       });
 
       this._defaultClient.on('connect', () => {

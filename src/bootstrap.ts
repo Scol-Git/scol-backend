@@ -22,7 +22,7 @@ export interface CreateNestAppOptions {
 /**
  * Creates and configures a NestJS application instance.
  * This function sets up all middleware, pipes, filters, interceptors, and Swagger.
- * 
+ *
  * @param options - Optional configuration for the app creation
  * @returns Configured Nest application (not listening - call app.listen() for local dev)
  */
@@ -100,4 +100,3 @@ export async function createNestApp(
 
   return app;
 }
-
