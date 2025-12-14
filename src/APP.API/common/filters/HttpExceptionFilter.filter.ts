@@ -14,6 +14,7 @@ import { BusinessException } from '@shared/exceptions/BusinessException';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { ErrorCode } from '@shared/enums/ErrorCode.enum';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
+import { captureException } from '@infra/monitoring/sentry';
 
 @Catch()
 @Injectable()
@@ -86,6 +87,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status,
       reqId: req.headers['x-request-id'],
     });
+
+    // Capture 5xx errors and unexpected exceptions with Sentry
+    // Skip expected 4xx validation/auth errors to avoid noise
+    if (status >= 500 || (!isHttp && !isValidation && !isBusiness)) {
+      captureException(exception, {
+        path: req.url,
+        method: req.method,
+        status,
+        requestId: req.headers['x-request-id'],
+      });
+    }
 
     // Build error response using BaseResponseDto structure
     const errorResponse = new ErrorResponseDto();

@@ -73,6 +73,13 @@ import { AppDbContext } from './AppDbContext';
             cfg.get('NODE_ENV') === 'development'
               ? ['error', 'warn']
               : ['error'],
+          // Serverless-optimized connection pool settings
+          // Keeps connections minimal to avoid exhausting Neon/serverless DB limits
+          extra: {
+            max: 2, // Maximum connections per serverless instance
+            idleTimeoutMillis: 10000, // Close idle connections after 10s
+            connectionTimeoutMillis: 10000, // Timeout for new connections
+          },
         };
       },
     }),

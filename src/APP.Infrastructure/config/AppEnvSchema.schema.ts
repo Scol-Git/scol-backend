@@ -65,6 +65,10 @@ export const AppEnvSchema = Joi.object({
   CORS_ENABLED: Joi.string().valid('true', 'false').default('true'),
   CORS_ORIGINS: Joi.string().default('*'),
 
+  // Sentry Error Tracking (optional)
+  SENTRY_DSN: Joi.string().uri().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.05),
+
   // Rate Limiting Configuration
   RATE_LIMIT_ENABLED: Joi.string().valid('true', 'false').default('false'),
 
