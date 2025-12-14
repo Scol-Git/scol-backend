@@ -86,7 +86,15 @@ export async function createNestApp(
     )
     .build();
   const doc = SwaggerModule.createDocument(app, swaggerCfg);
-  SwaggerModule.setup('/swagger', app, doc);
+  SwaggerModule.setup('/swagger', app, doc, {
+    // Use CDN for Swagger UI assets (required for serverless environments like Vercel)
+    customCssUrl:
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.js',
+    ],
+  });
 
   await app.init();
 
