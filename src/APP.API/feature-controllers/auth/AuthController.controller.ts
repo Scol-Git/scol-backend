@@ -42,6 +42,7 @@ import type { Request } from 'express';
 import './swagger.doc';
 import { RateLimitGuard } from '@api/common/guards/RateLimitGuard.guard';
 import { UserContextAccessor } from '@shared/context/UserContextAccessor';
+import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
 
 /**
  * Auth Controller
@@ -116,7 +117,7 @@ export class AuthController {
    * Resend OTP
    * GET /auth/resend-otp
    * Requires: OTP JWT token in Authorization header
-   */
+   
   @Get('resend-otp')
   @UseGuards(OtpJwtGuard)
   @ApiBearerAuth('OTP-auth')
@@ -127,8 +128,17 @@ export class AuthController {
   ): Promise<RegisterLeadResponseDto> {
     return await this.authService.resendOtp(otpUserPayload);
   }
-
- 
+  */
+  @Get('resend-otp')
+  @UseGuards(OtpJwtGuard)
+  @ApiBearerAuth('OTP-auth')
+  @AddSwaggerDoc('auth', 'resendOtp')
+  async resendOtp(
+    @OtpUser() otpUser: OtpUserPayload,
+  ): Promise<ResendOtpResponseDto> {
+    return this.authService.resendOtp(otpUser);
+  }
+  
  
 
   /**

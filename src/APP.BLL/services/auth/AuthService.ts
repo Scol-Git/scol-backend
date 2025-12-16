@@ -47,6 +47,7 @@ import { ValidationException } from '@shared/exceptions/ValidationException';
 import { PhoneNumberUtil } from '@shared/utils/PhoneNumberUtil';
 import { EntityManager } from 'typeorm';
 import { randomUUID } from 'crypto';
+import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
 
 /**
  * Auth Service
@@ -315,10 +316,15 @@ export class AuthService {
       }
 
       if (!pendingData.passwordHash || !pendingData.fullName) {
-        throw new BusinessException(
+        throw new ValidationException(
           'Invalid registration data',
+          {
+            email: ['Email is invalid'],
+            password: ['Password must be at least 8 characters'],
+          },
           'INVALID_REGISTRATION_DATA',
         );
+        
       }
 
       // Create user and profile in a transaction
@@ -326,7 +332,7 @@ export class AuthService {
         async (manager: EntityManager) => {
           const userRepo = manager.getRepository(SysUsers);
           const profileRepo = manager.getRepository(SysLeadProfiles);
-
+//session?id
           // Race condition guard: Re-check phone uniqueness
           const existingUser = await userRepo.findOne({
             where: { phone: otpUserPayload.phone },
@@ -381,6 +387,7 @@ export class AuthService {
       }
 
       const tokens = await this.token.issueTokenPair(user, ip, userAgent);
+      //session?id is created here
 
       this.logger.info('OTP verified successfully, user created', {
         context: 'AuthService.verifyOtp',
@@ -402,7 +409,7 @@ export class AuthService {
 
   /**
    * Resend OTP
-   */
+   
   async resendOtp(
     otpUserPayload: OtpUserPayload,
   ): Promise<RegisterLeadResponseDto> {
@@ -511,6 +518,111 @@ export class AuthService {
       ...(this.isDevelopment && { devOtp: plainOtp }),
     };
   }
+*/
+    /**
+     * Resend OTP (Registration Flow Only)
+     *
+     * - Does NOT issue any OTP access token
+     * - Only resends OTP within existing OTP session
+     * - Returns devOtp in non-production environments only
+     */
+    async resendOtp(
+      otpUserPayload: OtpUserPayload,
+    ): Promise<ResendOtpResponseDto> {
+    
+      this.logger.info('OTP resend requested', {
+        context: 'AuthService.resendOtp',
+        purpose: otpUserPayload.purpose,
+        phone: PhoneNumberUtil.mask(otpUserPayload.phone),
+        action: 'RESEND_OTP_START',
+      });
+    
+      // 1. Validate allowed purposes
+      if (
+        otpUserPayload.purpose !== 'phone_verify' &&
+        otpUserPayload.purpose !== 'password_reset'
+      ) {
+        throw new InvalidTokenException(
+          'Resend OTP is not allowed for this operation',
+        );
+      }
+    
+      // 2. Resolve OTP purpose + session identifier
+      let otpPurpose: OtpPurpose;
+      let sessionId: string;
+    
+      if (otpUserPayload.purpose === 'phone_verify') {
+        if (!otpUserPayload.pendingId) {
+          throw new InvalidTokenException('Pending ID missing from token');
+        }
+        otpPurpose = OtpPurpose.Registration;
+        sessionId = otpUserPayload.pendingId;
+      } else {
+        // password_reset
+        if (!otpUserPayload.userId) {
+          throw new InvalidTokenException('User ID missing from token');
+        }
+        otpPurpose = OtpPurpose.PasswordReset;
+        sessionId = otpUserPayload.userId;
+      }
+    
+      // 3. Rate-limit resend attempts
+      await this.otp.ensureCanSendOtp(
+        otpPurpose,
+        otpUserPayload.phone,
+        sessionId,
+      );
+    
+      // 4. Fetch OTP session (Redis → DB fallback)
+      const pendingData = await this.otp.getOtpSession(
+        otpPurpose,
+        otpUserPayload.phone,
+        sessionId,
+      );
+    
+      if (!pendingData || pendingData.expiresAt < new Date()) {
+        await this.otp.deleteOtpSession(
+          otpUserPayload.phone,
+          otpPurpose,
+          sessionId,
+        );
+    
+        throw new BusinessException(
+          'OTP session expired. Please start again.',
+          'OTP_EXPIRED',
+        );
+      }
+    
+      // 5. Generate new OTP
+      const plainOtp = this.otp.generateOtp();
+    
+      // 6. Update OTP in session
+      await this.otp.updateOtpInSession(
+        otpPurpose,
+        otpUserPayload.phone,
+        sessionId,
+        plainOtp,
+      );
+    
+      // 7. Send OTP via SMS
+      await this.sms.sendOtp(otpUserPayload.phone, plainOtp);
+    
+      this.logger.info('OTP resent successfully', {
+        context: 'AuthService.resendOtp',
+        purpose: otpUserPayload.purpose,
+        sessionId,
+        action: 'RESEND_OTP_SUCCESS',
+      });
+    
+      // 8. Response (NO TOKEN)
+      return {
+        message: 'OTP resent successfully.',
+        retryAfter: this.securityConfig.otp.resendCooldownSeconds,
+        ...(this.isDevelopment && { devOtp: plainOtp }),
+      };
+    }
+    
+
 
   /**
    * Login
@@ -684,7 +796,7 @@ export class AuthService {
 
   /**
    * Resend OTP using credentials (phone + password) to issue a new OTP access token
-   */
+   
   async resendOtpWithCredentials(
     dto: any,
     ip?: string,
@@ -694,6 +806,7 @@ export class AuthService {
       'FEATURE_DISABLED',
     );
   }
+  */
 
   /**
    * Logout
@@ -752,7 +865,7 @@ export class AuthService {
       action: 'LOGOUT_ALL_SUCCESS',
     });
   }
-
+  
   /**
    * Forgot Password - Initiate password reset flow
    * Verifies user exists and sends OTP for password reset
@@ -921,6 +1034,10 @@ export class AuthService {
       throw new InvalidTokenException('Phone number mismatch');
     }
 
+
+  // 🔐 STEP 1: Revoke ALL existing sessions
+  await this.logoutAll(user.id);
+
     // Hash new password
     const newPasswordHash = await this.hasher.hash(dto.newPassword);
 
@@ -937,7 +1054,7 @@ export class AuthService {
     await this.db.users.save(user);
 
     // Revoke all existing sessions for security
-    await this.logoutAll(user.id);
+   // await this.logoutAll(user.id);
 
     // Issue new token pair (creates new session)
     const tokens = await this.token.issueTokenPair(user, ip, userAgent);
