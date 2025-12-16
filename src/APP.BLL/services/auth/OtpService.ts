@@ -90,58 +90,76 @@ export class OtpService {
   async saveOtpSession(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
     plainOtp: string,
     expiresAt: Date,
     metadata?: {
       passwordHash?: string;
       fullName?: string;
     },
-  ): Promise<void> {
-    const otpHash = await this.hasher.hash(plainOtp);
-    const existingSession = await this.getOtpSessionByPhoneAndPurpose(
-      phone,
-      purpose,
-    );
+  ): Promise<{ sessionId: string }> {
+    try {
+      // Generate OTP hash for storage
+      const otpHash = await this.hasher.hash(plainOtp);
 
-    // If existing and not expired, update it
-    if (existingSession && this.isNotExpired(existingSession.expiresAt)) {
-      const updated: OtpSessionCache = {
-        ...existingSession,
+      // Check if session already exists
+      const existingSession = await this.getOtpSessionByPhoneAndPurpose(
+        phone,
+        purpose,
+      );
+
+      // If session exists and is not expired, update it
+      if (existingSession && this.isNotExpired(existingSession.expiresAt)) {
+        const updated: OtpSessionCache = {
+          ...existingSession,
+          expiresAt,
+          otpHash,
+          otpAttempts: 0,
+          otpCreatedAt: new Date(),
+          ...(metadata?.passwordHash && {
+            passwordHash: metadata.passwordHash,
+          }),
+          ...(metadata?.fullName && { fullName: metadata.fullName }),
+        };
+
+        // Save updated session to cache and database
+        await this.saveOtpSessionToCacheAndDb(updated);
+        this.logOtpOperation('updated', phone, purpose, existingSession.id);
+        return { sessionId: existingSession.id };
+      }
+
+      // Create new session if it doesn't exist
+      const sessionId = randomUUID();
+      const newData: OtpSessionCache = {
+        id: sessionId,
+        phone,
+        purpose,
         sessionId,
+        passwordHash: metadata?.passwordHash,
+        fullName: metadata?.fullName,
+        attemptCount: purpose === OtpPurpose.Registration ? 0 : undefined,
+        resendCount: 0,
         expiresAt,
+        lastOtpSentAt: undefined,
         otpHash,
         otpAttempts: 0,
         otpCreatedAt: new Date(),
-        ...(metadata?.passwordHash && { passwordHash: metadata.passwordHash }),
-        ...(metadata?.fullName && { fullName: metadata.fullName }),
       };
 
-      await this.saveOtpSessionToCacheAndDb(updated);
-      this.logOtpOperation('updated', phone, purpose, existingSession.id);
-      return;
+      await this.saveOtpSessionToCacheAndDb(newData);
+      this.logOtpOperation('created', phone, purpose, sessionId);
+      return { sessionId };
+    } catch (error) {
+      this.logger.LogError('Failed to save OTP session', error as Error, {
+        context: 'OtpService.saveOtpSession',
+        phone: this.maskPhone(phone),
+        purpose,
+      });
+
+      throw new BusinessException(
+        'Failed to save OTP session',
+        'OTP_SESSION_SAVE_FAILED',
+      );
     }
-
-    // Create new session
-    const newSessionId = randomUUID();
-    const newData: OtpSessionCache = {
-      id: newSessionId,
-      phone,
-      purpose,
-      sessionId,
-      passwordHash: metadata?.passwordHash,
-      fullName: metadata?.fullName,
-      attemptCount: purpose === OtpPurpose.Registration ? 0 : undefined,
-      resendCount: 0,
-      expiresAt,
-      lastOtpSentAt: undefined,
-      otpHash,
-      otpAttempts: 0,
-      otpCreatedAt: new Date(),
-    };
-
-    await this.saveOtpSessionToCacheAndDb(newData);
-    this.logOtpOperation('created', phone, purpose, newSessionId);
   }
 
   /**

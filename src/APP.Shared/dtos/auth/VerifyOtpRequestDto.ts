@@ -7,7 +7,7 @@ import { AutoMap } from '@automapper/classes';
  * Request payload for verifying phone OTP after registration.
  * Phone number is extracted from the OTP JWT token in the Authorization header.
  */
-export class VerifyOtpDto {
+export class VerifyOtpRequestDto {
   /**
    * 6-digit OTP code received via SMS
    * @example "123456"

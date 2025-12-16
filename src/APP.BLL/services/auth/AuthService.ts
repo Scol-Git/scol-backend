@@ -23,7 +23,7 @@ import { AuthResponseMapper } from '@bll/mappings/auth/AuthResponseMapper';
 import { UserResponseMapper } from '@bll/mappings/auth/UserResponseMapper';
 import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
-import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
+import { VerifyOtpRequestDto } from '@shared/dtos/auth/VerifyOtpRequestDto';
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
 import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto';
@@ -31,7 +31,6 @@ import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTo
 
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
-import { UserDto } from '@shared/dtos/auth/UserDto';
 
 import type { OtpUserPayload } from '@shared/interfaces/auth/OtpUserPayload.interface';
 import { SysUsers } from '@entity/entities/SysUsers.entity';
@@ -46,8 +45,9 @@ import { BusinessException } from '@shared/exceptions/BusinessException';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { PhoneNumberUtil } from '@shared/utils/PhoneNumberUtil';
 import { EntityManager } from 'typeorm';
-import { randomUUID } from 'crypto';
+
 import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
+import { UserContextAccessor } from '@shared/context/UserContextAccessor';
 
 /**
  * Auth Service
@@ -78,10 +78,6 @@ export class AuthService {
   ) {
     this.isDevelopment = this.configService.get('NODE_ENV') === 'development';
   }
-
-  // ============================================
-  // WRITE OPERATIONS (Commands)
-  // ============================================
 
   /**
    * Register a new lead/student
@@ -116,14 +112,10 @@ export class AuthService {
     // Generate OTP first
     const plainOtp = this.otp.generateOtp();
 
-    // Generate pendingId for registration
-    const pendingId = randomUUID();
-
-    // Save OTP session (unified method for registration and password reset)
-    await this.otp.saveOtpSession(
+    // Save OTP session
+    const { sessionId } = await this.otp.saveOtpSession(
       OtpPurpose.Registration,
       dto.phone,
-      pendingId,
       plainOtp,
       expiresAt,
       {
@@ -136,21 +128,21 @@ export class AuthService {
     await this.otp.ensureCanSendOtp(
       OtpPurpose.Registration,
       dto.phone,
-      pendingId,
+      sessionId,
     );
 
     // Send OTP via SMS
     await this.sms.sendOtp(dto.phone, plainOtp);
 
     const otpToken = this.jwt.generateOtpToken({
-      pendingId,
+      sessionId,
       phone: dto.phone,
       purpose: 'phone_verify',
     });
 
     this.logger.info('Pending registration created/updated successfully', {
       context: 'AuthService.registerLead',
-      pendingId,
+      sessionId,
       phone: PhoneNumberUtil.mask(dto.phone),
       action: 'REGISTER_LEAD_SUCCESS',
     });
@@ -169,7 +161,7 @@ export class AuthService {
    * Verify OTP and activate account (for registration) or return password reset token (for password reset)
    */
   async verifyOtp(
-    dto: VerifyOtpDto,
+    dto: VerifyOtpRequestDto,
     otpUserPayload: OtpUserPayload,
     ip?: string,
     userAgent?: string,
@@ -183,19 +175,26 @@ export class AuthService {
       action: 'VERIFY_OTP_START',
     });
 
+    // Validate token
+    if (!otpUserPayload.purpose) {
+      throw new InvalidTokenException('Invalid Phone Verification Token');
+    }
+
+    if (otpUserPayload.purpose == 'phone_verify' && !otpUserPayload.pendingId) {
+      throw new InvalidTokenException('Invalid Phone Verification Token');
+    }
+
+    if (otpUserPayload.purpose == 'password_reset' && !otpUserPayload.userId) {
+      throw new InvalidTokenException('Invalid Password Reset Token');
+    }
+
     // Handle password reset flow
     if (otpUserPayload.purpose === 'password_reset') {
-      if (!otpUserPayload.userId) {
-        throw new InvalidTokenException('User ID missing from token');
-      }
-
-      const userId = otpUserPayload.userId; // Type guard
-
       // Verify OTP using unified method
       const { sessionId } = await this.otp.verifyOtp(
         OtpPurpose.PasswordReset,
         otpUserPayload.phone,
-        userId,
+        otpUserPayload.userId!,
         dto.otp,
       );
 
@@ -207,7 +206,7 @@ export class AuthService {
           otpSessionId: sessionId,
           action: 'VERIFY_OTP_FAILED_OTP_MISMATCH',
         });
-        throw new InvalidTokenException('OTP does not match user');
+        throw new InvalidCredentialsException();
       }
 
       // Verify user exists
@@ -324,7 +323,6 @@ export class AuthService {
           },
           'INVALID_REGISTRATION_DATA',
         );
-        
       }
 
       // Create user and profile in a transaction
@@ -332,7 +330,7 @@ export class AuthService {
         async (manager: EntityManager) => {
           const userRepo = manager.getRepository(SysUsers);
           const profileRepo = manager.getRepository(SysLeadProfiles);
-//session?id
+          //session?id
           // Race condition guard: Re-check phone uniqueness
           const existingUser = await userRepo.findOne({
             where: { phone: otpUserPayload.phone },
@@ -408,221 +406,106 @@ export class AuthService {
   }
 
   /**
-   * Resend OTP
-   
+   * Resend OTP (Registration Flow Only)
+   *
+   * - Does NOT issue any OTP access token
+   * - Only resends OTP within existing OTP session
+   * - Returns devOtp in non-production environments only
+   */
   async resendOtp(
     otpUserPayload: OtpUserPayload,
-  ): Promise<RegisterLeadResponseDto> {
+  ): Promise<ResendOtpResponseDto> {
     this.logger.info('OTP resend requested', {
       context: 'AuthService.resendOtp',
-      pendingId: otpUserPayload.pendingId,
+      purpose: otpUserPayload.purpose,
       phone: PhoneNumberUtil.mask(otpUserPayload.phone),
       action: 'RESEND_OTP_START',
     });
 
-    // Validate this is for registration flow (phone_verify)
-    if (otpUserPayload.purpose !== 'phone_verify') {
+    // 1. Validate allowed purposes
+    if (
+      otpUserPayload.purpose !== 'phone_verify' &&
+      otpUserPayload.purpose !== 'password_reset'
+    ) {
       throw new InvalidTokenException(
-        'Resend OTP is only available for registration flow',
+        'Resend OTP is not allowed for this operation',
       );
     }
 
-    if (!otpUserPayload.pendingId) {
-      throw new InvalidTokenException('Pending ID missing from token');
+    // 2. Resolve OTP purpose + session identifier
+    let otpPurpose: OtpPurpose;
+    let sessionId: string;
+
+    if (otpUserPayload.purpose === 'phone_verify') {
+      if (!otpUserPayload.pendingId) {
+        throw new InvalidTokenException('Pending ID missing from token');
+      }
+      otpPurpose = OtpPurpose.Registration;
+      sessionId = otpUserPayload.pendingId;
+    } else {
+      // password_reset
+      if (!otpUserPayload.userId) {
+        throw new InvalidTokenException('User ID missing from token');
+      }
+      otpPurpose = OtpPurpose.PasswordReset;
+      sessionId = otpUserPayload.userId;
     }
 
-    // Validate this is for registration flow (phone_verify)
-    if (otpUserPayload.purpose !== 'phone_verify') {
-      throw new InvalidTokenException(
-        'Resend OTP is only available for registration flow',
-      );
-    }
-
-    // Check if we can send OTP (rate limiting)
+    // 3. Rate-limit resend attempts
     await this.otp.ensureCanSendOtp(
-      OtpPurpose.Registration,
+      otpPurpose,
       otpUserPayload.phone,
-      otpUserPayload.pendingId,
+      sessionId,
     );
 
-    // Get OTP session data (Redis-first with DB fallback)
+    // 4. Fetch OTP session (Redis → DB fallback)
     const pendingData = await this.otp.getOtpSession(
-      OtpPurpose.Registration,
+      otpPurpose,
       otpUserPayload.phone,
-      otpUserPayload.pendingId,
+      sessionId,
     );
 
-    if (!pendingData) {
-      this.logger.warn('OTP session not found for resend', {
-        context: 'AuthService.resendOtp',
-        pendingId: otpUserPayload.pendingId,
-        phone: PhoneNumberUtil.mask(otpUserPayload.phone),
-        action: 'RESEND_OTP_FAILED_NOT_FOUND',
-      });
-      throw new BusinessException(
-        'Registration session expired. Please register again.',
-        'REGISTRATION_EXPIRED',
-      );
-    }
-
-    // Check if session has expired
-    if (pendingData.expiresAt < new Date()) {
+    if (!pendingData || pendingData.expiresAt < new Date()) {
       await this.otp.deleteOtpSession(
         otpUserPayload.phone,
-        OtpPurpose.Registration,
-        otpUserPayload.pendingId,
+        otpPurpose,
+        sessionId,
       );
-      this.logger.warn('OTP session expired on resend', {
-        context: 'AuthService.resendOtp',
-        pendingId: otpUserPayload.pendingId,
-        phone: PhoneNumberUtil.mask(otpUserPayload.phone),
-        action: 'RESEND_OTP_FAILED_EXPIRED',
-      });
+
       throw new BusinessException(
-        'Registration session expired. Please register again.',
-        'REGISTRATION_EXPIRED',
+        'OTP session expired. Please start again.',
+        'OTP_EXPIRED',
       );
     }
 
-    // Generate new OTP
+    // 5. Generate new OTP
     const plainOtp = this.otp.generateOtp();
 
-    // Update OTP in session (keeps cache and DB in sync)
+    // 6. Update OTP in session
     await this.otp.updateOtpInSession(
-      OtpPurpose.Registration,
+      otpPurpose,
       otpUserPayload.phone,
-      otpUserPayload.pendingId,
+      sessionId,
       plainOtp,
     );
 
-    // Send OTP via SMS
+    // 7. Send OTP via SMS
     await this.sms.sendOtp(otpUserPayload.phone, plainOtp);
-
-    const otpToken = this.jwt.generateOtpToken({
-      pendingId: otpUserPayload.pendingId,
-      phone: otpUserPayload.phone,
-      purpose: 'phone_verify',
-    });
 
     this.logger.info('OTP resent successfully', {
       context: 'AuthService.resendOtp',
-      pendingId: otpUserPayload.pendingId,
+      purpose: otpUserPayload.purpose,
+      sessionId,
       action: 'RESEND_OTP_SUCCESS',
     });
 
+    // 8. Response (NO TOKEN)
     return {
-      otpAccessToken: otpToken,
-      expiresIn: this.securityConfig.otp.ttlSeconds,
       message: 'OTP resent successfully.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       ...(this.isDevelopment && { devOtp: plainOtp }),
     };
   }
-*/
-    /**
-     * Resend OTP (Registration Flow Only)
-     *
-     * - Does NOT issue any OTP access token
-     * - Only resends OTP within existing OTP session
-     * - Returns devOtp in non-production environments only
-     */
-    async resendOtp(
-      otpUserPayload: OtpUserPayload,
-    ): Promise<ResendOtpResponseDto> {
-    
-      this.logger.info('OTP resend requested', {
-        context: 'AuthService.resendOtp',
-        purpose: otpUserPayload.purpose,
-        phone: PhoneNumberUtil.mask(otpUserPayload.phone),
-        action: 'RESEND_OTP_START',
-      });
-    
-      // 1. Validate allowed purposes
-      if (
-        otpUserPayload.purpose !== 'phone_verify' &&
-        otpUserPayload.purpose !== 'password_reset'
-      ) {
-        throw new InvalidTokenException(
-          'Resend OTP is not allowed for this operation',
-        );
-      }
-    
-      // 2. Resolve OTP purpose + session identifier
-      let otpPurpose: OtpPurpose;
-      let sessionId: string;
-    
-      if (otpUserPayload.purpose === 'phone_verify') {
-        if (!otpUserPayload.pendingId) {
-          throw new InvalidTokenException('Pending ID missing from token');
-        }
-        otpPurpose = OtpPurpose.Registration;
-        sessionId = otpUserPayload.pendingId;
-      } else {
-        // password_reset
-        if (!otpUserPayload.userId) {
-          throw new InvalidTokenException('User ID missing from token');
-        }
-        otpPurpose = OtpPurpose.PasswordReset;
-        sessionId = otpUserPayload.userId;
-      }
-    
-      // 3. Rate-limit resend attempts
-      await this.otp.ensureCanSendOtp(
-        otpPurpose,
-        otpUserPayload.phone,
-        sessionId,
-      );
-    
-      // 4. Fetch OTP session (Redis → DB fallback)
-      const pendingData = await this.otp.getOtpSession(
-        otpPurpose,
-        otpUserPayload.phone,
-        sessionId,
-      );
-    
-      if (!pendingData || pendingData.expiresAt < new Date()) {
-        await this.otp.deleteOtpSession(
-          otpUserPayload.phone,
-          otpPurpose,
-          sessionId,
-        );
-    
-        throw new BusinessException(
-          'OTP session expired. Please start again.',
-          'OTP_EXPIRED',
-        );
-      }
-    
-      // 5. Generate new OTP
-      const plainOtp = this.otp.generateOtp();
-    
-      // 6. Update OTP in session
-      await this.otp.updateOtpInSession(
-        otpPurpose,
-        otpUserPayload.phone,
-        sessionId,
-        plainOtp,
-      );
-    
-      // 7. Send OTP via SMS
-      await this.sms.sendOtp(otpUserPayload.phone, plainOtp);
-    
-      this.logger.info('OTP resent successfully', {
-        context: 'AuthService.resendOtp',
-        purpose: otpUserPayload.purpose,
-        sessionId,
-        action: 'RESEND_OTP_SUCCESS',
-      });
-    
-      // 8. Response (NO TOKEN)
-      return {
-        message: 'OTP resent successfully.',
-        retryAfter: this.securityConfig.otp.resendCooldownSeconds,
-        ...(this.isDevelopment && { devOtp: plainOtp }),
-      };
-    }
-    
-
 
   /**
    * Login
@@ -795,51 +678,36 @@ export class AuthService {
   }
 
   /**
-   * Resend OTP using credentials (phone + password) to issue a new OTP access token
-   
-  async resendOtpWithCredentials(
-    dto: any,
-    ip?: string,
-  ): Promise<RegisterLeadResponseDto> {
-    throw new BusinessException(
-      'Resend OTP with credentials is not supported in this build.',
-      'FEATURE_DISABLED',
-    );
-  }
-  */
-
-  /**
    * Logout
    */
-  async logout(userId: string, sessionId?: string): Promise<void> {
+  async logout(ip?: string, userAgent?: string): Promise<void> {
+    const user = UserContextAccessor.userContext;
+
     this.logger.info('Logout requested', {
       context: 'AuthService.logout',
-      userId,
-      sessionId,
+      userId: user.userId,
+      ip,
+      userAgent,
       action: 'LOGOUT_START',
     });
 
-    if (sessionId) {
+    if (ip && userAgent) {
       await this.db.userSessions.update(
-        { id: sessionId, userId },
+        { userId: user.userId, ipAddress: ip, userAgent: userAgent },
         { revokedAt: new Date() },
       );
     } else {
-      const session = await this.db.userSessions.findOne({
-        where: { userId, revokedAt: IsNull() },
-        order: { createdAt: 'DESC' },
-      });
-
-      if (session) {
-        session.revokedAt = new Date();
-        await this.db.userSessions.save(session);
-      }
+      await this.db.userSessions.update(
+        { userId: user.userId, revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      );
     }
 
     this.logger.info('Logout successful', {
       context: 'AuthService.logout',
-      userId,
-      sessionId,
+      userId: user.userId,
+      ip,
+      userAgent,
       action: 'LOGOUT_SUCCESS',
     });
   }
@@ -865,7 +733,7 @@ export class AuthService {
       action: 'LOGOUT_ALL_SUCCESS',
     });
   }
-  
+
   /**
    * Forgot Password - Initiate password reset flow
    * Verifies user exists and sends OTP for password reset
@@ -930,7 +798,6 @@ export class AuthService {
     await this.otp.saveOtpSession(
       OtpPurpose.PasswordReset,
       dto.phone,
-      user.id,
       plainOtp,
       expiresAt,
     );
@@ -1034,9 +901,8 @@ export class AuthService {
       throw new InvalidTokenException('Phone number mismatch');
     }
 
-
-  // 🔐 STEP 1: Revoke ALL existing sessions
-  await this.logoutAll(user.id);
+    // 🔐 STEP 1: Revoke ALL existing sessions
+    await this.logoutAll(user.id);
 
     // Hash new password
     const newPasswordHash = await this.hasher.hash(dto.newPassword);
@@ -1054,7 +920,7 @@ export class AuthService {
     await this.db.users.save(user);
 
     // Revoke all existing sessions for security
-   // await this.logoutAll(user.id);
+    // await this.logoutAll(user.id);
 
     // Issue new token pair (creates new session)
     const tokens = await this.token.issueTokenPair(user, ip, userAgent);
@@ -1076,51 +942,5 @@ export class AuthService {
     });
 
     return this.authResponseMapper.toAuthResponse(user, tokens, profile);
-  }
-
-  // ============================================
-  // READ OPERATIONS (Queries)
-  // ============================================
-
-  /**
-   * Get current user information
-   */
-  async getCurrentUser(userId: string): Promise<UserDto> {
-    const user = await this.db.users.findOne({
-      where: { id: userId },
-      relations: { roles: true, permissions: true },
-    });
-
-    if (!user) {
-      throw new BusinessException('User not found', 'USER_NOT_FOUND');
-    }
-
-    let profile = undefined;
-    if (user.userType === UserType.Lead) {
-      profile =
-        (await this.db.leadProfiles.findOne({
-          where: { userId: user.id },
-        })) ?? undefined;
-    }
-
-    return this.userMapper.toUserDto(user, profile);
-  }
-
-  /**
-   * Get user sessions
-   */
-  async getUserSessions(userId: string) {
-    const sessions = await this.db.userSessions.find({
-      where: { userId, revokedAt: null as any },
-      order: { createdAt: 'DESC' },
-    });
-
-    return sessions.map((session) => ({
-      id: session.id,
-      ipAddress: session.ipAddress,
-      userAgent: session.userAgent,
-      createdAt: session.createdAt,
-      expiresAt: session.expiresAt,
-    }));
   }
 }

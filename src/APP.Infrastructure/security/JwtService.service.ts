@@ -125,13 +125,13 @@ export class JwtService implements IJwtService {
    * @returns JWT token string
    */
   generateOtpToken(payload: {
-    pendingId?: string;
+    sessionId?: string;
     userId?: string;
     phone: string;
     purpose: 'phone_verify' | 'password_reset';
   }): string {
     const tokenPayload: Record<string, any> = {
-      sub: payload.pendingId || payload.userId, // Use pendingId for registration, userId for password reset
+      sub: payload.sessionId || payload.userId, // Use sessionId for registration, userId for password reset
       phone: payload.phone,
       purpose: payload.purpose,
       aud: 'otp', // Audience for OTP tokens
@@ -166,7 +166,10 @@ export class JwtService implements IJwtService {
 
       // Validate purpose
       const validPurposes = ['phone_verify', 'password_reset'];
-      if (!decoded.purpose || !validPurposes.includes(decoded.purpose as string)) {
+      if (
+        !decoded.purpose ||
+        !validPurposes.includes(decoded.purpose as string)
+      ) {
         throw new Error('Invalid OTP token purpose.');
       }
 

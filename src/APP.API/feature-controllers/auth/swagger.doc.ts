@@ -16,7 +16,7 @@ import {
 } from '@api/common/swagger/swagger-docs.registry';
 import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
-import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
+import { VerifyOtpRequestDto } from '@shared/dtos/auth/VerifyOtpRequestDto';
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
@@ -27,7 +27,6 @@ import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTo
 import { UserDto } from '@shared/dtos/auth/UserDto';
 import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
-
 
 const docs: Record<string, SwaggerDocSet> = {
   // ============================================
@@ -100,7 +99,8 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Validation error',
             value: {
               status: 'error',
-              message: 'Phone must be a valid 11-digit Bangladesh number starting with 01',
+              message:
+                'Phone must be a valid 11-digit Bangladesh number starting with 01',
               statusCode: 400,
               error: {
                 details: {
@@ -127,7 +127,7 @@ const docs: Record<string, SwaggerDocSet> = {
         'Verify phone number with OTP code. Supports two flows: (1) Registration (purpose=phone_verify): Activates account and returns access/refresh tokens. (2) Password reset (purpose=password_reset): Returns password reset token for /reset-password endpoint.',
     }),
     ApiBody({
-      schema: { $ref: getSchemaPath(VerifyOtpDto) },
+      schema: { $ref: getSchemaPath(VerifyOtpRequestDto) },
       examples: {
         default: {
           summary: 'OTP verification',
@@ -303,7 +303,7 @@ const docs: Record<string, SwaggerDocSet> = {
       description:
         'Request a new OTP code using phone + password when OTP access token has expired. Subject to the same rate limits as resend-otp.',
     }),
-   
+
     ApiOkResponse({
       description: 'New OTP sent successfully via SMS',
       schema: {
@@ -328,7 +328,8 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Validation error',
             value: {
               status: 'error',
-              message: 'Phone must be a valid 11-digit Bangladesh number starting with 01',
+              message:
+                'Phone must be a valid 11-digit Bangladesh number starting with 01',
               statusCode: 400,
               error: {
                 details: {
@@ -466,7 +467,10 @@ const docs: Record<string, SwaggerDocSet> = {
               data: {
                 type: 'object',
                 properties: {
-                  message: { type: 'string', example: 'Logged out successfully' },
+                  message: {
+                    type: 'string',
+                    example: 'Logged out successfully',
+                  },
                 },
               },
             },
