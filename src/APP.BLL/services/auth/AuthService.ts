@@ -45,7 +45,6 @@ import { BusinessException } from '@shared/exceptions/BusinessException';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { PhoneNumberUtil } from '@shared/utils/PhoneNumberUtil';
 import { EntityManager } from 'typeorm';
-
 import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
 import { UserContextAccessor } from '@shared/context/UserContextAccessor';
 
@@ -323,15 +322,16 @@ export class AuthService {
           },
           'INVALID_REGISTRATION_DATA',
         );
+        
       }
 
       // Create user and profile in a transaction
       const result = await this.db.transaction(
         async (manager: EntityManager) => {
-          const userRepo = manager.getRepository(SysUsers);
-          const profileRepo = manager.getRepository(SysLeadProfiles);
-          //session?id
-          // Race condition guard: Re-check phone uniqueness
+        const userRepo = manager.getRepository(SysUsers);
+        const profileRepo = manager.getRepository(SysLeadProfiles);
+        //session?id
+        // Race condition guard: Re-check phone uniqueness
           const existingUser = await userRepo.findOne({
             where: { phone: otpUserPayload.phone },
           });
@@ -733,7 +733,7 @@ export class AuthService {
       action: 'LOGOUT_ALL_SUCCESS',
     });
   }
-
+  
   /**
    * Forgot Password - Initiate password reset flow
    * Verifies user exists and sends OTP for password reset
@@ -918,9 +918,6 @@ export class AuthService {
     }
 
     await this.db.users.save(user);
-
-    // Revoke all existing sessions for security
-    // await this.logoutAll(user.id);
 
     // Issue new token pair (creates new session)
     const tokens = await this.token.issueTokenPair(user, ip, userAgent);

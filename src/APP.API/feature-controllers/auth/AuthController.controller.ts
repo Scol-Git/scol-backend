@@ -31,6 +31,7 @@ import {
 // Types imports
 import type { ICurrentUser } from '@shared/interfaces/domain';
 import type { OtpUserPayload } from '@shared/interfaces/auth/OtpUserPayload.interface';
+import type { Request } from 'express';
 
 // Services imports
 import { AuthService } from '@bll/services/auth/AuthService';
@@ -47,11 +48,11 @@ import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
 import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTokenResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
+import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
 
 // Common DTOs imports
 import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
-import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
 
 /**
  * Auth Controller
@@ -112,7 +113,6 @@ export class AuthController {
     @OtpUser() otpUser: OtpUserPayload,
     @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<AuthResponseDto | PasswordResetTokenResponseDto> {
-    console.log('reqInfo', reqInfo);
     return await this.authService.verifyOtp(
       dto,
       otpUser,
@@ -125,18 +125,7 @@ export class AuthController {
    * Resend OTP
    * GET /auth/resend-otp
    * Requires: OTP JWT token in Authorization header
-   
-  @Get('resend-otp')
-  @UseGuards(OtpJwtGuard)
-  @ApiBearerAuth('OTP-auth')
-  @AddSwaggerDoc('auth', 'resendOtp')
-  async resendOtp(
-    @OtpUser() otpUserPayload: OtpUserPayload,
-    @ReqInfo() reqInfo: ReqInfoPayload,
-  ): Promise<RegisterLeadResponseDto> {
-    return await this.authService.resendOtp(otpUserPayload);
-  }
-  */
+   */
   @Get('resend-otp')
   @UseGuards(OtpJwtGuard)
   @ApiBearerAuth('OTP-auth')
