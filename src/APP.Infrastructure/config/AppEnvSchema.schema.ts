@@ -1,9 +1,9 @@
 import * as Joi from 'joi';
 
 export const AppEnvSchema = Joi.object({
-  NODE_ENV: Joi.string()
-    .valid('development', 'test', 'production')
-    .default('development'),
+  // Application stage (dev, qa, prod) - use this for stage-dependent logic
+  APP_STAGE: Joi.string().valid('dev', 'qa', 'prod').default('dev'),
+
   PORT: Joi.number().default(3000),
 
   DATABASE_URL: Joi.string().uri().required(), // prefer URL in cloud
@@ -14,20 +14,6 @@ export const AppEnvSchema = Joi.object({
   DB_USER: Joi.string().optional(),
   DB_PASS: Joi.string().optional(),
   DB_NAME: Joi.string().optional(),
-
-  // Email Configuration (optional, defaults to console mode)
-  EMAIL_PROVIDER: Joi.string().valid('console', 'smtp').default('console'),
-  SMTP_HOST: Joi.string().optional(),
-  SMTP_PORT: Joi.number().optional(),
-  SMTP_SECURE: Joi.alternatives()
-    .try(
-      Joi.boolean(),
-      Joi.string().valid('true', 'false', '1', '0', 'yes', 'no'),
-    )
-    .optional(),
-  SMTP_USER: Joi.string().optional(),
-  SMTP_PASS: Joi.string().optional(),
-  SMTP_FROM: Joi.string().optional(),
 
   // Redis Cache (optional, falls back to in-memory if not provided)
   REDIS_URL: Joi.string().uri().optional(),
@@ -65,9 +51,14 @@ export const AppEnvSchema = Joi.object({
   CORS_ENABLED: Joi.string().valid('true', 'false').default('true'),
   CORS_ORIGINS: Joi.string().default('*'),
 
-  // Sentry Error Tracking (optional)
-  SENTRY_DSN: Joi.string().uri().optional(),
-  SENTRY_TRACES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.05),
+  // Cron Job Security (required in qa/prod for Vercel Cron)
+  CRON_SECRET: Joi.string()
+    .min(16)
+    .when('APP_STAGE', {
+      is: Joi.valid('qa', 'prod'),
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    }),
 
   // Rate Limiting Configuration
   RATE_LIMIT_ENABLED: Joi.string().valid('true', 'false').default('false'),

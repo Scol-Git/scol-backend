@@ -71,7 +71,7 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
       const redisOptions: import('ioredis').RedisOptions = {
         host: url.hostname,
         port: parseInt(url.port, 10) || 6379,
-        username: url.username || 'default',
+        username: url.username || undefined,
         password: url.password ? decodeURIComponent(url.password) : undefined,
         // TLS configuration for Upstash and other cloud Redis providers
         tls: useTls ? {} : undefined,

@@ -1,5 +1,4 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { LessThan } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ILogger } from '@shared/interfaces/logging';
@@ -8,10 +7,12 @@ import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 /**
  * OTP Session Cleanup Service
  *
- * Cron job that runs every 5 minutes to clean up expired OTP sessions
- * (both registration and password reset) from the PostgreSQL database.
+ * Cleans up expired OTP sessions from the PostgreSQL database.
  *
- * Note: This only cleans up DB records. Redis entries expire automatically via TTL.
+ * NOTE: In serverless environments (Vercel), this is triggered via HTTP endpoint
+ * at /internal/cron/otp-sessions by Vercel Cron Jobs.
+ * The @Cron decorator does NOT work reliably in serverless environments
+ * because there's no persistent process to schedule cron jobs.
  */
 @Injectable()
 export class OtpSessionCleanupService {
@@ -22,38 +23,40 @@ export class OtpSessionCleanupService {
 
   /**
    * Cleanup expired OTP sessions
-   * Runs every 5 minutes
+   *
+   * Called by:
+   * - Vercel Cron via /internal/cron/otp-sessions (production/qa)
+   * - Can be called manually for testing
+   *
+   * @returns Number of deleted sessions
    */
-  @Cron('*/5 * * * *', {
-    name: 'cleanup-expired-otp-sessions',
-  })
-  async cleanupExpiredOtpSessions(): Promise<void> {
+  async cleanupExpiredOtpSessions(): Promise<number> {
     try {
       const now = new Date();
       const result = await this.db.otpSessions.delete({
         expiresAt: LessThan(now),
       });
 
-      if (result.affected && result.affected > 0) {
+      const deletedCount = result.affected || 0;
+
+      if (deletedCount > 0) {
         this.logger.LogInfo(
-          `Cleaned up ${result.affected} expired OTP session(s)`,
+          `Cleaned up ${deletedCount} expired OTP session(s)`,
           {
-            context: 'OtpSessionCleanupService.cleanupExpiredOtpSessions',
-            deletedCount: result.affected,
-            action: 'CLEANUP_EXPIRED_OTP_SESSIONS_SUCCESS',
+            context: 'OtpSessionCleanupService',
+            deletedCount,
           },
         );
       }
+
+      return deletedCount;
     } catch (error) {
       this.logger.LogError(
         'Failed to cleanup expired OTP sessions',
         error as Error,
-        {
-          context: 'OtpSessionCleanupService.cleanupExpiredOtpSessions',
-          action: 'CLEANUP_EXPIRED_OTP_SESSIONS_FAILED',
-        },
+        { context: 'OtpSessionCleanupService' },
       );
+      throw error;
     }
   }
 }
-

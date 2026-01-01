@@ -14,7 +14,6 @@ import { BusinessException } from '@shared/exceptions/BusinessException';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { ErrorCode } from '@shared/enums/ErrorCode.enum';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
-import { captureException } from '@infra/monitoring/sentry';
 
 @Catch()
 @Injectable()
@@ -70,9 +69,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // Specialize auth errors for clarity
       if (status === HttpStatus.UNAUTHORIZED) {
         if (msgString?.toLowerCase().includes('missing authentication token')) {
-          detail = 'Missing authentication token. Include Authorization: Bearer <access-token>';
-        } else if (msgString?.toLowerCase().includes('invalid or expired token')) {
-          detail = 'Invalid or expired authentication token. Please re-login or refresh the token.';
+          detail =
+            'Missing authentication token. Include Authorization: Bearer <access-token>';
+        } else if (
+          msgString?.toLowerCase().includes('invalid or expired token')
+        ) {
+          detail =
+            'Invalid or expired authentication token. Please re-login or refresh the token.';
         } else {
           detail = msgString ?? 'Unauthorized';
         }
@@ -85,19 +88,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: req.url,
       method: req.method,
       status,
-      reqId: req.headers['x-request-id'],
+      requestId: req.headers['x-request-id'],
     });
-
-    // Capture 5xx errors and unexpected exceptions with Sentry
-    // Skip expected 4xx validation/auth errors to avoid noise
-    if (status >= 500 || (!isHttp && !isValidation && !isBusiness)) {
-      captureException(exception, {
-        path: req.url,
-        method: req.method,
-        status,
-        requestId: req.headers['x-request-id'],
-      });
-    }
 
     // Build error response using BaseResponseDto structure
     const errorResponse = new ErrorResponseDto();
@@ -108,11 +100,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // Handle 429 Too Many Requests - set Retry-After header and error code
     if (status === HttpStatus.TOO_MANY_REQUESTS && isHttp) {
       const payload = exception.getResponse();
-      if (
-        payload &&
-        typeof payload === 'object' &&
-        'retryAfter' in payload
-      ) {
+      if (payload && typeof payload === 'object' && 'retryAfter' in payload) {
         const retryAfter = (payload as { retryAfter?: number }).retryAfter;
         if (retryAfter !== undefined && retryAfter > 0) {
           res.setHeader('Retry-After', retryAfter.toString());

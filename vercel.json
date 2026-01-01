@@ -15,5 +15,11 @@
       "src": "/(.*)",
       "dest": "/api/index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/internal/cron/otp-sessions",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }

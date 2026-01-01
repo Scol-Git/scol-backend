@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
 import type { IInfrastructureConfig } from '@shared/interfaces/config/IInfrastructureConfig.interface';
 import { IInfrastructureConfig as IInfrastructureConfigToken } from '@shared/tokens/injection.tokens';
+import { getAppStage } from '@infra/config/getAppStage';
 
 // Import QueryBuilder extension methods to register them globally
 import '../extensions/QueryBuilderExtensions';
@@ -37,16 +38,7 @@ import { AppDbContext } from './AppDbContext';
         cfg: ConfigService,
       ): DataSourceOptions => {
         const url = config.database.url;
-        const base: DataSourceOptions = url
-          ? { type: 'postgres', url }
-          : {
-              type: 'postgres',
-              host: config.database.host,
-              port: config.database.port,
-              username: config.database.username,
-              password: config.database.password,
-              database: config.database.database,
-            };
+        const base: DataSourceOptions = { type: 'postgres', url };
 
         return {
           ...base,
@@ -69,10 +61,7 @@ import { AppDbContext } from './AppDbContext';
             OtpSession,
           ],
           synchronize: false,
-          logging:
-            cfg.get('NODE_ENV') === 'development'
-              ? ['error', 'warn']
-              : ['error'],
+          logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
           // Serverless-optimized connection pool settings
           // Keeps connections minimal to avoid exhausting Neon/serverless DB limits
           extra: {

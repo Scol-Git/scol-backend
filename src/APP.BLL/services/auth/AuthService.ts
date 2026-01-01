@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { isDev } from '@infra/config/getAppStage';
 import { IsNull } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { IPasswordHasher } from '@shared/interfaces/security';
@@ -73,9 +73,9 @@ export class AuthService {
     private readonly appConfig: IApplicationConfig,
     @Inject(ISecurityConfigToken)
     private readonly securityConfig: ISecurityConfig,
-    private readonly configService: ConfigService,
   ) {
-    this.isDevelopment = this.configService.get('NODE_ENV') === 'development';
+    // Use APP_STAGE instead of NODE_ENV for stage-dependent behavior
+    this.isDevelopment = isDev();
   }
 
   // ============================================

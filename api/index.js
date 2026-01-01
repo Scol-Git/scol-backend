@@ -3,10 +3,6 @@
 const express = require('express');
 const { ExpressAdapter } = require('@nestjs/platform-express');
 
-// Initialize Sentry before anything else
-const { initSentry } = require('../dist/APP.Infrastructure/monitoring/sentry');
-initSentry();
-
 // Lazy-initialize the Nest app once and reuse across invocations
 let cachedHandler = null;
 
@@ -30,4 +26,3 @@ module.exports = async function handler(req, res) {
   const server = await getHandler();
   server(req, res);
 };
-

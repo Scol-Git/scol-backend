@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { AuthService } from './AuthService';
 import { AuthValidationService } from './AuthValidationService';
 import { OtpService } from './OtpService';
@@ -16,15 +15,13 @@ import { SmsModule } from '@infra/sms/SmsModule.module';
  * - AuthValidationService (business rule validation)
  * - OtpService (OTP management)
  * - TokenService (JWT token management)
- * - OtpSessionCleanupService (cron job for cleaning expired OTP sessions)
+ * - OtpSessionCleanupService (cleanup via HTTP endpoint for serverless)
  *
- * Imports:
- * - ScheduleModule (for cron jobs)
- * - MappingModule (for AutoMapper)
- * - SmsModule (for ISmsService from Infrastructure layer)
+ * Note: ScheduleModule removed - @Cron doesn't work in serverless (Vercel).
+ * OTP cleanup is triggered via /internal/cron/otp-sessions endpoint by Vercel Cron.
  */
 @Module({
-  imports: [ScheduleModule.forRoot(), MappingModule, SmsModule],
+  imports: [MappingModule, SmsModule],
   providers: [
     AuthService,
     AuthValidationService,
@@ -32,6 +29,6 @@ import { SmsModule } from '@infra/sms/SmsModule.module';
     TokenService,
     OtpSessionCleanupService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, OtpSessionCleanupService],
 })
 export class AuthModule {}
