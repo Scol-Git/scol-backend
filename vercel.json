@@ -19,7 +19,7 @@
   "crons": [
     {
       "path": "/internal/cron/otp-sessions",
-      "schedule": "*/5 * * * *"
+      "schedule": "40 0 * * *"
     }
   ]
 }
