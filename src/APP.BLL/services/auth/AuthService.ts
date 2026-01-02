@@ -158,7 +158,7 @@ export class AuthService {
       otpAccessToken: otpToken,
       expiresIn: this.securityConfig.otp.ttlSeconds,
       message:
-        'Registration successful. Please verify your phone with the OTP sent via SMS.',
+        'Registration successful. Push Test - Please verify your phone with the OTP sent via SMS.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       //...(this.isDevelopment && { devOtp: plainOtp }),
       devOtp: plainOtp,
