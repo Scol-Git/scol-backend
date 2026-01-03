@@ -10,8 +10,10 @@ export class PhoneNumberUtil {
   /**
    * Bangladesh phone number regex pattern
    * Format: 01XXXXXXXXX (11 digits starting with 01)
+   * Third digit: 3-9 (operator code)
+   * Supports: 01[3-9]XXXXXXXX
    */
-  static readonly BD_PHONE_REGEX = /^01[0-9]{9}$/;
+  static readonly BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
 
   /**
    * Check if phone number is valid Bangladesh format
@@ -31,7 +33,7 @@ export class PhoneNumberUtil {
   static validate(phone: string): void {
     if (!this.isValid(phone)) {
       throw new ValidationException(
-        'Phone must be a valid 11-digit Bangladesh number starting with 01',
+        'Phone must be a valid 11-digit Bangladesh number starting with 01, third digit must be 3-9 (operator code: 013, 014, 015, 016, 017, 018, 019)',
       );
     }
   }

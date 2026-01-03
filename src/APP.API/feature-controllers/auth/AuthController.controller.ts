@@ -160,7 +160,7 @@ export class AuthController {
   @Get('refresh')
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 20, windowSeconds: 300 }) // 20 refresh requests per 5 minutes
-  @ApiBearerAuth('Refresh-auth')
+  @ApiBearerAuth('JWT-auth')
   @AddSwaggerDoc('auth', 'refresh')
   async refresh(
     @Headers('authorization') authHeader: string | undefined,
