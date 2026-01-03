@@ -6,8 +6,15 @@ import { HttpExceptionFilter } from './common/filters/HttpExceptionFilter.filter
 import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMiddleware';
 
 // Feature modules
-
 import { AuthModule } from './feature-controllers/auth/AuthModule.module';
+
+// Standalone controllers
+import { HealthController } from './feature-controllers/health/HealthController.controller';
+import { InternalCronController } from './feature-controllers/internal/InternalCronController.controller';
+
+// BLL modules for controller dependencies
+import { AuthModule as AuthBllModule } from '@bll/services/auth/AuthModule.module';
+import { HealthCheckModule } from '@bll/services/health/HealthCheckModule.module';
 
 /**
  * API Module - Entry point for the REST API layer.
@@ -25,6 +32,14 @@ import { AuthModule } from './feature-controllers/auth/AuthModule.module';
 
     // Feature modules
     AuthModule,
+
+    // BLL modules for standalone controllers
+    AuthBllModule, // For InternalCronController
+    HealthCheckModule, // For HealthController
+  ],
+  controllers: [
+    HealthController,
+    InternalCronController,
   ],
   providers: [HttpExceptionFilter, RequestLoggingMiddleware],
 })

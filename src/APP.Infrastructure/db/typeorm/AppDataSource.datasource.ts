@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import * as path from 'path';
 import * as fs from 'fs';
 import { config as dotenvConfig } from 'dotenv';
+import { getAppStage } from '@infra/config/getAppStage';
 
 // ---------------------------
 // 1. Resolve project root safely
@@ -42,9 +43,9 @@ const dbUrl = process.env.DATABASE_URL;
 // ---------------------------
 // 4. Determine migration path based on mode
 // ---------------------------
-// ts-node -> use .ts
-// prod build -> use dist .js
-const isTs = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+// ts-node -> use .ts (dev)
+// prod build -> use dist .js (qa/prod)
+const isTs = getAppStage() === 'dev';
 const migrationPath = isTs
   ? path.join(projectRoot, 'migrations', '*.ts')
   : path.join(projectRoot, 'dist', 'migrations', '*.js');

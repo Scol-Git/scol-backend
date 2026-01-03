@@ -62,16 +62,39 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      // Create default connection (can be reused by services that don't need special config)
-      this._defaultClient = new Redis(this._redisUrl, {
+      // Parse the Redis URL to extract components
+      const url = new URL(this._redisUrl);
+      const useTls =
+        url.protocol === 'rediss:' || this._redisUrl.startsWith('rediss://');
+
+      // Build connection options explicitly for better compatibility with Upstash
+      const redisOptions: import('ioredis').RedisOptions = {
+        host: url.hostname,
+        port: parseInt(url.port, 10) || 6379,
+        username: url.username || undefined,
+        password: url.password ? decodeURIComponent(url.password) : undefined,
+        // TLS configuration for Upstash and other cloud Redis providers
+        tls: useTls ? {} : undefined,
+        // Retry strategy for serverless
         retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
-          return delay;
+          if (times > 3) return null; // Stop retrying after 3 attempts
+          return Math.min(times * 100, 1000);
         },
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         lazyConnect: true,
-      });
+        // Connection timeouts for serverless environments
+        connectTimeout: 10000,
+      };
+
+      if (this._logger) {
+        this._logger.LogInfo(
+          `Redis connecting to ${url.hostname}:${url.port || 6379} (TLS: ${useTls})`,
+        );
+      }
+
+      // Create default connection
+      this._defaultClient = new Redis(redisOptions);
 
       this._defaultClient.on('connect', () => {
         if (this._logger) {

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { isDev } from '@infra/config/getAppStage';
 import { IsNull } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { IPasswordHasher } from '@shared/interfaces/security';
@@ -73,9 +73,9 @@ export class AuthService {
     private readonly appConfig: IApplicationConfig,
     @Inject(ISecurityConfigToken)
     private readonly securityConfig: ISecurityConfig,
-    private readonly configService: ConfigService,
   ) {
-    this.isDevelopment = this.configService.get('NODE_ENV') === 'development';
+    // Use APP_STAGE instead of NODE_ENV for stage-dependent behavior
+    this.isDevelopment = isDev();
   }
 
   /**
@@ -150,9 +150,10 @@ export class AuthService {
       otpAccessToken: otpToken,
       expiresIn: this.securityConfig.otp.ttlSeconds,
       message:
-        'Registration successful. Please verify your phone with the OTP sent via SMS.',
+        'Registration successful. Push Test - Please verify your phone with the OTP sent via SMS.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
-      ...(this.isDevelopment && { devOtp: plainOtp }),
+      //...(this.isDevelopment && { devOtp: plainOtp }),
+      devOtp: plainOtp,
     };
   }
 
@@ -503,7 +504,8 @@ export class AuthService {
     return {
       message: 'OTP resent successfully.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
-      ...(this.isDevelopment && { devOtp: plainOtp }),
+      //...(this.isDevelopment && { devOtp: plainOtp }),
+      devOtp: plainOtp,
     };
   }
 

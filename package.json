@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
-    "build": "nest build",
+    "build": "nest build && tsc-alias -p tsconfig.build.json",
+    "vercel-build": "npm run build",
     "start:prod": "npm run build && node dist/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -23,7 +24,6 @@
     "@nestjs/config": "4.0.2",
     "@nestjs/core": "11.0.1",
     "@nestjs/platform-express": "11.0.1",
-    "@nestjs/schedule": "^6.1.0",
     "@nestjs/swagger": "11.2.1",
     "@nestjs/typeorm": "11.0.0",
     "bcrypt": "^6.0.0",
@@ -73,6 +73,7 @@
     "ts-jest": "29.4.5",
     "ts-loader": "9.5.2",
     "ts-node": "10.9.2",
+    "tsc-alias": "^1.8.10",
     "tsconfig-paths": "4.2.0",
     "typescript": "5.7.3",
     "typescript-eslint": "8.20.0"
