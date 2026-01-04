@@ -67,10 +67,18 @@ export class OtpService {
   ) {
     this.otpLength = config.otp.length;
     this.otpTtl = config.otp.ttlSeconds;
+
+    // How many times a user can enter an OTP incorrectly for a single session.
     this.maxAttempts = config.otp.maxAttempts;
+
     this.resendCooldown = config.otp.resendCooldownSeconds;
+
+    // How many times an OTP can be re-sent within the same session.
     this.maxResendPerSession = config.otp.maxResendPerSession;
+
     this.redisPrefix = config.otp.redisPrefix;
+
+    // 1st OTP + resends
     this.maxTotalOtps = this.maxResendPerSession + 1;
   }
 
@@ -91,6 +99,7 @@ export class OtpService {
     purpose: OtpPurpose,
     phone: string,
     plainOtp: string,
+    purposeId: string,
     expiresAt: Date,
     metadata?: {
       passwordHash?: string;
@@ -133,7 +142,7 @@ export class OtpService {
         id: sessionId,
         phone,
         purpose,
-        sessionId,
+        sessionId: purposeId,
         passwordHash: metadata?.passwordHash,
         fullName: metadata?.fullName,
         attemptCount: purpose === OtpPurpose.Registration ? 0 : undefined,
@@ -169,13 +178,13 @@ export class OtpService {
   async verifyOtp(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
+    purposeId: string,
     otp: string,
-  ): Promise<{ sessionId: string }> {
+  ): Promise<{ purposeId: string }> {
     const sessionData = await this.getOtpSessionByPhonePurposeAndSessionId(
       phone,
       purpose,
-      sessionId,
+      purposeId,
     );
 
     if (!sessionData?.otpHash) {
@@ -192,7 +201,7 @@ export class OtpService {
 
     // Check attempts
     if (sessionData.otpAttempts >= this.maxAttempts) {
-      await this.deleteOtpSession(phone, purpose, sessionId);
+      await this.deleteOtpSession(phone, purpose, purposeId);
       throw new OtpAttemptsExceededException(this.maxAttempts);
     }
 
@@ -200,11 +209,11 @@ export class OtpService {
     const isValid = await this.hasher.verify(otp, sessionData.otpHash);
 
     if (!isValid) {
-      await this.incrementOtpAttempts(phone, purpose, sessionId);
+      await this.incrementOtpAttempts(phone, purpose, purposeId);
       throw new InvalidOtpException();
     }
 
-    return { sessionId: sessionData.sessionId };
+    return { purposeId: sessionData.sessionId };
   }
 
   /**
@@ -214,12 +223,12 @@ export class OtpService {
   async ensureCanSendOtp(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
+    purposeId: string,
   ): Promise<void> {
     const session = await this.getOtpSessionByPhonePurposeAndSessionId(
       phone,
       purpose,
-      sessionId,
+      purposeId,
     );
 
     if (!session) {
@@ -232,7 +241,7 @@ export class OtpService {
 
     // Check if expired
     if (!this.isNotExpired(session.expiresAt)) {
-      await this.deleteOtpSession(phone, purpose, sessionId);
+      await this.deleteOtpSession(phone, purpose, purposeId);
       const errorMessage =
         purpose === OtpPurpose.Registration
           ? 'Registration session expired. Please register again.'
@@ -275,7 +284,7 @@ export class OtpService {
   async updateOtpInSession(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
+    purposeId: string,
     plainOtp: string,
   ): Promise<void> {
     const otpHash = await this.hasher.hash(plainOtp);
@@ -283,7 +292,7 @@ export class OtpService {
 
     // Try to update Redis
     const cached = await this.safeGetFromCache<OtpSessionCache>(redisKey);
-    if (cached && cached.sessionId === sessionId) {
+    if (cached && cached.sessionId === purposeId) {
       cached.otpHash = otpHash;
       cached.otpAttempts = 0;
       cached.otpCreatedAt = new Date();
@@ -292,7 +301,7 @@ export class OtpService {
 
     // Always update DB
     await this.db.otpSessions.update(
-      { phone, purpose, sessionId },
+      { phone, purpose, sessionId: purposeId },
       {
         otpHash,
         otpAttempts: 0,
@@ -304,7 +313,7 @@ export class OtpService {
       context: 'OtpService.updateOtpInSession',
       phone: this.maskPhone(phone),
       purpose,
-      sessionId,
+      purposeId,
     });
   }
 
@@ -315,12 +324,12 @@ export class OtpService {
   async getOtpSession(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
+    purposeId: string,
   ): Promise<OtpSessionData | null> {
     const session = await this.getOtpSessionByPhonePurposeAndSessionId(
       phone,
       purpose,
-      sessionId,
+      purposeId,
     );
 
     if (!session) {
@@ -328,7 +337,7 @@ export class OtpService {
     }
 
     if (!this.isNotExpired(session.expiresAt)) {
-      await this.deleteOtpSession(phone, purpose, sessionId);
+      await this.deleteOtpSession(phone, purpose, purposeId);
       return null;
     }
 
@@ -348,7 +357,7 @@ export class OtpService {
   async deleteOtpSession(
     phone: string,
     purpose: OtpPurpose,
-    sessionId: string,
+    purposeId: string,
   ): Promise<void> {
     const redisKey = this.getOtpSessionCacheKey(phone, purpose);
 
@@ -358,7 +367,7 @@ export class OtpService {
     // Delete from DB
     try {
       const session = await this.db.otpSessions.findOne({
-        where: { phone, purpose, sessionId },
+        where: { phone, purpose, sessionId: purposeId },
       });
       if (session) {
         await this.db.otpSessions.remove(session);
@@ -368,7 +377,7 @@ export class OtpService {
         context: 'OtpService.deleteOtpSession',
         phone: this.maskPhone(phone),
         purpose,
-        sessionId,
+        purposeId,
       });
     }
   }
@@ -406,19 +415,19 @@ export class OtpService {
   private async getOtpSessionByPhonePurposeAndSessionId(
     phone: string,
     purpose: OtpPurpose,
-    sessionId: string,
+    purposeId: string,
   ): Promise<OtpSessionCache | null> {
     const redisKey = this.getOtpSessionCacheKey(phone, purpose);
 
     // Try Redis first
     const cached = await this.safeGetFromCache<OtpSessionCache>(redisKey);
-    if (cached && cached.sessionId === sessionId) {
+    if (cached && cached.sessionId === purposeId) {
       return cached;
     }
 
     // Fallback to DB
     const dbSession = await this.db.otpSessions.findOne({
-      where: { phone, purpose, sessionId },
+      where: { phone, purpose, sessionId: purposeId },
     });
 
     return dbSession ?? null;
@@ -482,20 +491,20 @@ export class OtpService {
   private async incrementOtpAttempts(
     phone: string,
     purpose: OtpPurpose,
-    sessionId: string,
+    purposeId: string,
   ): Promise<void> {
     const redisKey = this.getOtpSessionCacheKey(phone, purpose);
 
     // Try to increment in Redis
     const cached = await this.safeGetFromCache<OtpSessionCache>(redisKey);
-    if (cached && cached.sessionId === sessionId) {
+    if (cached && cached.sessionId === purposeId) {
       cached.otpAttempts = (cached.otpAttempts ?? 0) + 1;
       await this.safeSetToCache(redisKey, cached, this.otpTtl);
     }
 
     // Always increment in DB
     await this.db.otpSessions.increment(
-      { phone, purpose, sessionId },
+      { phone, purpose, sessionId: purposeId },
       'otpAttempts',
       1,
     );

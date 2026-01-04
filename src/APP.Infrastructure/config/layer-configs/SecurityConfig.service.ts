@@ -29,14 +29,6 @@ export class SecurityConfig implements ISecurityConfig {
       this._config.get<string>('JWT_REFRESH_TOKEN_EXPIRES_IN') || '7d',
   };
 
-  oauth = {
-    google: {
-      clientId: this._config.get<string>('GOOGLE_CLIENT_ID'),
-      clientSecret: this._config.get<string>('GOOGLE_CLIENT_SECRET'),
-      callbackUrl: this._config.get<string>('GOOGLE_CALLBACK_URL'),
-    },
-  };
-
   password = {
     bcryptSaltRounds: this._config.get<number>('BCRYPT_SALT_ROUNDS') ?? 12,
     minLength: this._config.get<number>('PASSWORD_MIN_LENGTH') ?? 8,

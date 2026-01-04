@@ -8,13 +8,6 @@ export const AppEnvSchema = Joi.object({
 
   DATABASE_URL: Joi.string().uri().required(), // prefer URL in cloud
 
-  // Optional individual parts if you ever need local connection pieces:
-  DB_HOST: Joi.string().optional(),
-  DB_PORT: Joi.number().optional(),
-  DB_USER: Joi.string().optional(),
-  DB_PASS: Joi.string().optional(),
-  DB_NAME: Joi.string().optional(),
-
   // Redis Cache (optional, falls back to in-memory if not provided)
   REDIS_URL: Joi.string().uri().optional(),
 
