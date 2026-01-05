@@ -16,18 +16,15 @@ import {
 } from '@api/common/swagger/swagger-docs.registry';
 import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
-import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
+import { VerifyOtpRequestDto } from '@shared/dtos/auth/VerifyOtpRequestDto';
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
-import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto';
-import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTokenResponseDto';
 
 import { UserDto } from '@shared/dtos/auth/UserDto';
 import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
-
 
 const docs: Record<string, SwaggerDocSet> = {
   // ============================================
@@ -100,7 +97,8 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Validation error',
             value: {
               status: 'error',
-              message: 'Phone must be a valid 11-digit Bangladesh number starting with 01',
+              message:
+                'Phone must be a valid 11-digit Bangladesh number starting with 01',
               statusCode: 400,
               error: {
                 details: {
@@ -124,10 +122,10 @@ const docs: Record<string, SwaggerDocSet> = {
     ApiOperation({
       summary: 'Verify OTP after registration or for password reset',
       description:
-        'Verify phone number with OTP code. Supports two flows: (1) Registration (purpose=phone_verify): Activates account and returns access/refresh tokens. (2) Password reset (purpose=password_reset): Returns password reset token for /reset-password endpoint.',
+        'Verify phone number with OTP code. Supports two flows: (1) Registration (purpose=phone_verify): Activates account and returns access/refresh tokens. (2) Password reset (purpose=password_reset): Applies the provided new password and returns access/refresh tokens (no separate reset-password step).',
     }),
     ApiBody({
-      schema: { $ref: getSchemaPath(VerifyOtpDto) },
+      schema: { $ref: getSchemaPath(VerifyOtpRequestDto) },
       examples: {
         default: {
           summary: 'OTP verification',
@@ -139,34 +137,16 @@ const docs: Record<string, SwaggerDocSet> = {
     }),
     ApiOkResponse({
       description:
-        'OTP verified successfully. For registration: Returns auth tokens and user info. For password reset: Returns password reset token.',
+        'OTP verified successfully. Returns auth tokens (applies new password in password_reset flow).',
       schema: {
-        oneOf: [
+        allOf: [
+          { $ref: getSchemaPath(SuccessResponseDto) },
           {
-            allOf: [
-              { $ref: getSchemaPath(SuccessResponseDto) },
-              {
-                properties: {
-                  data: {
-                    $ref: getSchemaPath(AuthResponseDto),
-                  },
-                },
+            properties: {
+              data: {
+                $ref: getSchemaPath(AuthResponseDto),
               },
-            ],
-            description: 'Registration flow response',
-          },
-          {
-            allOf: [
-              { $ref: getSchemaPath(SuccessResponseDto) },
-              {
-                properties: {
-                  data: {
-                    $ref: getSchemaPath(PasswordResetTokenResponseDto),
-                  },
-                },
-              },
-            ],
-            description: 'Password reset flow response',
+            },
           },
         ],
       },
@@ -303,7 +283,7 @@ const docs: Record<string, SwaggerDocSet> = {
       description:
         'Request a new OTP code using phone + password when OTP access token has expired. Subject to the same rate limits as resend-otp.',
     }),
-   
+
     ApiOkResponse({
       description: 'New OTP sent successfully via SMS',
       schema: {
@@ -328,7 +308,8 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Validation error',
             value: {
               status: 'error',
-              message: 'Phone must be a valid 11-digit Bangladesh number starting with 01',
+              message:
+                'Phone must be a valid 11-digit Bangladesh number starting with 01',
               statusCode: 400,
               error: {
                 details: {
@@ -466,7 +447,10 @@ const docs: Record<string, SwaggerDocSet> = {
               data: {
                 type: 'object',
                 properties: {
-                  message: { type: 'string', example: 'Logged out successfully' },
+                  message: {
+                    type: 'string',
+                    example: 'Logged out successfully',
+                  },
                 },
               },
             },
@@ -521,7 +505,7 @@ const docs: Record<string, SwaggerDocSet> = {
     ApiOperation({
       summary: 'Forgot password - Initiate password reset',
       description:
-        'Request password reset for an existing user. Verifies user exists and sends OTP to phone. Returns OTP verification token. Use this token with /verify-otp endpoint to verify OTP, then use the returned password reset token with /reset-password endpoint.',
+        'Request password reset for an existing user. Verifies user exists, hashes the new password up front, and sends OTP to phone. Returns a short-lived OTP token (purpose=password_reset) that embeds the hashed new password. Complete the flow via /verify-otp (no separate reset-password step).',
     }),
     ApiBody({
       schema: { $ref: getSchemaPath(ForgotPasswordRequestDto) },
@@ -530,6 +514,7 @@ const docs: Record<string, SwaggerDocSet> = {
           summary: 'Forgot password request',
           value: {
             phone: '01837917991',
+            newPassword: 'NewSecureP@ss123',
           },
         },
       },
@@ -647,137 +632,6 @@ const docs: Record<string, SwaggerDocSet> = {
           },
         },
       },
-    }),
-  ],
-
-  'auth.resetPassword': [
-    ApiOperation({
-      summary: 'Reset password - Update password after OTP verification',
-      description:
-        'Reset user password after OTP has been verified. Requires password reset token in Authorization header (obtained from /verify-otp endpoint after OTP verification). All existing sessions will be revoked for security. User is automatically logged in and receives new auth tokens.',
-    }),
-    ApiBearerAuth('OTP-auth'),
-    ApiBody({
-      schema: { $ref: getSchemaPath(ResetPasswordRequestDto) },
-      examples: {
-        default: {
-          summary: 'Reset password request',
-          value: {
-            newPassword: 'NewSecureP@ss123',
-            confirmPassword: 'NewSecureP@ss123',
-          },
-        },
-      },
-    }),
-    ApiOkResponse({
-      description:
-        'Password reset successfully. User is automatically logged in. Returns access token, refresh token, and user info.',
-      schema: {
-        allOf: [
-          { $ref: getSchemaPath(SuccessResponseDto) },
-          {
-            properties: {
-              data: {
-                $ref: getSchemaPath(AuthResponseDto),
-              },
-            },
-          },
-        ],
-      },
-    }),
-    ApiBadRequestResponse({
-      description: 'Invalid input (password mismatch, weak password, etc.)',
-      schema: {
-        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
-        examples: {
-          passwordMismatch: {
-            summary: 'Passwords do not match',
-            value: {
-              status: 'error',
-              message: 'Passwords do not match',
-              statusCode: 400,
-              error: {
-                details: {
-                  confirmPassword: ['Passwords do not match'],
-                },
-              },
-            },
-          },
-          weakPassword: {
-            summary: 'Weak password',
-            value: {
-              status: 'error',
-              message:
-                'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-              statusCode: 400,
-              error: {
-                details: {
-                  newPassword: [
-                    'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-                  ],
-                },
-              },
-            },
-          },
-        },
-      },
-    }),
-    ApiUnauthorizedResponse({
-      description:
-        'Invalid, expired, or wrong purpose token. User not found. Phone mismatch.',
-      schema: {
-        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
-        examples: {
-          invalidToken: {
-            summary: 'Invalid or expired token',
-            value: {
-              status: 'error',
-              message: 'Invalid or expired OTP verification token',
-              statusCode: 401,
-              error: {
-                code: 'UNAUTHORIZED',
-              },
-            },
-          },
-          wrongPurpose: {
-            summary: 'Wrong token purpose',
-            value: {
-              status: 'error',
-              message: 'Invalid token for password reset',
-              statusCode: 500,
-              error: {
-                code: 'INVALID_TOKEN',
-              },
-            },
-          },
-          userNotFound: {
-            summary: 'User not found',
-            value: {
-              status: 'error',
-              message: 'Invalid email or password',
-              statusCode: 401,
-              error: {
-                code: 'INVALID_CREDENTIALS',
-              },
-            },
-          },
-          phoneMismatch: {
-            summary: 'Phone number mismatch',
-            value: {
-              status: 'error',
-              message: 'Phone number mismatch',
-              statusCode: 500,
-              error: {
-                code: 'INVALID_TOKEN',
-              },
-            },
-          },
-        },
-      },
-    }),
-    ApiTooManyRequestsResponse({
-      description: 'Rate limit exceeded (5 attempts per 5 minutes)',
-      schema: { $ref: getSchemaPath(ErrorResponseDto) },
     }),
   ],
 

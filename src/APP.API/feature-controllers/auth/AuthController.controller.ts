@@ -4,44 +4,53 @@ import {
   Post,
   Get,
   UseGuards,
-  Ip,
   Headers,
   Req,
   BadRequestException,
 } from '@nestjs/common';
+
+// Swagger imports
 import { ApiExtraModels, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AddSwaggerDoc } from '@api/common/swagger/add-swagger-doc.decorator';
-import { CurrentUser } from '@api/common/decorators/CurrentUser.decorator';
-import { OtpUser } from '@api/common/decorators/OtpUser.decorator';
+import './swagger.doc';
+
+// Guards imports
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { OtpJwtGuard } from '@api/common/guards/OtpJwtGuard.guard';
+import { RateLimitGuard } from '@api/common/guards/RateLimitGuard.guard';
+
+// Decorators imports
+import { CurrentUser } from '@api/common/decorators/CurrentUser.decorator';
+import { OtpUser } from '@api/common/decorators/OtpUser.decorator';
 import { RateLimit } from '@api/common/decorators/RateLimit.decorator';
 import {
   ReqInfo,
   ReqInfoPayload,
 } from '@api/common/decorators/ReqInfo.decorator';
-import { AuthService } from '@bll/services/auth/AuthService';
 
-import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
-import { VerifyOtpDto } from '@shared/dtos/auth/VerifyOtpDto';
-import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
-
-import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
-import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
-
-import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
-import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
-import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto';
-import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTokenResponseDto';
-import { UserDto } from '@shared/dtos/auth/UserDto';
-import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
-import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
+// Types imports
 import type { ICurrentUser } from '@shared/interfaces/domain';
 import type { OtpUserPayload } from '@shared/interfaces/auth/OtpUserPayload.interface';
 import type { Request } from 'express';
-import './swagger.doc';
-import { RateLimitGuard } from '@api/common/guards/RateLimitGuard.guard';
-import { UserContextAccessor } from '@shared/context/UserContextAccessor';
+
+// Services imports
+import { AuthService } from '@bll/services/auth/AuthService';
+
+// Request DTOs imports
+import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
+import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
+import { VerifyOtpRequestDto } from '@shared/dtos/auth/VerifyOtpRequestDto';
+import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
+
+// Response DTOs imports
+import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
+import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
+import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
+import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
+
+// Common DTOs imports
+import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
+import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
 
 /**
  * Auth Controller
@@ -56,16 +65,13 @@ import { UserContextAccessor } from '@shared/context/UserContextAccessor';
 @ApiExtraModels(
   RegisterLeadResponseDto,
   RegisterLeadRequestDto,
-  VerifyOtpDto,
+  VerifyOtpRequestDto,
   LoginRequestDto,
   AuthResponseDto,
   TokenRefreshResponseDto,
-  UserDto,
   SuccessResponseDto,
   ErrorResponseDto,
   ForgotPasswordRequestDto,
-  ResetPasswordRequestDto,
-  PasswordResetTokenResponseDto,
 )
 @Controller('auth')
 export class AuthController {
@@ -89,9 +95,9 @@ export class AuthController {
    * Verify OTP after registration or for password reset
    * POST /auth/verify-otp
    * Requires: OTP JWT token in Authorization header
-   * 
+   *
    * For registration (purpose=phone_verify): Returns auth tokens and creates user account
-   * For password reset (purpose=password_reset): Returns password reset token
+   * For password reset (purpose=password_reset): Applies new password and returns auth tokens
    */
   @Post('verify-otp')
   @UseGuards(OtpJwtGuard)
@@ -99,11 +105,10 @@ export class AuthController {
   @ApiBearerAuth('OTP-auth')
   @AddSwaggerDoc('auth', 'verifyOtp')
   async verifyOtp(
-    @Body() dto: VerifyOtpDto,
+    @Body() dto: VerifyOtpRequestDto,
     @OtpUser() otpUser: OtpUserPayload,
     @ReqInfo() reqInfo: ReqInfoPayload,
-  ): Promise<AuthResponseDto | PasswordResetTokenResponseDto> {
-    console.log('reqInfo', reqInfo);
+  ): Promise<AuthResponseDto> {
     return await this.authService.verifyOtp(
       dto,
       otpUser,
@@ -122,14 +127,10 @@ export class AuthController {
   @ApiBearerAuth('OTP-auth')
   @AddSwaggerDoc('auth', 'resendOtp')
   async resendOtp(
-    @OtpUser() otpUserPayload: OtpUserPayload,
-    @ReqInfo() reqInfo: ReqInfoPayload,
-  ): Promise<RegisterLeadResponseDto> {
-    return await this.authService.resendOtp(otpUserPayload);
+    @OtpUser() otpUser: OtpUserPayload,
+  ): Promise<ResendOtpResponseDto> {
+    return this.authService.resendOtp(otpUser);
   }
-
- 
- 
 
   /**
    * Login
@@ -142,7 +143,7 @@ export class AuthController {
   @AddSwaggerDoc('auth', 'login')
   async login(
     @Body() dto: LoginRequestDto,
-    @Req() reqInfo: { ip: string; userAgent: string },
+    @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<AuthResponseDto> {
     return await this.authService.login(dto, reqInfo.ip, reqInfo.userAgent);
   }
@@ -155,20 +156,19 @@ export class AuthController {
   @Get('refresh')
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 20, windowSeconds: 300 }) // 20 refresh requests per 5 minutes
-  @ApiBearerAuth('Refresh-auth')
+  @ApiBearerAuth('JWT-auth')
   @AddSwaggerDoc('auth', 'refresh')
   async refresh(
     @Headers('authorization') authHeader: string | undefined,
     @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<TokenRefreshResponseDto> {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new BadRequestException('Refresh token is required in Authorization header');
+      throw new BadRequestException(
+        'Refresh token is required in Authorization header',
+      );
     }
     const refreshToken = authHeader.substring(7);
-    return await this.authService.refreshAccessToken(
-      refreshToken,
-      reqInfo.ip,
-    );
+    return await this.authService.refreshAccessToken(refreshToken, reqInfo.ip);
   }
 
   /**
@@ -178,19 +178,19 @@ export class AuthController {
    */
   @Get('logout')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @AddSwaggerDoc('auth', 'logout')
   async logout(
-    @CurrentUser() user: ICurrentUser,
+    @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<{ message: string }> {
-    await this.authService.logout(user.userId);
+    await this.authService.logout(reqInfo.ip, reqInfo.userAgent);
     return { message: 'Logged out successfully' };
   }
 
   /**
    * Forgot Password - Initiate password reset
    * POST /auth/forgot-password
-   * Sends OTP to user's phone and returns password reset token
+   * Sends OTP to user's phone; embeds hashed new password in OTP token. Flow completes via verify-otp (no reset-password step).
    */
   @Post('forgot-password')
   @UseGuards(RateLimitGuard)
@@ -201,29 +201,5 @@ export class AuthController {
     @ReqInfo() reqInfo: ReqInfoPayload,
   ): Promise<RegisterLeadResponseDto> {
     return await this.authService.forgotPassword(dto, reqInfo.ip);
-  }
-
-  /**
-   * Reset Password - Update password after OTP verification
-   * POST /auth/reset-password
-   * Requires: Password reset token in Authorization header (obtained after OTP verification)
-   * Returns: Auth tokens and user info (user is automatically logged in)
-   */
-  @Post('reset-password')
-  @UseGuards(OtpJwtGuard, RateLimitGuard)
-  @RateLimit({ limit: 5, windowSeconds: 300 }) // 5 attempts per 5 minutes
-  @ApiBearerAuth('OTP-auth')
-  @AddSwaggerDoc('auth', 'resetPassword')
-  async resetPassword(
-    @Body() dto: ResetPasswordRequestDto,
-    @OtpUser() otpUser: OtpUserPayload,
-    @ReqInfo() reqInfo: ReqInfoPayload,
-  ): Promise<AuthResponseDto> {
-    return await this.authService.resetPassword(
-      dto,
-      otpUser,
-      reqInfo.ip,
-      reqInfo.userAgent,
-    );
   }
 }

@@ -39,10 +39,11 @@ export interface IJwtService {
    * @returns JWT OTP token
    */
   generateOtpToken(payload: {
-    pendingId?: string;
+    sessionId?: string;
     userId?: string;
     phone: string;
     purpose: 'phone_verify' | 'password_reset';
+    newPasswordHash?: string;
   }): string;
 
   /**
@@ -58,6 +59,7 @@ export interface IJwtService {
     phone: string;
     purpose: string;
     aud: string;
+    newPasswordHash?: string;
   };
 
   /**

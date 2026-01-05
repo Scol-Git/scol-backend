@@ -67,10 +67,18 @@ export class OtpService {
   ) {
     this.otpLength = config.otp.length;
     this.otpTtl = config.otp.ttlSeconds;
+
+    // How many times a user can enter an OTP incorrectly for a single session.
     this.maxAttempts = config.otp.maxAttempts;
+
     this.resendCooldown = config.otp.resendCooldownSeconds;
+
+    // How many times an OTP can be re-sent within the same session.
     this.maxResendPerSession = config.otp.maxResendPerSession;
+
     this.redisPrefix = config.otp.redisPrefix;
+
+    // 1st OTP + resends
     this.maxTotalOtps = this.maxResendPerSession + 1;
   }
 
@@ -90,58 +98,119 @@ export class OtpService {
   async saveOtpSession(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
     plainOtp: string,
+    purposeId: string,
     expiresAt: Date,
     metadata?: {
       passwordHash?: string;
       fullName?: string;
     },
-  ): Promise<void> {
-    const otpHash = await this.hasher.hash(plainOtp);
-    const existingSession = await this.getOtpSessionByPhoneAndPurpose(
-      phone,
-      purpose,
-    );
+  ): Promise<{ sessionId: string }> {
+    try {
+      // Generate OTP hash for storage
+      const otpHash = await this.hasher.hash(plainOtp);
 
-    // If existing and not expired, update it
-    if (existingSession && this.isNotExpired(existingSession.expiresAt)) {
-      const updated: OtpSessionCache = {
-        ...existingSession,
-        sessionId,
+      // Check if session already exists
+      const existingSession = await this.getOtpSessionByPhoneAndPurpose(
+        phone,
+        purpose,
+      );
+
+      // If session exists (expired or not), reuse it to avoid unique constraint violation
+      if (existingSession) {
+        // Check if session is expired using age-based check (timezone-safe, same as verifyOtp)
+        let isExpired = false;
+        if (existingSession.otpCreatedAt) {
+          const sessionAge = Date.now() - this.toTimestamp(existingSession.otpCreatedAt);
+          isExpired = sessionAge > this.otpTtl * 1000;
+        } else {
+          // Fallback to expiresAt if otpCreatedAt doesn't exist (shouldn't happen)
+          isExpired = !this.isNotExpired(existingSession.expiresAt);
+          
+          this.logger.LogWarning('Session missing otpCreatedAt, using expiresAt fallback', {
+            context: 'OtpService.saveOtpSession',
+            phone: this.maskPhone(phone),
+            expiresAt: existingSession.expiresAt,
+            isExpired,
+          });
+        }
+
+        // If session is NOT expired, check cooldown to prevent spam
+        if (!isExpired && existingSession.lastOtpSentAt) {
+          const elapsedSeconds = this.getElapsedSeconds(
+            existingSession.lastOtpSentAt,
+            Date.now(),
+          );
+
+          if (elapsedSeconds < this.resendCooldown) {
+            const retryAfter = this.resendCooldown - elapsedSeconds;
+            throw new OtpResendRateLimitException(
+              `Please wait ${retryAfter} seconds before requesting a new OTP.`,
+              retryAfter,
+            );
+          }
+        }
+
+        // Update existing session (expired or cooldown passed)
+        const updated: OtpSessionCache = {
+          ...existingSession,
+          id: existingSession.id, // REUSE same ID to avoid duplicate key violation
+          sessionId: purposeId, // UPDATE with new purposeId for this attempt
+          expiresAt,
+          otpHash,
+          otpAttempts: 0,
+          otpCreatedAt: new Date(),
+          // NOTE: Don't update lastOtpSentAt here - it's updated in ensureCanSendOtp() after validation
+          ...(metadata?.passwordHash && {
+            passwordHash: metadata.passwordHash,
+          }),
+          ...(metadata?.fullName && { fullName: metadata.fullName }),
+        };
+
+        // Save updated session to cache and database
+        await this.saveOtpSessionToCacheAndDb(updated);
+        this.logOtpOperation('updated', phone, purpose, existingSession.id);
+        return { sessionId: purposeId }; // Return the purposeId, not the record ID
+      }
+
+      // Create new session only if no existing session
+      const sessionId = randomUUID();
+      const newData: OtpSessionCache = {
+        id: sessionId,
+        phone,
+        purpose,
+        sessionId: purposeId,
+        passwordHash: metadata?.passwordHash,
+        fullName: metadata?.fullName,
+        attemptCount: purpose === OtpPurpose.Registration ? 0 : undefined,
+        resendCount: 0,
         expiresAt,
+        lastOtpSentAt: undefined, // Will be set by ensureCanSendOtp() after validation
         otpHash,
         otpAttempts: 0,
         otpCreatedAt: new Date(),
-        ...(metadata?.passwordHash && { passwordHash: metadata.passwordHash }),
-        ...(metadata?.fullName && { fullName: metadata.fullName }),
       };
 
-      await this.saveOtpSessionToCacheAndDb(updated);
-      this.logOtpOperation('updated', phone, purpose, existingSession.id);
-      return;
+      await this.saveOtpSessionToCacheAndDb(newData);
+      this.logOtpOperation('created', phone, purpose, sessionId);
+      return { sessionId };
+    } catch (error) {
+      // Re-throw rate limit exceptions - they should reach the controller with proper 429 status
+      if (error instanceof OtpResendRateLimitException) {
+        throw error;
+      }
+
+      this.logger.LogError('Failed to save OTP session', error as Error, {
+        context: 'OtpService.saveOtpSession',
+        phone: this.maskPhone(phone),
+        purpose,
+      });
+
+      throw new BusinessException(
+        'Failed to save OTP session',
+        'OTP_SESSION_SAVE_FAILED',
+      );
     }
-
-    // Create new session
-    const newSessionId = randomUUID();
-    const newData: OtpSessionCache = {
-      id: newSessionId,
-      phone,
-      purpose,
-      sessionId,
-      passwordHash: metadata?.passwordHash,
-      fullName: metadata?.fullName,
-      attemptCount: purpose === OtpPurpose.Registration ? 0 : undefined,
-      resendCount: 0,
-      expiresAt,
-      lastOtpSentAt: undefined,
-      otpHash,
-      otpAttempts: 0,
-      otpCreatedAt: new Date(),
-    };
-
-    await this.saveOtpSessionToCacheAndDb(newData);
-    this.logOtpOperation('created', phone, purpose, newSessionId);
   }
 
   /**
@@ -151,13 +220,13 @@ export class OtpService {
   async verifyOtp(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
+    purposeId: string,
     otp: string,
-  ): Promise<{ sessionId: string }> {
+  ): Promise<{ purposeId: string }> {
     const sessionData = await this.getOtpSessionByPhonePurposeAndSessionId(
       phone,
       purpose,
-      sessionId,
+      purposeId,
     );
 
     if (!sessionData?.otpHash) {
@@ -174,7 +243,7 @@ export class OtpService {
 
     // Check attempts
     if (sessionData.otpAttempts >= this.maxAttempts) {
-      await this.deleteOtpSession(phone, purpose, sessionId);
+      await this.deleteOtpSession(phone, purpose, purposeId);
       throw new OtpAttemptsExceededException(this.maxAttempts);
     }
 
@@ -182,11 +251,11 @@ export class OtpService {
     const isValid = await this.hasher.verify(otp, sessionData.otpHash);
 
     if (!isValid) {
-      await this.incrementOtpAttempts(phone, purpose, sessionId);
+      await this.incrementOtpAttempts(phone, purpose, purposeId);
       throw new InvalidOtpException();
     }
 
-    return { sessionId: sessionData.sessionId };
+    return { purposeId: sessionData.sessionId };
   }
 
   /**
@@ -196,12 +265,12 @@ export class OtpService {
   async ensureCanSendOtp(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
+    purposeId: string,
   ): Promise<void> {
     const session = await this.getOtpSessionByPhonePurposeAndSessionId(
       phone,
       purpose,
-      sessionId,
+      purposeId,
     );
 
     if (!session) {
@@ -214,7 +283,7 @@ export class OtpService {
 
     // Check if expired
     if (!this.isNotExpired(session.expiresAt)) {
-      await this.deleteOtpSession(phone, purpose, sessionId);
+      await this.deleteOtpSession(phone, purpose, purposeId);
       const errorMessage =
         purpose === OtpPurpose.Registration
           ? 'Registration session expired. Please register again.'
@@ -257,7 +326,7 @@ export class OtpService {
   async updateOtpInSession(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
+    purposeId: string,
     plainOtp: string,
   ): Promise<void> {
     const otpHash = await this.hasher.hash(plainOtp);
@@ -265,7 +334,7 @@ export class OtpService {
 
     // Try to update Redis
     const cached = await this.safeGetFromCache<OtpSessionCache>(redisKey);
-    if (cached && cached.sessionId === sessionId) {
+    if (cached && cached.sessionId === purposeId) {
       cached.otpHash = otpHash;
       cached.otpAttempts = 0;
       cached.otpCreatedAt = new Date();
@@ -274,7 +343,7 @@ export class OtpService {
 
     // Always update DB
     await this.db.otpSessions.update(
-      { phone, purpose, sessionId },
+      { phone, purpose, sessionId: purposeId },
       {
         otpHash,
         otpAttempts: 0,
@@ -286,7 +355,7 @@ export class OtpService {
       context: 'OtpService.updateOtpInSession',
       phone: this.maskPhone(phone),
       purpose,
-      sessionId,
+      purposeId,
     });
   }
 
@@ -297,12 +366,12 @@ export class OtpService {
   async getOtpSession(
     purpose: OtpPurpose,
     phone: string,
-    sessionId: string,
+    purposeId: string,
   ): Promise<OtpSessionData | null> {
     const session = await this.getOtpSessionByPhonePurposeAndSessionId(
       phone,
       purpose,
-      sessionId,
+      purposeId,
     );
 
     if (!session) {
@@ -310,7 +379,7 @@ export class OtpService {
     }
 
     if (!this.isNotExpired(session.expiresAt)) {
-      await this.deleteOtpSession(phone, purpose, sessionId);
+      await this.deleteOtpSession(phone, purpose, purposeId);
       return null;
     }
 
@@ -330,7 +399,7 @@ export class OtpService {
   async deleteOtpSession(
     phone: string,
     purpose: OtpPurpose,
-    sessionId: string,
+    purposeId: string,
   ): Promise<void> {
     const redisKey = this.getOtpSessionCacheKey(phone, purpose);
 
@@ -340,7 +409,7 @@ export class OtpService {
     // Delete from DB
     try {
       const session = await this.db.otpSessions.findOne({
-        where: { phone, purpose, sessionId },
+        where: { phone, purpose, sessionId: purposeId },
       });
       if (session) {
         await this.db.otpSessions.remove(session);
@@ -350,7 +419,7 @@ export class OtpService {
         context: 'OtpService.deleteOtpSession',
         phone: this.maskPhone(phone),
         purpose,
-        sessionId,
+        purposeId,
       });
     }
   }
@@ -388,19 +457,19 @@ export class OtpService {
   private async getOtpSessionByPhonePurposeAndSessionId(
     phone: string,
     purpose: OtpPurpose,
-    sessionId: string,
+    purposeId: string,
   ): Promise<OtpSessionCache | null> {
     const redisKey = this.getOtpSessionCacheKey(phone, purpose);
 
     // Try Redis first
     const cached = await this.safeGetFromCache<OtpSessionCache>(redisKey);
-    if (cached && cached.sessionId === sessionId) {
+    if (cached && cached.sessionId === purposeId) {
       return cached;
     }
 
     // Fallback to DB
     const dbSession = await this.db.otpSessions.findOne({
-      where: { phone, purpose, sessionId },
+      where: { phone, purpose, sessionId: purposeId },
     });
 
     return dbSession ?? null;
@@ -464,20 +533,20 @@ export class OtpService {
   private async incrementOtpAttempts(
     phone: string,
     purpose: OtpPurpose,
-    sessionId: string,
+    purposeId: string,
   ): Promise<void> {
     const redisKey = this.getOtpSessionCacheKey(phone, purpose);
 
     // Try to increment in Redis
     const cached = await this.safeGetFromCache<OtpSessionCache>(redisKey);
-    if (cached && cached.sessionId === sessionId) {
+    if (cached && cached.sessionId === purposeId) {
       cached.otpAttempts = (cached.otpAttempts ?? 0) + 1;
       await this.safeSetToCache(redisKey, cached, this.otpTtl);
     }
 
     // Always increment in DB
     await this.db.otpSessions.increment(
-      { phone, purpose, sessionId },
+      { phone, purpose, sessionId: purposeId },
       'otpAttempts',
       1,
     );

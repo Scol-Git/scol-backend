@@ -1,10 +1,10 @@
 /**
  * Security Configuration Interface
- * 
+ *
  * Defines configuration for security concerns:
  * - JWT token settings
  * - OAuth provider settings
- * 
+ *
  * @interface ISecurityConfig
  */
 export interface ISecurityConfig {
@@ -22,18 +22,6 @@ export interface ISecurityConfig {
     accessTokenExpiresIn: string;
     /** Refresh token expiration time (e.g., '7d', '30d') */
     refreshTokenExpiresIn: string;
-  };
-  
-  /**
-   * OAuth configuration
-   */
-  oauth: {
-    /** Google OAuth settings */
-    google?: {
-      clientId?: string;
-      clientSecret?: string;
-      callbackUrl?: string;
-    };
   };
 
   /**
@@ -59,4 +47,3 @@ export interface ISecurityConfig {
     redisPrefix: string;
   };
 }
-
