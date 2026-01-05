@@ -41,6 +41,7 @@ export class OtpJwtGuard implements CanActivate {
         userId: payload.userId,
         phone: payload.phone,
         purpose: payload.purpose as 'phone_verify' | 'password_reset',
+        newPasswordHash: payload.newPasswordHash,
       };
 
       return true;

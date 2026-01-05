@@ -116,14 +116,51 @@ export class OtpService {
         purpose,
       );
 
-      // If session exists and is not expired, update it
-      if (existingSession && this.isNotExpired(existingSession.expiresAt)) {
+      // If session exists (expired or not), reuse it to avoid unique constraint violation
+      if (existingSession) {
+        // Check if session is expired using age-based check (timezone-safe, same as verifyOtp)
+        let isExpired = false;
+        if (existingSession.otpCreatedAt) {
+          const sessionAge = Date.now() - this.toTimestamp(existingSession.otpCreatedAt);
+          isExpired = sessionAge > this.otpTtl * 1000;
+        } else {
+          // Fallback to expiresAt if otpCreatedAt doesn't exist (shouldn't happen)
+          isExpired = !this.isNotExpired(existingSession.expiresAt);
+          
+          this.logger.LogWarning('Session missing otpCreatedAt, using expiresAt fallback', {
+            context: 'OtpService.saveOtpSession',
+            phone: this.maskPhone(phone),
+            expiresAt: existingSession.expiresAt,
+            isExpired,
+          });
+        }
+
+        // If session is NOT expired, check cooldown to prevent spam
+        if (!isExpired && existingSession.lastOtpSentAt) {
+          const elapsedSeconds = this.getElapsedSeconds(
+            existingSession.lastOtpSentAt,
+            Date.now(),
+          );
+
+          if (elapsedSeconds < this.resendCooldown) {
+            const retryAfter = this.resendCooldown - elapsedSeconds;
+            throw new OtpResendRateLimitException(
+              `Please wait ${retryAfter} seconds before requesting a new OTP.`,
+              retryAfter,
+            );
+          }
+        }
+
+        // Update existing session (expired or cooldown passed)
         const updated: OtpSessionCache = {
           ...existingSession,
+          id: existingSession.id, // REUSE same ID to avoid duplicate key violation
+          sessionId: purposeId, // UPDATE with new purposeId for this attempt
           expiresAt,
           otpHash,
           otpAttempts: 0,
           otpCreatedAt: new Date(),
+          // NOTE: Don't update lastOtpSentAt here - it's updated in ensureCanSendOtp() after validation
           ...(metadata?.passwordHash && {
             passwordHash: metadata.passwordHash,
           }),
@@ -133,10 +170,10 @@ export class OtpService {
         // Save updated session to cache and database
         await this.saveOtpSessionToCacheAndDb(updated);
         this.logOtpOperation('updated', phone, purpose, existingSession.id);
-        return { sessionId: existingSession.id };
+        return { sessionId: purposeId }; // Return the purposeId, not the record ID
       }
 
-      // Create new session if it doesn't exist
+      // Create new session only if no existing session
       const sessionId = randomUUID();
       const newData: OtpSessionCache = {
         id: sessionId,
@@ -148,7 +185,7 @@ export class OtpService {
         attemptCount: purpose === OtpPurpose.Registration ? 0 : undefined,
         resendCount: 0,
         expiresAt,
-        lastOtpSentAt: undefined,
+        lastOtpSentAt: undefined, // Will be set by ensureCanSendOtp() after validation
         otpHash,
         otpAttempts: 0,
         otpCreatedAt: new Date(),
@@ -158,6 +195,11 @@ export class OtpService {
       this.logOtpOperation('created', phone, purpose, sessionId);
       return { sessionId };
     } catch (error) {
+      // Re-throw rate limit exceptions - they should reach the controller with proper 429 status
+      if (error instanceof OtpResendRateLimitException) {
+        throw error;
+      }
+
       this.logger.LogError('Failed to save OTP session', error as Error, {
         context: 'OtpService.saveOtpSession',
         phone: this.maskPhone(phone),

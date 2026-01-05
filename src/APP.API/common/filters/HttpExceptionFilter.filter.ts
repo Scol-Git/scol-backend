@@ -62,6 +62,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
         msgString = Array.isArray(msg)
           ? msg.join(', ')
           : String(msg ?? exception.message);
+        
+        // Extract error code from HttpException payload if present
+        if ('error' in payload && typeof payload.error === 'object' && payload.error !== null) {
+          const errorObj = payload.error as { code?: string };
+          if (errorObj.code) {
+            code = errorObj.code;
+          }
+        }
       } else {
         msgString = exception.message;
       }

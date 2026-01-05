@@ -27,7 +27,6 @@ import { VerifyOtpRequestDto } from '@shared/dtos/auth/VerifyOtpRequestDto';
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
 import { ResetPasswordRequestDto } from '@shared/dtos/auth/ResetPasswordRequestDto';
-import { PasswordResetTokenResponseDto } from '@shared/dtos/auth/PasswordResetTokenResponseDto';
 
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
@@ -169,7 +168,7 @@ export class AuthService {
     otpUserPayload: OtpUserPayload,
     ip?: string,
     userAgent?: string,
-  ): Promise<AuthResponseDto | PasswordResetTokenResponseDto> {
+  ): Promise<AuthResponseDto> {
     this.logger.info('OTP verification started', {
       context: 'AuthService.verifyOtp',
       pendingId: otpUserPayload.pendingId,
@@ -213,9 +212,26 @@ export class AuthService {
         throw new InvalidCredentialsException();
       }
 
-      // Verify user exists
+      // Fetch OTP session to get stored newPasswordHash
+      const otpSession = await this.otp.getOtpSession(
+        OtpPurpose.PasswordReset,
+        otpUserPayload.phone,
+        purposeId,
+      );
+
+      if (!otpSession || !otpSession.passwordHash) {
+        this.logger.warn('OTP session missing password hash', {
+          context: 'AuthService.verifyOtp',
+          userId: otpUserPayload.userId,
+          action: 'VERIFY_OTP_FAILED_NO_PASSWORD_HASH',
+        });
+        throw new InvalidCredentialsException();
+      }
+
+      // Verify user exists with relations
       const user = await this.db.users.findOne({
         where: { id: otpUserPayload.userId },
+        relations: { roles: true, permissions: true },
       });
 
       if (!user) {
@@ -239,25 +255,46 @@ export class AuthService {
         throw new InvalidTokenException('Phone number mismatch');
       }
 
-      // Generate password reset token (after OTP verification)
-      const passwordResetToken = this.jwt.generateOtpToken({
-        userId: user.id,
-        phone: user.phone,
-        purpose: 'password_reset',
-      });
+      // Revoke existing sessions before password change
+      await this.logoutAll(user.id);
 
-      this.logger.info('OTP verified successfully for password reset', {
+      // Apply new password hash from OTP session
+      user.passwordHash = otpSession.passwordHash;
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = undefined;
+      if (user.accountStatus === AccountStatus.Locked) {
+        user.accountStatus = AccountStatus.Active;
+      }
+
+      await this.db.users.save(user);
+
+      // Issue new token pair (creates new session)
+      const tokens = await this.token.issueTokenPair(user, ip, userAgent);
+
+      // Load profile if needed
+      let profile: SysLeadProfiles | undefined;
+      if (user.userType === UserType.Lead) {
+        profile =
+          (await this.db.leadProfiles.findOne({
+            where: { userId: user.id },
+          })) ?? undefined;
+      }
+
+      // Cleanup OTP session
+      await this.otp.deleteOtpSession(
+        otpUserPayload.phone,
+        OtpPurpose.PasswordReset,
+        purposeId,
+      );
+
+      this.logger.info('Password reset completed via OTP verify', {
         context: 'AuthService.verifyOtp',
         userId: user.id,
         phone: PhoneNumberUtil.mask(user.phone),
         action: 'VERIFY_OTP_PASSWORD_RESET_SUCCESS',
       });
 
-      return {
-        passwordResetToken,
-        expiresIn: 300,
-        message: 'OTP verified successfully. You can now reset your password.',
-      };
+      return this.authResponseMapper.toAuthResponse(user, tokens, profile);
     }
 
     // Handle registration flow (phone_verify)
@@ -795,17 +832,21 @@ export class AuthService {
       );
     }
 
+    // Hash new password up-front (will be applied after OTP verification)
+    const newPasswordHash = await this.hasher.hash(dto.newPassword);
+
     // Generate OTP
     const plainOtp = this.otp.generateOtp();
     const expiresAt = new Date(Date.now() + 300 * 1000);
 
-    // Save OTP session (unified method for password reset)
+    // Save OTP session (unified method for password reset) with password hash metadata
     await this.otp.saveOtpSession(
       OtpPurpose.PasswordReset,
       dto.phone,
       plainOtp,
       user.id,
       expiresAt,
+      { passwordHash: newPasswordHash },
     );
 
     // Check session limits (rate limiting)
@@ -822,6 +863,7 @@ export class AuthService {
       userId: user.id,
       phone: dto.phone,
       purpose: 'password_reset',
+      newPasswordHash,
     });
 
     this.logger.info('Password reset OTP sent successfully', {
@@ -852,98 +894,14 @@ export class AuthService {
     ip?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
-    this.logger.info('Password reset requested', {
+    this.logger.warn('Deprecated resetPassword called; use verify-otp flow', {
       context: 'AuthService.resetPassword',
       userId: otpUserPayload.userId,
-      phone: PhoneNumberUtil.mask(otpUserPayload.phone),
-      action: 'RESET_PASSWORD_START',
+      action: 'RESET_PASSWORD_DEPRECATED',
     });
-
-    // Validate token purpose
-    if (otpUserPayload.purpose !== 'password_reset') {
-      this.logger.warn('Invalid token purpose for password reset', {
-        context: 'AuthService.resetPassword',
-        purpose: otpUserPayload.purpose,
-        action: 'RESET_PASSWORD_FAILED_INVALID_PURPOSE',
-      });
-      throw new InvalidTokenException('Invalid token for password reset');
-    }
-
-    if (!otpUserPayload.userId) {
-      throw new InvalidTokenException('User ID missing from token');
-    }
-
-    // Verify passwords match
-    if (dto.newPassword !== dto.confirmPassword) {
-      throw new ValidationException('Passwords do not match', {
-        confirmPassword: ['Passwords do not match'],
-      });
-    }
-
-    // Get user with relations
-    const user = await this.db.users.findOne({
-      where: { id: otpUserPayload.userId },
-      relations: { roles: true, permissions: true },
-    });
-
-    if (!user) {
-      this.logger.warn('User not found for password reset', {
-        context: 'AuthService.resetPassword',
-        userId: otpUserPayload.userId,
-        action: 'RESET_PASSWORD_FAILED_USER_NOT_FOUND',
-      });
-      throw new InvalidCredentialsException();
-    }
-
-    // Verify phone matches
-    if (user.phone !== otpUserPayload.phone) {
-      this.logger.warn('Phone mismatch in password reset', {
-        context: 'AuthService.resetPassword',
-        userId: user.id,
-        tokenPhone: PhoneNumberUtil.mask(otpUserPayload.phone),
-        userPhone: PhoneNumberUtil.mask(user.phone),
-        action: 'RESET_PASSWORD_FAILED_PHONE_MISMATCH',
-      });
-      throw new InvalidTokenException('Phone number mismatch');
-    }
-
-    // 🔐 STEP 1: Revoke ALL existing sessions
-    await this.logoutAll(user.id);
-
-    // Hash new password
-    const newPasswordHash = await this.hasher.hash(dto.newPassword);
-
-    // Update password and reset failed login attempts
-    user.passwordHash = newPasswordHash;
-    user.failedLoginAttempts = 0;
-    user.lockedUntil = undefined;
-
-    // Auto-unlock if account was locked
-    if (user.accountStatus === AccountStatus.Locked) {
-      user.accountStatus = AccountStatus.Active;
-    }
-
-    await this.db.users.save(user);
-
-    // Issue new token pair (creates new session)
-    const tokens = await this.token.issueTokenPair(user, ip, userAgent);
-
-    // Get profile if user is Lead
-    let profile: SysLeadProfiles | undefined;
-    if (user.userType === UserType.Lead) {
-      profile =
-        (await this.db.leadProfiles.findOne({
-          where: { userId: user.id },
-        })) ?? undefined;
-    }
-
-    this.logger.info('Password reset successful', {
-      context: 'AuthService.resetPassword',
-      userId: user.id,
-      phone: PhoneNumberUtil.mask(user.phone),
-      action: 'RESET_PASSWORD_SUCCESS',
-    });
-
-    return this.authResponseMapper.toAuthResponse(user, tokens, profile);
+    throw new BusinessException(
+      'reset-password is deprecated. Complete password reset via verify-otp.',
+      'RESET_PASSWORD_DEPRECATED',
+    );
   }
 }

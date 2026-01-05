@@ -129,12 +129,14 @@ export class JwtService implements IJwtService {
     userId?: string;
     phone: string;
     purpose: 'phone_verify' | 'password_reset';
+    newPasswordHash?: string;
   }): string {
     const tokenPayload: Record<string, any> = {
       sub: payload.sessionId || payload.userId, // Use sessionId for registration, userId for password reset
       phone: payload.phone,
       purpose: payload.purpose,
       aud: 'otp', // Audience for OTP tokens
+      ...(payload.newPasswordHash && { newPasswordHash: payload.newPasswordHash }),
     };
 
     return jwt.sign(tokenPayload, this.accessSecret, {
@@ -155,6 +157,7 @@ export class JwtService implements IJwtService {
     phone: string;
     purpose: string;
     aud: string;
+    newPasswordHash?: string;
   } {
     try {
       const decoded = jwt.verify(token, this.accessSecret) as jwt.JwtPayload;
@@ -179,10 +182,14 @@ export class JwtService implements IJwtService {
         phone: string;
         purpose: string;
         aud: string;
+        newPasswordHash?: string;
       } = {
         phone: decoded.phone as string,
         purpose: decoded.purpose as string,
         aud: decoded.aud as string,
+        ...(decoded.newPasswordHash && {
+          newPasswordHash: decoded.newPasswordHash as string,
+        }),
       };
 
       // Set pendingId or userId based on purpose

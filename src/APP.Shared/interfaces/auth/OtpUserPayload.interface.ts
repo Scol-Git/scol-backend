@@ -27,4 +27,9 @@ export interface OtpUserPayload {
    * @example "phone_verify" | "password_reset"
    */
   purpose: 'phone_verify' | 'password_reset';
+
+  /**
+   * Hashed new password (for password_reset purpose)
+   */
+  newPasswordHash?: string;
 }
