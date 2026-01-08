@@ -879,29 +879,8 @@ export class AuthService {
       message:
         'OTP sent successfully. Please verify your phone to reset your password.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
-      ...(this.isDevelopment && { devOtp: plainOtp }),
+      // ...(this.isDevelopment && { devOtp: plainOtp }),
+      devOtp: plainOtp,
     };
-  }
-
-  /**
-   * Reset Password - Update password after OTP verification
-   * Requires password reset token in Authorization header (obtained after OTP verification)
-   * Returns auth tokens to automatically log in the user
-   */
-  async resetPassword(
-    dto: ResetPasswordRequestDto,
-    otpUserPayload: OtpUserPayload,
-    ip?: string,
-    userAgent?: string,
-  ): Promise<AuthResponseDto> {
-    this.logger.warn('Deprecated resetPassword called; use verify-otp flow', {
-      context: 'AuthService.resetPassword',
-      userId: otpUserPayload.userId,
-      action: 'RESET_PASSWORD_DEPRECATED',
-    });
-    throw new BusinessException(
-      'reset-password is deprecated. Complete password reset via verify-otp.',
-      'RESET_PASSWORD_DEPRECATED',
-    );
   }
 }
