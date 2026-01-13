@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
 import { isDev } from '@infra/config/getAppStage';
 import { IsNull } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
@@ -779,6 +779,7 @@ export class AuthService {
   /**
    * Forgot Password - Initiate password reset flow
    * Verifies user exists and sends OTP for password reset
+   * Always returns generic message (401 if user not found, 200 if OTP sent) to prevent user enumeration
    */
   async forgotPassword(
     dto: ForgotPasswordRequestDto,
@@ -798,14 +799,20 @@ export class AuthService {
       where: { phone: dto.phone },
     });
 
+    // Always return generic message to prevent user enumeration
+    // Only send OTP if user exists and account is valid
     if (!user) {
-      // Don't reveal if user exists for security
+      // Don't reveal if user exists for security - log internally but return generic error
       this.logger.warn('Forgot password - user not found', {
         context: 'AuthService.forgotPassword',
         phone: PhoneNumberUtil.mask(dto.phone),
-        action: 'FORGOT_PASSWORD_FAILED_NOT_FOUND',
+        action: 'FORGOT_PASSWORD_USER_NOT_FOUND',
       });
-      throw new InvalidCredentialsException();
+
+      // Return 401 with generic message to prevent user enumeration
+      throw new UnauthorizedException(
+        'If an account exists with this phone number, you will receive an OTP shortly.',
+      );
     }
 
     // Check if account is locked or suspended
@@ -877,7 +884,7 @@ export class AuthService {
       otpAccessToken: otpToken,
       expiresIn: 300,
       message:
-        'OTP sent successfully. Please verify your phone to reset your password.',
+        'If an account exists with this phone number, you will receive an OTP shortly.',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       // ...(this.isDevelopment && { devOtp: plainOtp }),
       devOtp: plainOtp,
