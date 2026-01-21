@@ -2,6 +2,7 @@ import { Entity, Column, OneToMany } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
+import { SysStates } from './SysStates.entity';
 
 /**
  * @class SysCountries
@@ -28,4 +29,11 @@ export class SysCountries extends BaseEntity {
    */
   @OneToMany(() => LeadPreferredCountries, (pref) => pref.country)
   leadPreferences!: LeadPreferredCountries[];
+
+  /**
+   * One-to-Many: States
+   * All states/provinces in this country
+   */
+  @OneToMany(() => SysStates, (state) => state.country)
+  states!: SysStates[];
 }

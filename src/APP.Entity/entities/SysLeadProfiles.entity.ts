@@ -11,6 +11,7 @@ import { BaseEntity } from './BaseEntity.template';
 import { SysUsers } from './SysUsers.entity';
 import { LeadAcademicResults } from './LeadAcademicResults.entity';
 import { LeadTestResults } from './LeadTestResults.entity';
+import { LeadEnglishTestResults } from './LeadEnglishTestResults.entity';
 import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
 import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
 
@@ -104,11 +105,20 @@ export class SysLeadProfiles extends BaseEntity {
   academicResults!: LeadAcademicResults[];
 
   /**
-   * One-to-Many: English test results
+   * One-to-Many: English test results (legacy)
    * A lead can have multiple test results (IELTS, TOEFL, etc.)
    */
   @OneToMany(() => LeadTestResults, (result) => result.lead, { cascade: true })
   testResults!: LeadTestResults[];
+
+  /**
+   * One-to-Many: English test results
+   * A lead can have multiple English test results with section scores
+   */
+  @OneToMany(() => LeadEnglishTestResults, (result) => result.lead, {
+    cascade: true,
+  })
+  englishTestResults!: LeadEnglishTestResults[];
 
   /**
    * One-to-Many: Preferred countries

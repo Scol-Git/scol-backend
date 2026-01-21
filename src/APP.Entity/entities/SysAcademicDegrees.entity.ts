@@ -18,6 +18,24 @@ export class SysAcademicDegrees extends BaseEntity {
   @AutoMap()
   degreeName!: string;
 
+  @Column({
+    name: 'gpaScale',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
+  @AutoMap()
+  gpaScale?: string;
+
+  @Column({
+    name: 'levelOrder',
+    type: 'int',
+    nullable: false,
+  })
+  @AutoMap()
+  levelOrder!: number;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================

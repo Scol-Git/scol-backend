@@ -7,6 +7,7 @@ import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMidd
 
 // Feature modules
 import { AuthModule } from './feature-controllers/auth/AuthModule.module';
+import { DemoModule } from './feature-controllers/demo/DemoModule.module';
 
 // Standalone controllers
 import { HealthController } from './feature-controllers/health/HealthController.controller';
@@ -32,6 +33,7 @@ import { HealthCheckModule } from '@bll/services/health/HealthCheckModule.module
 
     // Feature modules
     AuthModule,
+    DemoModule, // Demo endpoints for entity relationships
 
     // BLL modules for standalone controllers
     AuthBllModule, // For InternalCronController
