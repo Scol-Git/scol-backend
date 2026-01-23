@@ -85,15 +85,15 @@ export class UserPermissions {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
-  user!: SysUsers;
+  SysUser!: SysUsers;
 
   /**
    * Many-to-One: Permission
    * Direct access to the permission in this junction
    */
-  @ManyToOne(() => SysPermissions, (permission) => permission.users, {
-    onDelete: 'CASCADE',
+  @ManyToOne(() => SysPermissions, (permission) => permission.SysUser, {
+    onDelete: 'CASCADE',  
   })
   @JoinColumn({ name: 'permission_id' })
-  permission!: SysPermissions;
+  SysPermission!: SysPermissions;
 }

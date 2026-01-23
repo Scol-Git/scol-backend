@@ -29,7 +29,7 @@ export class SysPermissions extends BaseEntity {
    * Inverse side of the relationship defined in SysUsers
    */
   @ManyToMany(() => SysUsers, (user) => user.permissions)
-  users!: SysUsers[];
+  SysUser!: SysUsers[];
 
   /**
    * Many-to-Many: Roles with this permission

@@ -120,7 +120,7 @@ export class SysUniversities extends BaseEntity {
    */
   @ManyToOne(() => SysCountries)
   @JoinColumn({ name: 'sysCountryId' })
-  country!: SysCountries;
+  SysCountry!: SysCountries;
 
   /**
    * Many-to-One: State
@@ -128,7 +128,7 @@ export class SysUniversities extends BaseEntity {
    */
   @ManyToOne(() => SysStates)
   @JoinColumn({ name: 'sysStateId' })
-  state?: SysStates;
+  SysState?: SysStates;
 
   /**
    * Many-to-One: City
@@ -136,33 +136,33 @@ export class SysUniversities extends BaseEntity {
    */
   @ManyToOne(() => SysCities)
   @JoinColumn({ name: 'sysCityId' })
-  city?: SysCities;
+  SysCity?: SysCities;
 
   /**
    * One-to-Many: University intakes
    * A university can have multiple intake periods
    */
-  @OneToMany(() => UniIntakes, (uniIntake) => uniIntake.university)
-  uniIntakes!: UniIntakes[];
+  @OneToMany(() => UniIntakes, (uniIntake) => uniIntake.SysUniversity)
+  UniIntake!: UniIntakes[];
 
   /**
    * One-to-Many: University courses
    * A university can offer multiple courses
    */
-  @OneToMany(() => UniCourses, (course) => course.university)
-  courses!: UniCourses[];
+  @OneToMany(() => UniCourses, (course) => course.SysUniversity)
+  UniCourse!: UniCourses[];
 
   /**
    * One-to-Many: Academic requirements
    * A university can have multiple academic requirements
    */
-  @OneToMany(() => UniAcademicReq, (req) => req.university)
-  academicReqs!: UniAcademicReq[];
+  @OneToMany(() => UniAcademicReq, (req) => req.SysUniversity)
+  UniAcademicReq!: UniAcademicReq[];
 
   /**
    * One-to-Many: English requirements
    * A university can have multiple English test requirements
    */
-  @OneToMany(() => UniEngReq, (req) => req.university)
-  engReqs!: UniEngReq[];
+  @OneToMany(() => UniEngReq, (req) => req.SysUniversity)
+  UniEngReq!: UniEngReq[];
 }

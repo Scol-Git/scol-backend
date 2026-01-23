@@ -44,9 +44,9 @@ export class UniAcademicReq extends BaseEntity {
    * Many-to-One: University
    * Each academic requirement belongs to one university
    */
-  @ManyToOne(() => SysUniversities, (uni) => uni.academicReqs)
+  @ManyToOne(() => SysUniversities, (uni) => uni.UniAcademicReq)
   @JoinColumn({ name: 'uniId' })
-  university!: SysUniversities;
+  SysUniversity!: SysUniversities;
 
   /**
    * Many-to-One: Minimum degree level
@@ -54,5 +54,5 @@ export class UniAcademicReq extends BaseEntity {
    */
   @ManyToOne(() => SysAcademicDegrees)
   @JoinColumn({ name: 'sysDegreeId' })
-  degree!: SysAcademicDegrees;
+  SysAcademicDegree!: SysAcademicDegrees;
 }

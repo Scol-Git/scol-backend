@@ -97,17 +97,17 @@ export class UniCourseIntakes extends BaseEntity {
    * Many-to-One: University course
    * Each course intake belongs to one course
    */
-  @ManyToOne(() => UniCourses, (course) => course.courseIntakes)
+  @ManyToOne(() => UniCourses, (course) => course.UniCourseIntake)
   @JoinColumn({ name: 'uniCourseId' })
-  course!: UniCourses;
+  UniCourse!: UniCourses;
 
   /**
    * Many-to-One: University intake
    * Each course intake is for a specific university intake period
    */
-  @ManyToOne(() => UniIntakes, (uniIntake) => uniIntake.courseIntakes)
+  @ManyToOne(() => UniIntakes, (uniIntake) => uniIntake.UniCourseIntake)
   @JoinColumn({ name: 'uniIntakeId' })
-  uniIntake!: UniIntakes;
+  UniIntake!: UniIntakes;
 
   /**
    * One-to-Many: Scholarships
@@ -115,8 +115,8 @@ export class UniCourseIntakes extends BaseEntity {
    */
   @OneToMany(
     () => CourseIntakeScholarships,
-    (scholarship) => scholarship.courseIntake,
+    (scholarship) => scholarship.UniCourseIntake,
     { cascade: true },
   )
-  scholarships!: CourseIntakeScholarships[];
+  CourseIntakeScholarship!: CourseIntakeScholarships[];
 }

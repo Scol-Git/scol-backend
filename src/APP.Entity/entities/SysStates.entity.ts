@@ -35,14 +35,14 @@ export class SysStates extends BaseEntity {
    * Many-to-One: Country
    * Each state belongs to one country
    */
-  @ManyToOne(() => SysCountries, (country) => country.states)
+  @ManyToOne(() => SysCountries, (country) => country.SysState)
   @JoinColumn({ name: 'sysCountryId' })
-  country!: SysCountries;
+  SysCountry!: SysCountries;
 
   /**
    * One-to-Many: Cities
    * A state can have multiple cities
    */
-  @OneToMany(() => SysCities, (city) => city.state)
-  cities!: SysCities[];
+  @OneToMany(() => SysCities, (city) => city.SysState)
+  SysCity!: SysCities[];
 }

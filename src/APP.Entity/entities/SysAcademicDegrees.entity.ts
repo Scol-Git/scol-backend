@@ -44,6 +44,6 @@ export class SysAcademicDegrees extends BaseEntity {
    * One-to-Many: Lead academic results
    * All academic results associated with this degree type
    */
-  @OneToMany(() => LeadAcademicResults, (result) => result.degree)
-  leadResults!: LeadAcademicResults[];
+  @OneToMany(() => LeadAcademicResults, (result) => result.SysAcademicDegree)
+  LeadAcademicResult!: LeadAcademicResults[];
 }

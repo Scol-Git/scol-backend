@@ -72,9 +72,9 @@ export class UniCourses extends BaseEntity {
    * Many-to-One: University
    * Each course belongs to one university
    */
-  @ManyToOne(() => SysUniversities, (uni) => uni.courses)
+  @ManyToOne(() => SysUniversities, (uni) => uni.UniCourse)
   @JoinColumn({ name: 'uniId' })
-  university!: SysUniversities;
+  SysUniversity!: SysUniversities;
 
   /**
    * Many-to-One: Programme
@@ -82,7 +82,7 @@ export class UniCourses extends BaseEntity {
    */
   @ManyToOne(() => SysProgrammes)
   @JoinColumn({ name: 'sysProgrammeId' })
-  programme!: SysProgrammes;
+  SysProgramme!: SysProgrammes;
 
   /**
    * Many-to-One: Target degree level
@@ -90,7 +90,7 @@ export class UniCourses extends BaseEntity {
    */
   @ManyToOne(() => SysAcademicDegrees)
   @JoinColumn({ name: 'sysDegreeId' })
-  degree!: SysAcademicDegrees;
+  SysAcademicDegree!: SysAcademicDegrees;
 
   /**
    * Many-to-One: Minimum required degree
@@ -98,19 +98,19 @@ export class UniCourses extends BaseEntity {
    */
   @ManyToOne(() => SysAcademicDegrees)
   @JoinColumn({ name: 'minSysDegreeId' })
-  minDegree?: SysAcademicDegrees;
+  minSysAcademicDegree?: SysAcademicDegrees;
 
   /**
    * One-to-Many: Course intakes
    * A course can have multiple intake offerings
    */
-  @OneToMany(() => UniCourseIntakes, (courseIntake) => courseIntake.course)
-  courseIntakes!: UniCourseIntakes[];
+  @OneToMany(() => UniCourseIntakes, (courseIntake) => courseIntake.UniCourse)
+  UniCourseIntake!: UniCourseIntakes[];
 
   /**
    * One-to-Many: English requirements
    * A course can have multiple English test requirements
    */
-  @OneToMany(() => CourseEngReq, (req) => req.course)
-  engReqs!: CourseEngReq[];
+  @OneToMany(() => CourseEngReq, (req) => req.UniCourse)
+  CourseEngReq!: CourseEngReq[];
 }

@@ -62,17 +62,17 @@ export class LeadEnglishTestResults extends BaseEntity {
    * Many-to-One: Lead profile
    * Each test result belongs to one lead profile
    */
-  @ManyToOne(() => SysLeadProfiles, (lead) => lead.englishTestResults)
+  @ManyToOne(() => SysLeadProfiles, (lead) => lead.LeadEnglishTestResult)
   @JoinColumn({ name: 'leadId' })
-  lead!: SysLeadProfiles;
+  SysLeadProfile!: SysLeadProfiles;
 
   /**
    * Many-to-One: English test type
    * Each result is associated with a specific test (IELTS, TOEFL, etc.)
    */
-  @ManyToOne(() => SysEnglishTests, (test) => test.leadEnglishTestResults)
+  @ManyToOne(() => SysEnglishTests, (test) => test.LeadEnglishTestResult)
   @JoinColumn({ name: 'sysEngTestId' })
-  test!: SysEnglishTests;
+  SysEnglishTest!: SysEnglishTests;
 
   /**
    * One-to-Many: Section results
@@ -80,8 +80,8 @@ export class LeadEnglishTestResults extends BaseEntity {
    */
   @OneToMany(
     () => LeadEnglishTestSectionResults,
-    (sectionResult) => sectionResult.result,
+    (sectionResult) => sectionResult.LeadEnglishTestResult,
     { cascade: true },
   )
-  sectionResults!: LeadEnglishTestSectionResults[];
+  LeadEnglishTestSectionResult!: LeadEnglishTestSectionResults[];
 }

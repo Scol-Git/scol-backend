@@ -34,6 +34,6 @@ export class SysIntakes extends BaseEntity {
    * One-to-Many: University intakes
    * All university intake associations for this intake type
    */
-  @OneToMany(() => UniIntakes, (uniIntake) => uniIntake.intake)
-  uniIntakes!: UniIntakes[];
+  @OneToMany(() => UniIntakes, (uniIntake) => uniIntake.SysIntake)
+  UniIntake!: UniIntakes[];
 }

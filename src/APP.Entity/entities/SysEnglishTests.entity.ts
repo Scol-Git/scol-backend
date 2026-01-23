@@ -38,20 +38,20 @@ export class SysEnglishTests extends BaseEntity {
    * One-to-Many: Test sections
    * All sections for this test (Speaking, Writing, Reading, Listening)
    */
-  @OneToMany(() => SysEnglishTestSections, (section) => section.test)
-  sections!: SysEnglishTestSections[];
+  @OneToMany(() => SysEnglishTestSections, (section) => section.SysEnglishTest)
+  SysEnglishTestSection!: SysEnglishTestSections[];
 
   /**
    * One-to-Many: Lead test results (legacy)
    * All test results associated with this test type
    */
-  @OneToMany(() => LeadTestResults, (result) => result.test)
-  leadResults!: LeadTestResults[];
+  @OneToMany(() => LeadTestResults, (result) => result.SysEnglishTest)
+  LeadTestResult!: LeadTestResults[];
 
   /**
    * One-to-Many: Lead English test results
    * All English test results associated with this test type
    */
-  @OneToMany(() => LeadEnglishTestResults, (result) => result.test)
-  leadEnglishTestResults!: LeadEnglishTestResults[];
+  @OneToMany(() => LeadEnglishTestResults, (result) => result.SysEnglishTest)
+  LeadEnglishTestResult!: LeadEnglishTestResults[];
 }

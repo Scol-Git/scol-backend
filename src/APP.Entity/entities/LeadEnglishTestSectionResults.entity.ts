@@ -46,10 +46,10 @@ export class LeadEnglishTestSectionResults extends BaseEntity {
    */
   @ManyToOne(
     () => LeadEnglishTestResults,
-    (result) => result.sectionResults,
+    (result) => result.LeadEnglishTestSectionResult,
   )
   @JoinColumn({ name: 'resultId' })
-  result!: LeadEnglishTestResults;
+  LeadEnglishTestResult!: LeadEnglishTestResults;
 
   /**
    * Many-to-One: Test section
@@ -60,5 +60,5 @@ export class LeadEnglishTestSectionResults extends BaseEntity {
     (section) => section.sectionResults,
   )
   @JoinColumn({ name: 'sysEngTestSectionId' })
-  section!: SysEnglishTestSections;
+  SysEnglishTestSection!: SysEnglishTestSections;
 }

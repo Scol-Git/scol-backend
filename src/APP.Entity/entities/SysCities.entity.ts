@@ -34,7 +34,7 @@ export class SysCities extends BaseEntity {
    * Many-to-One: State
    * Each city belongs to one state
    */
-  @ManyToOne(() => SysStates, (state) => state.cities)
+  @ManyToOne(() => SysStates, (state) => state.SysCity)
   @JoinColumn({ name: 'sysStateId' })
-  state!: SysStates;
+  SysState!: SysStates;
 }

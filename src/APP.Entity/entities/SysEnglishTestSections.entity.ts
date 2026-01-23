@@ -45,9 +45,9 @@ export class SysEnglishTestSections extends BaseEntity {
    * Many-to-One: English test
    * Each section belongs to one test (IELTS, TOEFL, etc.)
    */
-  @ManyToOne(() => SysEnglishTests, (test) => test.sections)
+  @ManyToOne(() => SysEnglishTests, (test) => test.SysEnglishTestSection)
   @JoinColumn({ name: 'testId' })
-  test!: SysEnglishTests;
+  SysEnglishTest!: SysEnglishTests;
 
   /**
    * One-to-Many: Section results
@@ -55,7 +55,7 @@ export class SysEnglishTestSections extends BaseEntity {
    */
   @OneToMany(
     () => LeadEnglishTestSectionResults,
-    (sectionResult) => sectionResult.section,
+    (sectionResult) => sectionResult.SysEnglishTestSection,
   )
   sectionResults!: LeadEnglishTestSectionResults[];
 }

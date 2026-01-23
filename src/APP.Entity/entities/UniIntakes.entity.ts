@@ -44,22 +44,22 @@ export class UniIntakes extends BaseEntity {
    * Many-to-One: University
    * Each university intake belongs to one university
    */
-  @ManyToOne(() => SysUniversities, (uni) => uni.uniIntakes)
+  @ManyToOne(() => SysUniversities, (uni) => uni.UniIntake)
   @JoinColumn({ name: 'uniId' })
-  university!: SysUniversities;
+  SysUniversity!: SysUniversities;
 
   /**
    * Many-to-One: Intake type
    * Each university intake is of a specific intake type (Fall, Spring, etc.)
    */
-  @ManyToOne(() => SysIntakes, (intake) => intake.uniIntakes)
+  @ManyToOne(() => SysIntakes, (intake) => intake.UniIntake)
   @JoinColumn({ name: 'sysIntakeId' })
-  intake!: SysIntakes;
+  SysIntake!: SysIntakes;
 
   /**
    * One-to-Many: Course intakes
    * A university intake can be associated with multiple course intakes
    */
-  @OneToMany(() => UniCourseIntakes, (courseIntake) => courseIntake.uniIntake)
-  courseIntakes!: UniCourseIntakes[];
+  @OneToMany(() => UniCourseIntakes, (courseIntake) => courseIntake.UniIntake)
+  UniCourseIntake!: UniCourseIntakes[];
 }

@@ -54,9 +54,9 @@ export class UniEngReq extends BaseEntity {
    * Many-to-One: University
    * Each English requirement belongs to one university
    */
-  @ManyToOne(() => SysUniversities, (uni) => uni.engReqs)
+  @ManyToOne(() => SysUniversities, (uni) => uni.UniEngReq)
   @JoinColumn({ name: 'uniId' })
-  university!: SysUniversities;
+  SysUniversity!: SysUniversities;
 
   /**
    * Many-to-One: English test
@@ -64,5 +64,5 @@ export class UniEngReq extends BaseEntity {
    */
   @ManyToOne(() => SysEnglishTests)
   @JoinColumn({ name: 'sysEngTestId' })
-  test!: SysEnglishTests;
+  SysEnglishTest!: SysEnglishTests;
 }

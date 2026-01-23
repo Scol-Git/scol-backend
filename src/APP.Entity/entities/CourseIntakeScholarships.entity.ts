@@ -63,8 +63,8 @@ export class CourseIntakeScholarships extends BaseEntity {
    */
   @ManyToOne(
     () => UniCourseIntakes,
-    (courseIntake) => courseIntake.scholarships,
+    (courseIntake) => courseIntake.CourseIntakeScholarship,
   )
   @JoinColumn({ name: 'courseIntakeId' })
-  courseIntake!: UniCourseIntakes;
+  UniCourseIntake!: UniCourseIntakes;
 }

@@ -70,15 +70,15 @@ export class LeadAcademicResults extends BaseEntity {
    * Many-to-One: Lead profile
    * Each academic result belongs to one lead profile
    */
-  @ManyToOne(() => SysLeadProfiles, (lead) => lead.academicResults)
+  @ManyToOne(() => SysLeadProfiles, (lead) => lead.LeadAcademicResult)
   @JoinColumn({ name: 'lead_id' })
-  lead!: SysLeadProfiles;
+  SysLeadProfile!: SysLeadProfiles;
 
   /**
    * Many-to-One: Academic degree
    * Each result is associated with a degree type
    */
-  @ManyToOne(() => SysAcademicDegrees, (degree) => degree.leadResults)
+  @ManyToOne(() => SysAcademicDegrees, (degree) => degree.LeadAcademicResult)
   @JoinColumn({ name: 'degree_id' })
-  degree!: SysAcademicDegrees;
+  SysAcademicDegree!: SysAcademicDegrees;
 }

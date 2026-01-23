@@ -91,50 +91,50 @@ export class SysLeadProfiles extends BaseEntity {
    * One-to-One: Associated user
    * Each lead profile belongs to one user
    */
-  @OneToOne(() => SysUsers, (user) => user.leadProfile)
+  @OneToOne(() => SysUsers, (user) => user.SysLeadProfile)
   @JoinColumn({ name: 'user_id' })
-  user!: SysUsers;
+  SysUser!: SysUsers;
 
   /**
    * One-to-Many: Academic results
    * A lead can have multiple academic qualifications
    */
-  @OneToMany(() => LeadAcademicResults, (result) => result.lead, {
+  @OneToMany(() => LeadAcademicResults, (result) => result.SysLeadProfile, {
     cascade: true,
   })
-  academicResults!: LeadAcademicResults[];
+  LeadAcademicResult!: LeadAcademicResults[];
 
   /**
    * One-to-Many: English test results (legacy)
    * A lead can have multiple test results (IELTS, TOEFL, etc.)
    */
-  @OneToMany(() => LeadTestResults, (result) => result.lead, { cascade: true })
-  testResults!: LeadTestResults[];
+  @OneToMany(() => LeadTestResults, (result) => result.SysLeadProfile, { cascade: true })
+  LeadTestResult!: LeadTestResults[];
 
   /**
    * One-to-Many: English test results
    * A lead can have multiple English test results with section scores
    */
-  @OneToMany(() => LeadEnglishTestResults, (result) => result.lead, {
+  @OneToMany(() => LeadEnglishTestResults, (result) => result.SysLeadProfile, {
     cascade: true,
   })
-  englishTestResults!: LeadEnglishTestResults[];
+  LeadEnglishTestResult!: LeadEnglishTestResults[];
 
   /**
    * One-to-Many: Preferred countries
    * A lead can specify multiple preferred study destinations
    */
-  @OneToMany(() => LeadPreferredCountries, (pref) => pref.lead, {
+  @OneToMany(() => LeadPreferredCountries, (pref) => pref.SysLeadProfile, {
     cascade: true,
   })
-  preferredCountries!: LeadPreferredCountries[];
+  LeadPreferredCountry!: LeadPreferredCountries[];
 
   /**
    * One-to-Many: Preferred programs
    * A lead can specify multiple preferred study programs
    */
-  @OneToMany(() => LeadPreferredPrograms, (pref) => pref.lead, {
+  @OneToMany(() => LeadPreferredPrograms, (pref) => pref.SysLeadProfile, {
     cascade: true,
   })
-  preferredPrograms!: LeadPreferredPrograms[];
+  LeadPreferredProgram!: LeadPreferredPrograms[];
 }
