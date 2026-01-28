@@ -64,6 +64,24 @@ export class UniCourses extends BaseEntity {
   @AutoMap()
   minGpa?: string;
 
+  @Column({
+    name: 'higherSysDegreeId',
+    type: 'uuid',
+    nullable: true,
+  })
+  @AutoMap()
+  higherSysDegreeId?: string;
+
+  @Column({
+    name: 'higherGpa',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
+  @AutoMap()
+  higherGpa?: string;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================
@@ -91,6 +109,7 @@ export class UniCourses extends BaseEntity {
   @ManyToOne(() => SysAcademicDegrees)
   @JoinColumn({ name: 'sysDegreeId' })
   SysAcademicDegree!: SysAcademicDegrees;
+  
 
   /**
    * Many-to-One: Minimum required degree
@@ -99,6 +118,14 @@ export class UniCourses extends BaseEntity {
   @ManyToOne(() => SysAcademicDegrees)
   @JoinColumn({ name: 'minSysDegreeId' })
   minSysAcademicDegree?: SysAcademicDegrees;
+
+  /**
+   * Many-to-One: Higher required degree
+   * The higher degree level required to apply for this course
+   */
+  @ManyToOne(() => SysAcademicDegrees)
+  @JoinColumn({ name: 'higherSysDegreeId' })
+  higherSysAcademicDegree?: SysAcademicDegrees;
 
   /**
    * One-to-Many: Course intakes

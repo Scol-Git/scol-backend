@@ -8,6 +8,7 @@ import { UniIntakes } from './UniIntakes.entity';
 import { UniCourses } from './UniCourses.entity';
 import { UniAcademicReq } from './UniAcademicReq.entity';
 import { UniEngReq } from './UniEngReq.entity';
+import { CommissionType } from '@shared/enums/CommissionType.enum';
 
 /**
  * @class SysUniversities
@@ -109,6 +110,15 @@ export class SysUniversities extends BaseEntity {
   })
   @AutoMap()
   commission?: string;
+
+  @Column({
+    name: 'commissionType',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  @AutoMap()
+  commissionType?: CommissionType;
 
   // ========================================
   // Navigation Properties (EF Core style)

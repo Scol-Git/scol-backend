@@ -74,7 +74,6 @@ export class TokenService {
       expiresAt: this.getRefreshTokenExpiry(),
       ipAddress: ip,
       userAgent,
-      user,
     });
 
     await this.db.userSessions.save(session);

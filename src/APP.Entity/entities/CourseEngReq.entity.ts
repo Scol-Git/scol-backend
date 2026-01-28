@@ -54,7 +54,7 @@ export class CourseEngReq extends BaseEntity {
    * Many-to-One: University course
    * Each English requirement belongs to one course
    */
-  @ManyToOne(() => UniCourses, (course) => course.engReqs)
+  @ManyToOne(() => UniCourses, (course) => course.CourseEngReq)
   @JoinColumn({ name: 'uniCourseId' })
   UniCourse!: UniCourses;
 
