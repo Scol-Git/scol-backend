@@ -95,6 +95,9 @@ export class CourseResponseMapper {
       initialDeposit: courseIntake.initialDeposit
         ? parseFloat(courseIntake.initialDeposit)
         : undefined,
+      applicationFee: courseIntake.applicationFee
+        ? parseFloat(courseIntake.applicationFee)
+        : undefined,
       isScholarshipAvailable: scholarships.length > 0,
       engRequirements: this.toEnglishRequirements(engReqs),
       isWishlisted: false, // TODO: Implement wishlist check

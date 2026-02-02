@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysCountries } from './SysCountries.entity';
@@ -13,8 +20,20 @@ import { CommissionType } from '@shared/enums/CommissionType.enum';
 /**
  * @class SysUniversities
  * @extends {BaseEntity}
+ *
+ * **Search Indexes:**
+ * - sysCountryId: Country filtering (most common)
+ * - sysCityId: City filtering
+ * - sysStateId: State filtering
+ * - uniName: Text search
+ * - commission: Business ranking (DB-level commission sorting)
  */
 @Entity('sys_Universities')
+@Index('IX_SysUniversities_sysCountryId', ['sysCountryId'])
+@Index('IX_SysUniversities_sysCityId', ['sysCityId'])
+@Index('IX_SysUniversities_sysStateId', ['sysStateId'])
+@Index('IX_SysUniversities_uniName', ['uniName'])
+@Index('IX_SysUniversities_commission', ['commission'])
 export class SysUniversities extends BaseEntity {
   @Column({
     name: 'uniName',

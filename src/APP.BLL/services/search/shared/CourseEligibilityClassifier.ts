@@ -1,19 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import {
   SearchContext,
   RankedCourse,
-  LeadProfileData,
+  NormalizedLeadProfile,
   EligibilityDetails,
 } from '@shared/search/SearchTypes';
+import { ILogger } from '@shared/interfaces/logging';
+import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
 /**
  * Classifies courses by eligibility
  *
  * Does NOT filter courses - only adds eligibility flags.
  * Classification is based on academic and English requirements.
+ *
+ * **Optimization:** Uses normalizedProfile for O(1) Map lookups
+ * instead of O(n) array.find() operations. All scores are pre-parsed.
  */
 @Injectable()
 export class CourseEligibilityClassifier {
+  constructor(@Inject(ILoggerToken) private readonly logger: ILogger) {}
   /**
    * Classify ranked courses by eligibility
    * @param rankedCourses - Courses to classify
@@ -24,8 +30,9 @@ export class CourseEligibilityClassifier {
     rankedCourses: RankedCourse[],
     context: SearchContext,
   ): RankedCourse[] {
-    // No profile = cannot determine eligibility, treat all as eligible
-    if (!context.leadProfile) {
+    // No normalized profile = cannot determine eligibility, treat all as eligible
+    if (!context.normalizedProfile) {
+      this.logger.LogDebug('No normalized profile, treating all as eligible');
       return rankedCourses.map((rc) => ({
         ...rc,
         isEligible: true,
@@ -33,11 +40,17 @@ export class CourseEligibilityClassifier {
       }));
     }
 
+    const normalized = context.normalizedProfile;
+
+    // Debug: Log profile summary
+    this.logger.LogDebug('Eligibility check with profile', {
+      academicResultsCount: normalized.academicResultsByDegreeId.size,
+      englishResultsCount: normalized.englishResultsByTestId.size,
+      englishTestIds: [...normalized.englishResultsByTestId.keys()],
+    });
+
     return rankedCourses.map((rc) => {
-      const details = this.checkEligibility(
-        rc.courseIntake,
-        context.leadProfile!,
-      );
+      const details = this.checkEligibility(rc.courseIntake, normalized);
       return {
         ...rc,
         isEligible: details.academicEligible && details.englishEligible,
@@ -51,7 +64,7 @@ export class CourseEligibilityClassifier {
    */
   private checkEligibility(
     courseIntake: RankedCourse['courseIntake'],
-    profile: LeadProfileData,
+    profile: NormalizedLeadProfile,
   ): EligibilityDetails {
     const reasons: string[] = [];
 
@@ -71,11 +84,11 @@ export class CourseEligibilityClassifier {
   }
 
   /**
-   * Check academic eligibility
+   * Check academic eligibility using O(1) Map lookups
    */
   private checkAcademicEligibility(
     courseIntake: RankedCourse['courseIntake'],
-    profile: LeadProfileData,
+    profile: NormalizedLeadProfile,
     reasons: string[],
   ): boolean {
     const course = courseIntake.UniCourse;
@@ -86,21 +99,21 @@ export class CourseEligibilityClassifier {
     }
 
     // No academic results = not eligible
-    if (profile.academicResults.length === 0) {
+    if (profile.academicResultsByDegreeId.size === 0) {
       reasons.push('No academic qualifications provided');
       return false;
     }
 
-    const minDegreeResult = profile.academicResults.find(
-      (r) => r.degreeId === course.minSysDegreeId,
+    // O(1) lookup for minimum degree
+    const minDegreeResult = profile.academicResultsByDegreeId.get(
+      course.minSysDegreeId,
     );
     const minGpaRequired = course.minGpa
       ? parseFloat(course.minGpa)
       : undefined;
 
-    const minGpaValue = minDegreeResult?.gpa
-      ? parseFloat(minDegreeResult.gpa)
-      : undefined;
+    // gpa is already pre-parsed as number in normalized profile
+    const minGpaValue = minDegreeResult?.gpa;
 
     const meetsMinGpa =
       minGpaRequired === undefined ||
@@ -113,15 +126,15 @@ export class CourseEligibilityClassifier {
 
     // If minimum not met, try higher degree + higher GPA (if configured)
     if (course.higherSysDegreeId) {
-      const higherDegreeResult = profile.academicResults.find(
-        (r) => r.degreeId === course.higherSysDegreeId,
+      // O(1) lookup for higher degree
+      const higherDegreeResult = profile.academicResultsByDegreeId.get(
+        course.higherSysDegreeId,
       );
       const higherGpaRequired = course.higherGpa
         ? parseFloat(course.higherGpa)
         : undefined;
-      const higherGpaValue = higherDegreeResult?.gpa
-        ? parseFloat(higherDegreeResult.gpa)
-        : undefined;
+      // gpa is already pre-parsed
+      const higherGpaValue = higherDegreeResult?.gpa;
       const meetsHigherGpa =
         higherGpaRequired === undefined ||
         (higherGpaValue !== undefined && higherGpaValue >= higherGpaRequired);
@@ -153,11 +166,11 @@ export class CourseEligibilityClassifier {
   }
 
   /**
-   * Check English test eligibility
+   * Check English test eligibility using O(1) Map lookups
    */
   private checkEnglishEligibility(
     courseIntake: RankedCourse['courseIntake'],
-    profile: LeadProfileData,
+    profile: NormalizedLeadProfile,
     reasons: string[],
   ): boolean {
     const engReqs = (courseIntake.UniCourse?.CourseEngReq ?? []) as Array<{
@@ -173,35 +186,48 @@ export class CourseEligibilityClassifier {
     }
 
     // No test results = not eligible
-    if (profile.englishTestResults.length === 0) {
+    if (profile.englishResultsByTestId.size === 0) {
       reasons.push('No English test results provided');
       return false;
     }
 
     // Check if ANY requirement is met
     const meetsAnyRequirement = engReqs.some((req) => {
-      const matchingTest = profile.englishTestResults.find(
-        (t) => t.sysEngTestId === req.sysEngTestId,
-      );
+      // O(1) lookup by test ID
+      const matchingTest = profile.englishResultsByTestId.get(req.sysEngTestId);
 
-      if (!matchingTest?.overallScore) {
+      if (!matchingTest) {
         return false;
       }
 
-      const leadScore = parseFloat(matchingTest.overallScore);
+      // overallScore is already pre-parsed as number
       const requiredScore = parseFloat(req.minOverallReq ?? '0');
 
-      if (leadScore < requiredScore) {
+      if (matchingTest.overallScore < requiredScore) {
         return false;
       }
 
       // Check section requirements if applicable
       if (req.minSectionReq) {
         const requiredSection = parseFloat(req.minSectionReq);
-        const sections = matchingTest.LeadEnglishTestSectionResult ?? [];
+        const sections = matchingTest.sectionScores;
 
+        // Debug: Log section check
+        this.logger.LogDebug('Section check', {
+          testId: req.sysEngTestId,
+          requiredSection,
+          userSections: sections,
+          sectionsLength: sections.length,
+        });
+
+        // Empty sections array cannot satisfy section requirements
+        if (sections.length === 0) {
+          return false; // No section data = cannot verify = ineligible
+        }
+
+        // sectionScores are already pre-parsed as numbers
         const allSectionsMet = sections.every(
-          (s) => parseFloat(s.sectionScore ?? '0') >= requiredSection,
+          (s) => s.score >= requiredSection,
         );
 
         if (!allSectionsMet) {

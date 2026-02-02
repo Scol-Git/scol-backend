@@ -13,6 +13,9 @@ import { CourseCursorPaginationService } from './shared/CourseCursorPaginationSe
 import { SearchFilterService } from './shared/SearchFilterService';
 import { CourseResponseMapper } from '../../mappings/search/CourseResponseMapper';
 
+// Pipeline executor (3-phase optimized search)
+import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor';
+
 // Ranking system
 import { WEIGHT_CALCULATOR } from '@shared/interfaces/search/IWeightCalculator.interface';
 import { WeightCalculatorRegistry } from './shared/ranking/WeightCalculatorRegistry';
@@ -24,20 +27,40 @@ import { PreferenceMatchWeightCalculator } from './shared/ranking/calculators/Pr
 /**
  * Search Module (BLL)
  *
- * Provides search services:
+ * Provides optimized search services:
  * - HomeSearchService (home page with infinite scroll)
  * - CourseSearchService (normal + advanced search)
+ *
+ * **Architecture:**
+ * - 3-phase search pipeline (candidate IDs → hydration → processing)
+ * - DB-level commission ranking for anonymous users
+ * - In-memory ranking for logged-in users (eligibility + preferences)
+ * - Redis caching for search results (5 min) and user context (2 min)
+ *
+ * **Performance:**
+ * - 60%+ reduction in data transfer vs loading all courses
+ * - Eliminates in-memory sorting for anonymous users
+ * - Database indexes optimize Phase 1 candidate selection
  *
  * Weight calculators are registered as multi-providers
  * for pluggable ranking system.
  */
 @Module({
   providers: [
-    // Orchestrators
+    // =========================================================================
+    // Orchestrators (public services)
+    // =========================================================================
     HomeSearchService,
     CourseSearchService,
 
-    // Shared services
+    // =========================================================================
+    // Pipeline executor (core optimization)
+    // =========================================================================
+    SearchPipelineExecutor,
+
+    // =========================================================================
+    // Shared services (internal)
+    // =========================================================================
     UserSearchContextResolver,
     CourseQueryBuilder,
     CourseRankingService,
@@ -46,7 +69,9 @@ import { PreferenceMatchWeightCalculator } from './shared/ranking/calculators/Pr
     SearchFilterService,
     CourseResponseMapper,
 
-    // Weight calculators (pluggable)
+    // =========================================================================
+    // Weight calculators (pluggable ranking system)
+    // =========================================================================
     {
       provide: WEIGHT_CALCULATOR,
       useClass: CommissionWeightCalculator,

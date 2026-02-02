@@ -22,7 +22,6 @@ import { CursorPaginationDto } from '@shared/dtos/search/CursorPaginationDto';
 import { SearchFiltersDto } from '@shared/dtos/search/SearchFiltersDto';
 import { SearchRangesDto } from '@shared/dtos/search/SearchRangesDto';
 import { SearchFlagsDto } from '@shared/dtos/search/SearchFlagsDto';
-import { SortDto } from '@shared/dtos/search/SortDto';
 
 /**
  * Search Controller
@@ -45,7 +44,6 @@ import { SortDto } from '@shared/dtos/search/SortDto';
   SearchFiltersDto,
   SearchRangesDto,
   SearchFlagsDto,
-  SortDto,
 )
 @Controller('search')
 export class SearchController {
@@ -72,7 +70,8 @@ export class SearchController {
    * Advanced search
    * POST /search/advanced
    *
-   * Search courses with full filters, ranges, flags, and sorting.
+   * Search courses with full filters, ranges, and flags.
+   * Results are ranked by internal algorithm.
    * Strict matching - no results if no match.
    */
   @Post('advanced')

@@ -176,8 +176,19 @@ export class AcademicFormMapper {
 
   /**
    * Format date to ISO string (YYYY-MM-DD)
+   *
+   * Handles both Date objects and string values from database.
+   * Some database drivers return date columns as strings.
    */
-  private formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+  private formatDate(date: Date | string): string {
+    if (typeof date === 'string') {
+      // Already a string - extract date part if it's ISO format
+      return date.split('T')[0];
+    }
+    if (date instanceof Date) {
+      return date.toISOString().split('T')[0];
+    }
+    // Fallback: try to parse as date
+    return new Date(date).toISOString().split('T')[0];
   }
 }

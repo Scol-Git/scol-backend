@@ -17,7 +17,7 @@ import {
 export class EnglishTestSectionInputDto {
   @ApiProperty({ description: 'Section ID', example: 'uuid-listening' })
   @IsUUID()
-  sectionId!: string;
+  id!: string;
 
   @ApiProperty({ description: 'Section score', example: 6.5 })
   @IsNumber()

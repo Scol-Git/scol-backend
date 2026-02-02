@@ -85,6 +85,9 @@ export class CourseResultDto {
   @ApiPropertyOptional({ description: 'Initial deposit amount' })
   initialDeposit?: number;
 
+  @ApiPropertyOptional({ description: 'Application fee' })
+  applicationFee?: number;
+
   @ApiProperty({ description: 'Whether scholarship is available' })
   isScholarshipAvailable!: boolean;
 

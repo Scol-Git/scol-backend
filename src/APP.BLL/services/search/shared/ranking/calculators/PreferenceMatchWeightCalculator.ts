@@ -9,6 +9,9 @@ import { IWeightCalculator } from '@shared/interfaces/search/IWeightCalculator.i
  *
  * Only applies to ELIGIBILITY_PLUS_BUSINESS mode.
  * Matching user preferences = higher score.
+ *
+ * **Optimization:** Uses normalizedProfile Sets for O(1) .has()
+ * instead of O(n) array.includes() operations.
  */
 @Injectable()
 export class PreferenceMatchWeightCalculator implements IWeightCalculator {
@@ -26,34 +29,26 @@ export class PreferenceMatchWeightCalculator implements IWeightCalculator {
   }
 
   calculate(courseIntake: UniCourseIntakes, context: SearchContext): number {
-    if (!context.leadProfile) {
+    // Use normalized profile for O(1) Set lookups
+    if (!context.normalizedProfile) {
       return 0;
     }
 
     let score = 0;
     const course = courseIntake.UniCourse;
     const university = course?.SysUniversity;
+    const normalized = context.normalizedProfile;
 
-    // Country preference match
-    if (
-      university?.sysCountryId &&
-      context.leadProfile.preferredCountryIds.length > 0
-    ) {
-      if (
-        context.leadProfile.preferredCountryIds.includes(university.sysCountryId)
-      ) {
+    // Country preference match - O(1) Set.has() instead of O(n) includes()
+    if (university?.sysCountryId && normalized.preferredCountryIds.size > 0) {
+      if (normalized.preferredCountryIds.has(university.sysCountryId)) {
         score += this.COUNTRY_PREFERENCE_WEIGHT;
       }
     }
 
-    // Programme preference match
-    if (
-      course?.sysProgrammeId &&
-      context.leadProfile.preferredProgrammeIds.length > 0
-    ) {
-      if (
-        context.leadProfile.preferredProgrammeIds.includes(course.sysProgrammeId)
-      ) {
+    // Programme preference match - O(1) Set.has() instead of O(n) includes()
+    if (course?.sysProgrammeId && normalized.preferredProgrammeIds.size > 0) {
+      if (normalized.preferredProgrammeIds.has(course.sysProgrammeId)) {
         score += this.PROGRAMME_PREFERENCE_WEIGHT;
       }
     }

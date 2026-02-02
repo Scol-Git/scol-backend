@@ -4,13 +4,14 @@ import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { SearchFiltersDto } from '@shared/dtos/search/SearchFiltersDto';
 import { SearchRangesDto } from '@shared/dtos/search/SearchRangesDto';
 import { SearchFlagsDto } from '@shared/dtos/search/SearchFlagsDto';
-import { SortDto } from '@shared/dtos/search/SortDto';
 
 /**
- * Applies filters, ranges, flags, and sorting to search queries
+ * Applies filters, ranges, and flags to search queries
  *
  * Used for Normal Search and Advanced Search.
  * All filters are applied STRICTLY (no matches = no results).
+ *
+ * Note: Sorting is handled by the ranking system, not user-defined.
  */
 @Injectable()
 export class SearchFilterService {
@@ -152,45 +153,6 @@ export class SearchFilterService {
         )`,
       );
     }
-
-    return query;
-  }
-
-  /**
-   * Apply sorting
-   */
-  applySorting(
-    query: SelectQueryBuilder<UniCourseIntakes>,
-    sort?: SortDto[],
-  ): SelectQueryBuilder<UniCourseIntakes> {
-    if (!sort?.length) {
-      // Default: newest first with deterministic tie-breaker
-      return query
-        .orderBy('courseIntake.createdAt', 'DESC')
-        .addOrderBy('courseIntake.id', 'ASC');
-    }
-
-    const fieldMap: Record<string, string> = {
-      tuitionFee: 'CAST(courseIntake.tuitionFee AS DECIMAL)',
-      durationMonths: 'courseIntake.courseDuration',
-      courseName: 'course.courseName',
-      universityName: 'uni.uniName',
-      createdAt: 'courseIntake.createdAt',
-    };
-
-    sort.forEach((s, idx) => {
-      const column = fieldMap[s.field] ?? `courseIntake.${s.field}`;
-      const direction = s.order.toUpperCase() as 'ASC' | 'DESC';
-
-      if (idx === 0) {
-        query.orderBy(column, direction);
-      } else {
-        query.addOrderBy(column, direction);
-      }
-    });
-
-    // Always add deterministic tie-breaker
-    query.addOrderBy('courseIntake.id', 'ASC');
 
     return query;
   }

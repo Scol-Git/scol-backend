@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
@@ -6,8 +6,17 @@ import { UniCourseIntakes } from './UniCourseIntakes.entity';
 /**
  * @class CourseIntakeScholarships
  * @extends {BaseEntity}
+ *
+ * **Search Indexes:**
+ * - courseIntakeId: FK join to UniCourseIntakes
+ * - Composite (courseIntakeId, isActive): EXISTS subquery optimization
  */
 @Entity('CourseIntakeScholarships')
+@Index('IX_CourseIntakeScholarships_courseIntakeId', ['courseIntakeId'])
+@Index('IX_CourseIntakeScholarships_courseIntakeId_isActive', [
+  'courseIntakeId',
+  'isActive',
+])
 export class CourseIntakeScholarships extends BaseEntity {
   @Column({
     name: 'courseIntakeId',

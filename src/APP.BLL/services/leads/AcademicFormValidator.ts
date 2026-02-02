@@ -83,9 +83,9 @@ export class AcademicFormValidator {
           const validSectionIds = new Set(test.SysEnglishTestSection.map((s: any) => s.id));
 
           for (const section of testResult.sections) {
-            if (!validSectionIds.has(section.sectionId)) {
+            if (!validSectionIds.has(section.id)) {
               errors.push(
-                `Invalid section ID ${section.sectionId} for test ${test.testName}`,
+                `Invalid section ID ${section.id} for test ${test.testName}`,
               );
             }
           }

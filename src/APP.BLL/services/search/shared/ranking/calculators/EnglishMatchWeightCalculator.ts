@@ -9,6 +9,9 @@ import { IWeightCalculator } from '@shared/interfaces/search/IWeightCalculator.i
  *
  * Only applies to ELIGIBILITY_PLUS_BUSINESS mode.
  * Meeting/exceeding English requirements = higher score.
+ *
+ * **Optimization:** Uses normalizedProfile for O(1) Map lookups
+ * instead of O(n) array.find() operations. Scores are pre-parsed.
  */
 @Injectable()
 export class EnglishMatchWeightCalculator implements IWeightCalculator {
@@ -19,19 +22,19 @@ export class EnglishMatchWeightCalculator implements IWeightCalculator {
    * Weight values
    */
   private readonly BASE_ENGLISH_WEIGHT = 3000;
-  private readonly SCORE_SURPLUS_MULTIPLIER = 200;
 
   isApplicable(mode: RankingMode): boolean {
     return mode === RankingMode.ELIGIBILITY_PLUS_BUSINESS;
   }
 
   calculate(courseIntake: UniCourseIntakes, context: SearchContext): number {
-    if (!context.leadProfile) {
+    // Use normalized profile for O(1) lookups
+    if (!context.normalizedProfile) {
       return 0;
     }
 
     const engReqs = courseIntake.UniCourse?.CourseEngReq ?? [];
-    const leadTests = context.leadProfile.englishTestResults;
+    const normalized = context.normalizedProfile;
 
     // No English requirement = full points
     if (engReqs.length === 0) {
@@ -39,48 +42,24 @@ export class EnglishMatchWeightCalculator implements IWeightCalculator {
     }
 
     // No test results = no points
-    if (leadTests.length === 0) {
+    if (normalized.englishResultsByTestId.size === 0) {
       return 0;
     }
 
     // Find any matching test result and return score
     for (const req of engReqs) {
-      const matchingTest = leadTests.find(
-        (t) => t.sysEngTestId === req.sysEngTestId,
+      // O(1) lookup by test ID
+      const matchingTest = normalized.englishResultsByTestId.get(
+        req.sysEngTestId,
       );
 
-      if (!matchingTest?.overallScore) continue;
+      if (!matchingTest) continue;
 
-      const leadScore = parseFloat(matchingTest.overallScore);
       const requiredScore = parseFloat(req.minOverallReq ?? '0');
 
-      if (leadScore < requiredScore) continue;
+      // overallScore is already pre-parsed as number
+      if (matchingTest.overallScore < requiredScore) continue;
 
-      /*
-      const minSectionReq =
-        req.minSectionReq !== null && req.minSectionReq !== undefined
-          ? parseFloat(req.minSectionReq)
-          : undefined;
-      
-      // If section minimum exists, all section scores must meet it
-      if (minSectionReq !== undefined) {
-        const sectionResults = matchingTest.LeadEnglishTestSectionResult as
-          | Array<{ sectionScore?: string | null }>
-          | undefined;
-
-        if (!sectionResults || sectionResults.length === 0) continue;        
-
-        const allSectionsMeet = sectionResults.every((section) => {
-          const score =
-            section.sectionScore !== null && section.sectionScore !== undefined
-              ? parseFloat(section.sectionScore)
-              : NaN;
-          return Number.isFinite(score) && score >= minSectionReq;
-        });
-
-        if (!allSectionsMeet) continue;
-      }
-      */
       // If all checks pass, return score
       return this.BASE_ENGLISH_WEIGHT;
     }

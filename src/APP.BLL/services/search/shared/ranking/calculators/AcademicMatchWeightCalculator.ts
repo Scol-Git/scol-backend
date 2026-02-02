@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { RankingMode } from '@shared/enums/RankingMode.enum';
-import { SearchContext } from '@shared/search/SearchTypes';
+import { SearchContext, NormalizedLeadProfile } from '@shared/search/SearchTypes';
 import { IWeightCalculator } from '@shared/interfaces/search/IWeightCalculator.interface';
 
 /**
@@ -9,6 +9,9 @@ import { IWeightCalculator } from '@shared/interfaces/search/IWeightCalculator.i
  *
  * Only applies to ELIGIBILITY_PLUS_BUSINESS mode.
  * Higher match with academic requirements = higher score.
+ *
+ * **Optimization:** Uses normalizedProfile for O(1) Map lookups
+ * instead of O(n) array.find() operations.
  */
 @Injectable()
 export class AcademicMatchWeightCalculator implements IWeightCalculator {
@@ -19,20 +22,19 @@ export class AcademicMatchWeightCalculator implements IWeightCalculator {
    * Weight values
    */
   private readonly BASE_ACADEMIC_WEIGHT = 5000;
-  private readonly EXACT_DEGREE_BONUS = 2000;
-  private readonly GPA_SURPLUS_MULTIPLIER = 500;
 
   isApplicable(mode: RankingMode): boolean {
     return mode === RankingMode.ELIGIBILITY_PLUS_BUSINESS;
   }
 
   calculate(courseIntake: UniCourseIntakes, context: SearchContext): number {
-    if (!context.leadProfile) {
+    // Use normalized profile for O(1) lookups
+    if (!context.normalizedProfile) {
       return 0;
     }
 
     const course = courseIntake.UniCourse;
-    const leadDegrees = context.leadProfile.academicResults;
+    const normalized = context.normalizedProfile;
 
     // No academic requirement = full points
     if (!course?.minSysDegreeId) {
@@ -40,35 +42,35 @@ export class AcademicMatchWeightCalculator implements IWeightCalculator {
     }
 
     // No degrees = no points
-    if (leadDegrees.length === 0) {
+    if (normalized.academicResultsByDegreeId.size === 0) {
       return 0;
     }
 
-    // Find exact match for required degree
-    const exactMatch = leadDegrees.find(
-      (d) => d.degreeId === course.minSysDegreeId,
+    // O(1) lookup for exact match by degree ID
+    const exactMatch = normalized.academicResultsByDegreeId.get(
+      course.minSysDegreeId,
     );
 
-    if (exactMatch && exactMatch.gpa && course.minGpa) {
-      const leadGpa = parseFloat(exactMatch.gpa);
+    if (exactMatch && course.minGpa) {
       const requiredGpa = parseFloat(course.minGpa);
-      const surplus = leadGpa - requiredGpa;
-      // score += surplus * this.GPA_SURPLUS_MULTIPLIER;
+      const surplus = exactMatch.gpa - requiredGpa; // gpa already parsed
 
       if (surplus >= 0) return this.BASE_ACADEMIC_WEIGHT;
     }
 
-    // if exact minimum degree match does not match, check if lead has higher degree match
-    const higherMatch = leadDegrees.find(
-      (d) => d.degreeId === course.higherSysDegreeId,
-    );
+    // If minimum degree match does not meet GPA, check higher degree
+    if (course.higherSysDegreeId) {
+      // O(1) lookup for higher degree
+      const higherMatch = normalized.academicResultsByDegreeId.get(
+        course.higherSysDegreeId,
+      );
 
-    if (higherMatch && higherMatch.gpa && course.higherGpa) {
-      const leadGpa = parseFloat(higherMatch.gpa);
-      const requiredGpa = parseFloat(course.higherGpa);
-      const surplus = leadGpa - requiredGpa;
+      if (higherMatch && course.higherGpa) {
+        const requiredGpa = parseFloat(course.higherGpa);
+        const surplus = higherMatch.gpa - requiredGpa; // gpa already parsed
 
-      if (surplus >= 0) return this.BASE_ACADEMIC_WEIGHT;
+        if (surplus >= 0) return this.BASE_ACADEMIC_WEIGHT;
+      }
     }
 
     // default return 0

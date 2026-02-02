@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysUniversities } from './SysUniversities.entity';
@@ -8,8 +15,14 @@ import { UniCourseIntakes } from './UniCourseIntakes.entity';
 /**
  * @class UniIntakes
  * @extends {BaseEntity}
+ *
+ * **Search Indexes:**
+ * - uniId: FK join to SysUniversities
+ * - sysIntakeId: Intake type filtering (Fall, Spring, etc.)
  */
 @Entity('UniIntakes')
+@Index('IX_UniIntakes_uniId', ['uniId'])
+@Index('IX_UniIntakes_sysIntakeId', ['sysIntakeId'])
 export class UniIntakes extends BaseEntity {
   @Column({
     name: 'uniId',

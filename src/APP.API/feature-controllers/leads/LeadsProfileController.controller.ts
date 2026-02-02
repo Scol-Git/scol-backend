@@ -63,6 +63,7 @@ export class LeadsProfileController {
    *
    * Single transactional write for the entire form.
    * Replaces all existing data with new values.
+   * Returns the updated form data (same response as GET).
    */
   @Put('academic-form')
   @UseGuards(JwtAuthGuard)
@@ -70,8 +71,7 @@ export class LeadsProfileController {
   async updateAcademicForm(
     @CurrentUser() user: ICurrentUser,
     @Body() dto: AcademicFormRequestDto,
-  ): Promise<{ message: string }> {
-    await this.leadProfileService.updateAcademicForm(user.userId, dto);
-    return { message: 'Academic form saved successfully' };
+  ): Promise<AcademicFormResponseDto> {
+    return this.leadProfileService.updateAcademicForm(user.userId, dto);
   }
 }

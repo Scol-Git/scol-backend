@@ -1,15 +1,18 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsOptional, ValidateNested } from 'class-validator';
+import { IsOptional, ValidateNested } from 'class-validator';
 import { SearchRequestDto } from './SearchRequestDto';
 import { SearchFiltersDto } from './SearchFiltersDto';
 import { SearchRangesDto } from './SearchRangesDto';
 import { SearchFlagsDto } from './SearchFlagsDto';
-import { SortDto } from './SortDto';
 
 /**
  * Request DTO for POST /api/search/advanced
- * Advanced search with full filters, ranges, flags, and sorting
+ *
+ * Advanced search with filters, ranges, and flags.
+ * Results are automatically ranked by internal algorithm
+ * (eligibility + business ranking for logged-in users,
+ * commission-based ranking for anonymous users).
  */
 export class AdvancedSearchRequestDto extends SearchRequestDto {
   @ApiPropertyOptional({
@@ -38,14 +41,4 @@ export class AdvancedSearchRequestDto extends SearchRequestDto {
   @Type(() => SearchFlagsDto)
   @IsOptional()
   flags?: SearchFlagsDto;
-
-  @ApiPropertyOptional({
-    description: 'Sort configuration',
-    type: [SortDto],
-  })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => SortDto)
-  @IsOptional()
-  sort?: SortDto[];
 }

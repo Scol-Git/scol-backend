@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { UniCourses } from './UniCourses.entity';
@@ -8,8 +15,24 @@ import { CourseIntakeScholarships } from './CourseIntakeScholarships.entity';
 /**
  * @class UniCourseIntakes
  * @extends {BaseEntity}
+ *
+ * **Search Indexes:**
+ * - isActive: Filters active courses (most queries)
+ * - uniCourseId: FK join to UniCourses
+ * - uniIntakeId: FK join to UniIntakes
+ * - intakeYear: Year filtering
+ * - courseDuration: Duration range queries
+ * - createdAt: Default sorting (newest first)
+ * - Composite (isActive, createdAt): Common query pattern
  */
 @Entity('UniCourseIntakes')
+@Index('IX_UniCourseIntakes_isActive', ['isActive'])
+@Index('IX_UniCourseIntakes_uniCourseId', ['uniCourseId'])
+@Index('IX_UniCourseIntakes_uniIntakeId', ['uniIntakeId'])
+@Index('IX_UniCourseIntakes_intakeYear', ['intakeYear'])
+@Index('IX_UniCourseIntakes_courseDuration', ['courseDuration'])
+@Index('IX_UniCourseIntakes_createdAt', ['createdAt'])
+@Index('IX_UniCourseIntakes_active_createdAt', ['isActive', 'createdAt'])
 export class UniCourseIntakes extends BaseEntity {
   @Column({
     name: 'uniCourseId',
@@ -79,6 +102,16 @@ export class UniCourseIntakes extends BaseEntity {
   })
   @AutoMap()
   initialDeposit?: string;
+
+  @Column({
+    name: 'applicationFee',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  @AutoMap()
+  applicationFee?: string;
 
   @Column({
     name: 'isActive',
