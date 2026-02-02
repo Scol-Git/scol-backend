@@ -34,15 +34,15 @@ export class LeadPreferredCountries extends BaseEntity {
    * Many-to-One: Lead profile
    * Each preferred country belongs to one lead profile
    */
-  @ManyToOne(() => SysLeadProfiles, (lead) => lead.preferredCountries)
+  @ManyToOne(() => SysLeadProfiles, (lead) => lead.LeadPreferredCountry)
   @JoinColumn({ name: 'lead_id' })
-  lead!: SysLeadProfiles;
+  SysLeadProfile!: SysLeadProfiles;
 
   /**
    * Many-to-One: Country
    * Each preference is associated with a specific country
    */
-  @ManyToOne(() => SysCountries, (country) => country.leadPreferences)
+  @ManyToOne(() => SysCountries, (country) => country.LeadPreferredCountry)
   @JoinColumn({ name: 'country_id' })
-  country!: SysCountries;
+  SysCountry!: SysCountries;
 }

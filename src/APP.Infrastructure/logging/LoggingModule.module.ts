@@ -17,7 +17,10 @@ const CORRELATION_HEADER = 'x-correlation-id';
         const isDev = getAppStage() === 'dev';
 
         const pinoHttp: PinoHttpOptions = {
-          // log level
+          // Base logger level (controls which logs are shown)
+          level: isDev ? 'debug' : 'info',
+
+          // HTTP request log level (what level to log requests at)
           useLevel: isDev ? 'debug' : 'info',
 
           // 🚫 disable automatic access logs

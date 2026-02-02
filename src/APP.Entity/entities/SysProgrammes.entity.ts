@@ -26,6 +26,6 @@ export class SysProgrammes extends BaseEntity {
    * One-to-Many: Lead preferences
    * All leads who have selected this programme as a preference
    */
-  @OneToMany(() => LeadPreferredPrograms, (pref) => pref.programme)
-  leadPreferences!: LeadPreferredPrograms[];
+  @OneToMany(() => LeadPreferredPrograms, (pref) => pref.SysProgramme)
+  LeadPreferredProgram!: LeadPreferredPrograms[];
 }

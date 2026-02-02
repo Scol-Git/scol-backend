@@ -68,7 +68,7 @@ export class UserSessions extends BaseEntity {
    * Many-to-One: User
    * Each session belongs to one user
    */
-  @ManyToOne(() => SysUsers, (user) => user.sessions)
+  @ManyToOne(() => SysUsers, (user) => user.UserSession)
   @JoinColumn({ name: 'user_id' })
-  user!: SysUsers;
+  SysUser!: SysUsers;
 }

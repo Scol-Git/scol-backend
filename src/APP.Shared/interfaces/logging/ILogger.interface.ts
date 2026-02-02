@@ -63,7 +63,7 @@ export interface ILogger {
    * @param message - Log message
    * @param meta - Optional metadata/context object
    */
-  LogDebug?(message: string, meta?: Record<string, unknown>): void;
+  LogDebug(message: string, meta?: Record<string, unknown>): void;
 
   // NestJS LoggerService compatibility methods
   log(message: any, ...optionalParams: any[]): any;

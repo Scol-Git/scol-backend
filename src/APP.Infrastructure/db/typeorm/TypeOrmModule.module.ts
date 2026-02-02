@@ -26,6 +26,21 @@ import { UserSessions } from '@entity/entities/UserSessions.entity';
 import { UserPermissions } from '@entity/entities/UserPermissions.entity';
 import { UserRoles } from '@entity/entities/UserRoles.entity';
 import { OtpSession } from '@entity/entities/OtpSession.entity';
+// New entities
+import { SysStates } from '@entity/entities/SysStates.entity';
+import { SysCities } from '@entity/entities/SysCities.entity';
+import { SysEnglishTestSections } from '@entity/entities/SysEnglishTestSections.entity';
+import { LeadEnglishTestResults } from '@entity/entities/LeadEnglishTestResults.entity';
+import { LeadEnglishTestSectionResults } from '@entity/entities/LeadEnglishTestSectionResults.entity';
+import { SysIntakes } from '@entity/entities/SysIntakes.entity';
+import { SysUniversities } from '@entity/entities/SysUniversities.entity';
+import { UniIntakes } from '@entity/entities/UniIntakes.entity';
+import { UniCourses } from '@entity/entities/UniCourses.entity';
+import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
+import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
+import { UniAcademicReq } from '@entity/entities/UniAcademicReq.entity';
+import { UniEngReq } from '@entity/entities/UniEngReq.entity';
+import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -59,6 +74,21 @@ import { AppDbContext } from './AppDbContext';
             UserPermissions,
             UserRoles,
             OtpSession,
+            // New entities
+            SysStates,
+            SysCities,
+            SysEnglishTestSections,
+            LeadEnglishTestResults,
+            LeadEnglishTestSectionResults,
+            SysIntakes,
+            SysUniversities,
+            UniIntakes,
+            UniCourses,
+            UniCourseIntakes,
+            CourseIntakeScholarships,
+            UniAcademicReq,
+            UniEngReq,
+            CourseEngReq,
           ],
           synchronize: false,
           logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
@@ -90,6 +120,21 @@ import { AppDbContext } from './AppDbContext';
       UserPermissions,
       UserRoles,
       OtpSession,
+      // New entities
+      SysStates,
+      SysCities,
+      SysEnglishTestSections,
+      LeadEnglishTestResults,
+      LeadEnglishTestSectionResults,
+      SysIntakes,
+      SysUniversities,
+      UniIntakes,
+      UniCourses,
+      UniCourseIntakes,
+      CourseIntakeScholarships,
+      UniAcademicReq,
+      UniEngReq,
+      CourseEngReq,
     ]),
   ],
   providers: [AppDbContext],

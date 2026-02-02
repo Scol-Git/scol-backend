@@ -39,6 +39,10 @@ export class Logger implements ILogger, LoggerService {
     }
   }
 
+  LogDebug(message: string, meta?: Record<string, unknown>): void {
+    this.pino.debug(meta ?? {}, message);
+  }
+
   // --- Nest LoggerService compatibility ---
   log(message: any, ...optionalParams: any[]): any {
     this.pino.info(optionalParams, message);

@@ -80,13 +80,13 @@ export class UserRoles {
    */
   @ManyToOne(() => SysUsers, (user) => user.roles, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
-  user!: SysUsers;
+  SysUser!: SysUsers;
 
   /**
    * Many-to-One: Role
    * Direct access to the role in this junction
    */
-  @ManyToOne(() => SysRoles, (role) => role.users, { onDelete: 'CASCADE' })
+  @ManyToOne(() => SysRoles, (role) => role.SysUser, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'role_id' })
-  role!: SysRoles;
+  SysRole!: SysRoles;
 }

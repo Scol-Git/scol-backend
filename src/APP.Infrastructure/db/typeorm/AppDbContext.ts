@@ -19,15 +19,29 @@ import { SysLeadProfiles } from '@entity/entities/SysLeadProfiles.entity';
 import { SysCountries } from '@entity/entities/SysCountries.entity';
 import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
 import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
+import { SysEnglishTestSections } from '@entity/entities/SysEnglishTestSections.entity';
 import { SysProgrammes } from '@entity/entities/SysProgrammes.entity';
 import { LeadAcademicResults } from '@entity/entities/LeadAcademicResults.entity';
 import { LeadTestResults } from '@entity/entities/LeadTestResults.entity';
+import { LeadEnglishTestResults } from '@entity/entities/LeadEnglishTestResults.entity';
+import { LeadEnglishTestSectionResults } from '@entity/entities/LeadEnglishTestSectionResults.entity';
 import { LeadPreferredCountries } from '@entity/entities/LeadPreferredCountries.entity';
 import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.entity';
 import { UserSessions } from '@entity/entities/UserSessions.entity';
 import { UserRoles } from '@entity/entities/UserRoles.entity';
 import { UserPermissions } from '@entity/entities/UserPermissions.entity';
 import { OtpSession } from '@entity/entities/OtpSession.entity';
+
+// Course/University entities for search
+import { SysUniversities } from '@entity/entities/SysUniversities.entity';
+import { SysStates } from '@entity/entities/SysStates.entity';
+import { SysCities } from '@entity/entities/SysCities.entity';
+import { SysIntakes } from '@entity/entities/SysIntakes.entity';
+import { UniCourses } from '@entity/entities/UniCourses.entity';
+import { UniIntakes } from '@entity/entities/UniIntakes.entity';
+import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
+import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
+import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
 
 /**
  * AppDbContext - EF Core-style DbContext for TypeORM
@@ -104,8 +118,45 @@ export class AppDbContext {
     @InjectRepository(SysEnglishTests)
     public readonly englishTests: Repository<SysEnglishTests>,
 
+    @InjectRepository(SysEnglishTestSections)
+    public readonly englishTestSections: Repository<SysEnglishTestSections>,
+
     @InjectRepository(SysProgrammes)
     public readonly programmes: Repository<SysProgrammes>,
+
+    @InjectRepository(LeadEnglishTestResults)
+    public readonly leadEnglishTestResults: Repository<LeadEnglishTestResults>,
+
+    @InjectRepository(LeadEnglishTestSectionResults)
+    public readonly leadEnglishTestSectionResults: Repository<LeadEnglishTestSectionResults>,
+
+    // Course/University repositories for search
+    @InjectRepository(SysUniversities)
+    public readonly universities: Repository<SysUniversities>,
+
+    @InjectRepository(SysStates)
+    public readonly states: Repository<SysStates>,
+
+    @InjectRepository(SysCities)
+    public readonly cities: Repository<SysCities>,
+
+    @InjectRepository(SysIntakes)
+    public readonly intakes: Repository<SysIntakes>,
+
+    @InjectRepository(UniCourses)
+    public readonly courses: Repository<UniCourses>,
+
+    @InjectRepository(UniIntakes)
+    public readonly uniIntakes: Repository<UniIntakes>,
+
+    @InjectRepository(UniCourseIntakes)
+    public readonly courseIntakes: Repository<UniCourseIntakes>,
+
+    @InjectRepository(CourseEngReq)
+    public readonly courseEngReqs: Repository<CourseEngReq>,
+
+    @InjectRepository(CourseIntakeScholarships)
+    public readonly scholarships: Repository<CourseIntakeScholarships>,
   ) {}
 
   /**

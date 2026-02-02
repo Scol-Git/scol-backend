@@ -397,7 +397,6 @@ export class AuthService {
           const profile = profileRepo.create({
             userId: savedUser.id,
             fullName: pendingData.fullName,
-            user: savedUser,
           });
 
           await profileRepo.save(profile);
@@ -661,7 +660,7 @@ export class AuthService {
         userId: payload.sub,
         revokedAt: IsNull(),
       },
-      relations: { user: { roles: true, permissions: true } },
+      relations: { SysUser: { roles: true, permissions: true } },
     });
 
     if (!session) {
@@ -699,17 +698,17 @@ export class AuthService {
     }
 
     const newAccessToken = this.jwt.generateAccessToken({
-      sub: session.user.id,
+      sub: session.SysUser.id,
       orgId: '',
-      email: session.user.email || session.user.phone,
-      roles: session.user.roles.map((role) => role.name),
-      permissions: session.user.permissions.map((perm) => perm.name),
+      email: session.SysUser.email || session.SysUser.phone,
+      roles: session.SysUser.roles.map((role: any) => role.name),
+      permissions: session.SysUser.permissions.map((perm: any) => perm.name),
       isSuperAdmin: false,
     });
 
     this.logger.info('Token refreshed successfully', {
       context: 'AuthService.refreshAccessToken',
-      userId: session.user.id,
+      userId: session.SysUser.id,
       sessionId: session.id,
       action: 'REFRESH_TOKEN_SUCCESS',
     });

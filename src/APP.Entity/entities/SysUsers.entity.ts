@@ -124,7 +124,7 @@ export class SysUsers extends BaseEntity {
    * Many-to-Many: User roles
    * A user can have multiple roles, and a role can belong to multiple users
    */
-  @ManyToMany(() => SysRoles, (role) => role.users)
+  @ManyToMany(() => SysRoles, (role) => role.SysUser)
   @JoinTable({
     name: 'UserRoles',
     joinColumn: { name: 'user_id', referencedColumnName: 'id' },
@@ -136,7 +136,7 @@ export class SysUsers extends BaseEntity {
    * Many-to-Many: User permissions
    * A user can have multiple direct permissions (in addition to role-based permissions)
    */
-  @ManyToMany(() => SysPermissions, (permission) => permission.users)
+  @ManyToMany(() => SysPermissions, (permission) => permission.SysUser)
   @JoinTable({
     name: 'UserPermissions',
     joinColumn: { name: 'user_id', referencedColumnName: 'id' },
@@ -148,13 +148,13 @@ export class SysUsers extends BaseEntity {
    * One-to-Many: User sessions
    * A user can have multiple active/historical sessions
    */
-  @OneToMany(() => UserSessions, (session) => session.user)
-  sessions!: UserSessions[];
+  @OneToMany(() => UserSessions, (session) => session.SysUser)
+  UserSession!: UserSessions[];
 
   /**
    * One-to-One: Lead profile
    * A user may have an associated lead profile
    */
-  @OneToOne(() => SysLeadProfiles, (profile) => profile.user)
-  leadProfile?: SysLeadProfiles;
+  @OneToOne(() => SysLeadProfiles, (profile) => profile.SysUser)
+  SysLeadProfile?: SysLeadProfiles;
 }

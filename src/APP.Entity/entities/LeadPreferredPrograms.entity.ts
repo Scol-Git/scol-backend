@@ -34,15 +34,15 @@ export class LeadPreferredPrograms extends BaseEntity {
    * Many-to-One: Lead profile
    * Each preferred program belongs to one lead profile
    */
-  @ManyToOne(() => SysLeadProfiles, (lead) => lead.preferredPrograms)
+  @ManyToOne(() => SysLeadProfiles, (lead) => lead.LeadPreferredProgram)
   @JoinColumn({ name: 'lead_id' })
-  lead!: SysLeadProfiles;
+  SysLeadProfile!: SysLeadProfiles;
 
   /**
    * Many-to-One: Programme
    * Each preference is associated with a specific study programme
    */
-  @ManyToOne(() => SysProgrammes, (programme) => programme.leadPreferences)
+  @ManyToOne(() => SysProgrammes, (programme) => programme.LeadPreferredProgram)
   @JoinColumn({ name: 'programme_id' })
-  programme!: SysProgrammes;
+  SysProgramme!: SysProgrammes;
 }
