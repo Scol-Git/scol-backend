@@ -232,10 +232,10 @@ export class SearchPipelineExecutor {
       params.limit,
     );
 
-    this.logger.LogInfo('Pipeline execution complete', {
+    this.logger.LogDebug('Pipeline execution complete', {
       context: 'SearchPipelineExecutor.executeWithDbRanking',
       executionPath: 'DB_RANKING',
-      rankedCourses: rankedCourses.map((c) => ({
+      paginatedCourses: paginated.items.map((c) => ({
         courseName: c.courseIntake.UniCourse.courseName,
         universityName: c.courseIntake.UniCourse.SysUniversity.uniName,
         score: c.rankScore,
@@ -263,7 +263,7 @@ export class SearchPipelineExecutor {
       .select('ci.id', 'id')
       .addSelect(
         `CASE 
-          WHEN uni."commissionType" = '${CommissionType.AMOUNT}' 
+          WHEN COALESCE(uni."commissionType", '${CommissionType.AMOUNT}') = '${CommissionType.AMOUNT}' 
             THEN LEAST(COALESCE(CAST(uni.commission AS DECIMAL), 0), ${this.COMMISSION_MAX_WEIGHT})
           ELSE 
             LEAST(COALESCE(CAST(uni.commission AS DECIMAL), 0) * ${this.COMMISSION_MULTIPLIER}, ${this.COMMISSION_MAX_WEIGHT})

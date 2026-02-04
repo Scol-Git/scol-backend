@@ -85,19 +85,22 @@ export class CourseResponseMapper {
       courseId: courseIntake.id,
       courseName: course?.courseName ?? '',
       university: this.toUniversityDto(university),
-      imgUrl: university?.coverImageUrl,
+      imgUrl: university?.coverImageUrl ?? null,
       intake: this.toIntakeDto(uniIntake, courseIntake.intakeYear),
-      tuitionFee: courseIntake.tuitionFee
-        ? parseFloat(courseIntake.tuitionFee)
-        : undefined,
-      currency: courseIntake.currency,
-      durationMonths: courseIntake.courseDuration,
-      initialDeposit: courseIntake.initialDeposit
-        ? parseFloat(courseIntake.initialDeposit)
-        : undefined,
-      applicationFee: courseIntake.applicationFee
-        ? parseFloat(courseIntake.applicationFee)
-        : undefined,
+      tuitionFee:
+        courseIntake.tuitionFee != null
+          ? parseFloat(courseIntake.tuitionFee)
+          : null,
+      currency: courseIntake.currency ?? null,
+      durationMonths: courseIntake.courseDuration ?? null,
+      initialDeposit:
+        courseIntake.initialDeposit != null
+          ? parseFloat(courseIntake.initialDeposit)
+          : null,
+      applicationFee:
+        courseIntake.applicationFee != null
+          ? parseFloat(courseIntake.applicationFee)
+          : null,
       isScholarshipAvailable: scholarships.length > 0,
       engRequirements: this.toEnglishRequirements(engReqs),
       isWishlisted: false, // TODO: Implement wishlist check

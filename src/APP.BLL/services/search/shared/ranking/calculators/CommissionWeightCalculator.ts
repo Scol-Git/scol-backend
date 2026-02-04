@@ -38,8 +38,9 @@ export class CommissionWeightCalculator implements IWeightCalculator {
       | { commission?: string | null; commissionType?: CommissionType | null }
       | undefined;
     const commissionValue = parseFloat(university?.commission ?? '0');
+    // Treat null/undefined as AMOUNT so DB and in-memory ranking match (typical data has numeric amounts)
     const commissionType =
-      university?.commissionType ?? CommissionType.PERCENTAGE;
+      university?.commissionType ?? CommissionType.AMOUNT;
 
     if (!Number.isFinite(commissionValue) || commissionValue <= 0) {
       return 0;

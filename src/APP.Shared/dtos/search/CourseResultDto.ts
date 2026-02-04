@@ -67,26 +67,33 @@ export class CourseResultDto {
   @ApiProperty({ description: 'University information' })
   university!: UniversityDto;
 
-  @ApiPropertyOptional({ description: 'Course image URL' })
-  imgUrl?: string;
+  @ApiPropertyOptional({ description: 'Course image URL', nullable: true })
+  imgUrl?: string | null;
 
   @ApiProperty({ description: 'Intake information' })
   intake!: IntakeDto;
 
-  @ApiPropertyOptional({ description: 'Tuition fee' })
-  tuitionFee?: number;
+  @ApiPropertyOptional({ description: 'Tuition fee', nullable: true })
+  tuitionFee?: number | null;
 
-  @ApiPropertyOptional({ description: 'Currency code', example: 'USD' })
-  currency?: string;
+  @ApiPropertyOptional({
+    description: 'Currency code',
+    example: 'USD',
+    nullable: true,
+  })
+  currency?: string | null;
 
-  @ApiPropertyOptional({ description: 'Duration in months' })
-  durationMonths?: number;
+  @ApiPropertyOptional({ description: 'Duration in months', nullable: true })
+  durationMonths?: number | null;
 
-  @ApiPropertyOptional({ description: 'Initial deposit amount' })
-  initialDeposit?: number;
+  @ApiPropertyOptional({
+    description: 'Initial deposit amount',
+    nullable: true,
+  })
+  initialDeposit?: number | null;
 
-  @ApiPropertyOptional({ description: 'Application fee' })
-  applicationFee?: number;
+  @ApiPropertyOptional({ description: 'Application fee', nullable: true })
+  applicationFee?: number | null;
 
   @ApiProperty({ description: 'Whether scholarship is available' })
   isScholarshipAvailable!: boolean;
