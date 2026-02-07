@@ -60,3 +60,6 @@ migrations/*
 dist/migrations/*
 
 # Note: package-lock.json is NOT ignored - it ensures reproducible builds
+
+# Upload uni/course data and generated artifacts
+uploadUniCourse/
