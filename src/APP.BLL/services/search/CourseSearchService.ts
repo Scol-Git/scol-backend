@@ -96,7 +96,6 @@ export class CourseSearchService {
     this.logger.debug?.('Advanced search started', {
       context: 'CourseSearchService.advancedSearch',
       userId: user?.userId,
-      searchText: request.searchText,
       hasFilters: !!request.filters,
       hasRanges: !!request.ranges,
       hasFlags: !!request.flags,
@@ -108,7 +107,6 @@ export class CourseSearchService {
 
     // 2. Execute optimized search pipeline with all parameters
     const result = await this.pipelineExecutor.execute({
-      searchText: request.searchText,
       filters: request.filters,
       ranges: request.ranges,
       flags: request.flags,

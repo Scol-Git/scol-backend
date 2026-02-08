@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysLeadProfiles } from './SysLeadProfiles.entity';
@@ -9,6 +9,7 @@ import { SysAcademicDegrees } from './SysAcademicDegrees.entity';
  * @extends {BaseEntity}
  */
 @Entity('LeadAcademicResults')
+@Index('IX_LeadAcademicResults_lead_id_degree_id', ['leadId', 'degreeId'])
 export class LeadAcademicResults extends BaseEntity {
   @Column({
     name: 'lead_id',

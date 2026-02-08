@@ -44,21 +44,20 @@ export class HomeSearchService {
     request: HomeRequestDto,
     user?: ICurrentUser,
   ): Promise<SearchResponseDto> {
-    this.logger.debug?.('Home search started', {
+
+    this.logger.LogDebug('Home Search Started : ', {
       context: 'HomeSearchService.getHomeCourses',
-      userId: user?.userId,
       listType: request.listType,
       cursor: request.pagination?.cursor ? 'provided' : 'none',
+      userInfo: user,
     });
 
     // 1. Resolve user context (cached for 2 minutes)
     const context = await this.contextResolver.resolve(user);
 
-    this.logger.debug?.('Search context resolved', {
+    this.logger.debug?.('Search context resolved :', {
       context: 'HomeSearchService.getHomeCourses',
-      userState: context.userState,
-      formStatus: context.academicFormStatus,
-      rankingMode: context.rankingMode,
+      userContext: context,
     });
 
     // 2. Execute optimized search pipeline
