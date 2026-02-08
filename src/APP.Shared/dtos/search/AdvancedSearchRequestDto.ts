@@ -1,20 +1,35 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsOptional, ValidateNested } from 'class-validator';
-import { SearchRequestDto } from './SearchRequestDto';
+import { IsEnum, IsOptional, ValidateNested } from 'class-validator';
+import { CursorPaginationDto } from './CursorPaginationDto';
+import { ListType } from '@shared/enums/ListType.enum';
 import { SearchFiltersDto } from './SearchFiltersDto';
 import { SearchRangesDto } from './SearchRangesDto';
 import { SearchFlagsDto } from './SearchFlagsDto';
 
 /**
  * Request DTO for POST /api/search/advanced
- *
- * Advanced search with filters, ranges, and flags.
- * Results are automatically ranked by internal algorithm
- * (eligibility + business ranking for logged-in users,
- * commission-based ranking for anonymous users).
+ * Advanced search: filters, ranges, flags. No searchText.
  */
-export class AdvancedSearchRequestDto extends SearchRequestDto {
+export class AdvancedSearchRequestDto {
+  @ApiPropertyOptional({
+    description: 'Cursor pagination',
+    type: CursorPaginationDto,
+  })
+  @ValidateNested()
+  @Type(() => CursorPaginationDto)
+  @IsOptional()
+  pagination?: CursorPaginationDto;
+
+  @ApiPropertyOptional({
+    description: 'List type filter',
+    enum: ListType,
+    default: ListType.ELIGIBLE_ONLY,
+  })
+  @IsEnum(ListType)
+  @IsOptional()
+  listType?: ListType = ListType.ELIGIBLE_ONLY;
+
   @ApiPropertyOptional({
     description: 'Filters',
     type: SearchFiltersDto,
