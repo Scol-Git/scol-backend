@@ -16,10 +16,9 @@ import { SearchResponseDto } from '@shared/dtos/search/SearchResponseDto';
 import {
   SearchContext,
   RankedCourse,
+  CursorData,
   PaginatedResult,
 } from '@shared/search/SearchTypes';
-import { CourseRankingService } from '../CourseRankingService';
-import { CourseEligibilityClassifier } from '../CourseEligibilityClassifier';
 import { CourseCursorPaginationService } from '../CourseCursorPaginationService';
 import { CourseResponseMapper } from '../../../../mappings/search/CourseResponseMapper';
 import {
@@ -58,6 +57,21 @@ interface CandidateWithScore {
 }
 
 /**
+ * Row from Phase-1 DB-driven ranking (logged-in path)
+ */
+interface RankedCandidateRow {
+  courseIntakeId: string;
+  rankScore: number;
+  isEligible: boolean;
+}
+
+/** Weight constants matching WeightCalculatorRegistry (exact 1:1) */
+const ACADEMIC_WEIGHT = 5000;
+const ENGLISH_WEIGHT = 3000;
+const COUNTRY_PREFERENCE_WEIGHT = 1500;
+const PROGRAMME_PREFERENCE_WEIGHT = 1500;
+
+/**
  * Search Pipeline Executor
  *
  * Implements a 3-phase search pipeline for optimized performance:
@@ -91,9 +105,6 @@ interface CandidateWithScore {
  */
 @Injectable()
 export class SearchPipelineExecutor {
-  /** Maximum candidates to process (prevents memory issues) */
-  private readonly CANDIDATE_LIMIT = 2000;
-
   /** Commission weight constants (matching CommissionWeightCalculator) */
   private readonly COMMISSION_MULTIPLIER = 100;
   private readonly COMMISSION_MAX_WEIGHT = 5000;
@@ -101,8 +112,6 @@ export class SearchPipelineExecutor {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
-    private readonly rankingService: CourseRankingService,
-    private readonly eligibilityClassifier: CourseEligibilityClassifier,
     private readonly paginationService: CourseCursorPaginationService,
     private readonly responseMapper: CourseResponseMapper,
     @Inject(ICacheToken)
@@ -128,8 +137,9 @@ export class SearchPipelineExecutor {
   async execute(params: PipelineParams): Promise<SearchResponseDto> {
     const startTime = Date.now();
 
-    // Build cache key
+    // Build cache key from full relevant user context (identity + profile data that affects ranking/eligibility)
     const cacheKeyParams: SearchResultsKeyParams = {
+      userContext: SearchCacheKeyBuilder.fromSearchContext(params.context),
       searchText: params.searchText,
       filters: params.filters,
       ranges: params.ranges,
@@ -147,10 +157,18 @@ export class SearchPipelineExecutor {
       listType: params.listType,
       rankingMode: params.context.rankingMode,
       leadId: params.context.normalizedProfile?.leadId,
-      academicResultsByDegreeId: Object.fromEntries(params.context.normalizedProfile?.academicResultsByDegreeId ?? []),
-      englishResultsByTestId: Object.fromEntries(params.context.normalizedProfile?.englishResultsByTestId ?? []),
-      preferredCountryIds: [...(params.context.normalizedProfile?.preferredCountryIds ?? [])],
-      preferredProgrammeIds: [...(params.context.normalizedProfile?.preferredProgrammeIds ?? [])],
+      academicResultsByDegreeId: Object.fromEntries(
+        params.context.normalizedProfile?.academicResultsByDegreeId ?? [],
+      ),
+      englishResultsByTestId: Object.fromEntries(
+        params.context.normalizedProfile?.englishResultsByTestId ?? [],
+      ),
+      preferredCountryIds: [
+        ...(params.context.normalizedProfile?.preferredCountryIds ?? []),
+      ],
+      preferredProgrammeIds: [
+        ...(params.context.normalizedProfile?.preferredProgrammeIds ?? []),
+      ],
     });
 
     // Try to get from cache
@@ -162,11 +180,11 @@ export class SearchPipelineExecutor {
 
         const result = canUseDbRanking
           ? await this.executeWithDbRanking(params)
-          : await this.executeWithInMemoryRanking(params);
+          : await this.executeWithDbDrivenRanking(params);
 
         this.logger.debug?.('Pipeline execution complete', {
           context: 'SearchPipelineExecutor.execute',
-          executionPath: canUseDbRanking ? 'DB_RANKING' : 'MEMORY_RANKING',
+          executionPath: canUseDbRanking ? 'DB_RANKING' : 'DB_DRIVEN_RANKING',
           elapsedMs: Date.now() - startTime,
           resultCount: result.courses.length,
         });
@@ -193,16 +211,30 @@ export class SearchPipelineExecutor {
   // =========================================================================
 
   /**
-   * Execute pipeline with DB-level commission ranking
+   * Execute pipeline with DB-level commission ranking (anonymous users)
    *
-   * Optimized for anonymous users where only commission affects ranking.
-   * Sorting is done in the database, eliminating in-memory sorting.
+   * Cursor and limit applied in SQL; only the page IDs are hydrated.
    */
   private async executeWithDbRanking(
     params: PipelineParams,
   ): Promise<SearchResponseDto> {
-    // Phase 1: Get candidate IDs with commission scores (sorted by DB)
-    const candidates = await this.getCandidateIdsWithCommissionRanking(params);
+    const effectiveLimit = this.paginationService.getEffectiveLimit(
+      params.limit,
+    );
+    const limitPlusOne = effectiveLimit + 1;
+
+    const cursorData: CursorData | null = params.cursor
+      ? this.paginationService.decodeCursor(params.cursor)
+      : null;
+    const cursorScore = cursorData !== null ? cursorData.rankScore : null;
+    const cursorId = cursorData !== null ? cursorData.courseIntakeId : null;
+
+    const candidates = await this.getCandidateIdsWithCommissionRanking(
+      params,
+      cursorScore,
+      cursorId,
+      limitPlusOne,
+    );
 
     if (candidates.length === 0) {
       return this.responseMapper.toEmptyResponse(
@@ -211,26 +243,18 @@ export class SearchPipelineExecutor {
       );
     }
 
-    // Phase 2: Hydrate (preserving order)
     const hydrated = await this.hydrateByIdsPreservingOrder(
       candidates.map((c) => c.id),
     );
-
-    // Phase 3: Minimal processing (no ranking needed!)
-    // Build ranked courses with scores from DB
     const scoreMap = new Map(candidates.map((c) => [c.id, c.commissionScore]));
     const rankedCourses: RankedCourse[] = hydrated.map((courseIntake) => ({
       courseIntake,
       rankScore: scoreMap.get(courseIntake.id) ?? 0,
-      isEligible: true, // Anonymous users: all courses shown as eligible
+      isEligible: true,
     }));
 
-    // Apply pagination (eligibility classifier skipped for anonymous)
-    const paginated = this.paginationService.applyPagination(
-      rankedCourses,
-      params.cursor,
-      params.limit,
-    );
+    const paginated: PaginatedResult<RankedCourse> =
+      this.paginationService.buildPaginatedResult(rankedCourses, params.limit);
 
     this.logger.LogDebug('Pipeline execution complete', {
       context: 'SearchPipelineExecutor.executeWithDbRanking',
@@ -250,26 +274,25 @@ export class SearchPipelineExecutor {
   }
 
   /**
-   * Phase 1 (DB Ranking): Get candidate IDs with commission scores
-   *
-   * Sorts by commission score in the database, eliminating need for
-   * in-memory sorting. Uses same formula as CommissionWeightCalculator.
+   * Phase 1 (DB Ranking): Get candidate IDs with commission scores, cursor and limit in SQL.
+   * Wrapped in subquery so cursor/ORDER BY use computed column (no alias-in-WHERE bug). rankScore as integer.
    */
   private async getCandidateIdsWithCommissionRanking(
     params: PipelineParams,
+    cursorScore: number | null,
+    cursorId: string | null,
+    limitPlusOne: number,
   ): Promise<CandidateWithScore[]> {
-    let query = this.dataSource
+    const commissionExpr = `(CASE
+      WHEN COALESCE(uni."commissionType", '${CommissionType.AMOUNT}') = '${CommissionType.AMOUNT}'
+      THEN LEAST(COALESCE(CAST(uni.commission AS DECIMAL), 0), ${this.COMMISSION_MAX_WEIGHT})
+      ELSE LEAST(COALESCE(CAST(uni.commission AS DECIMAL), 0) * ${this.COMMISSION_MULTIPLIER}, ${this.COMMISSION_MAX_WEIGHT})
+      END)`;
+
+    let innerQb = this.dataSource
       .createQueryBuilder(UniCourseIntakes, 'ci')
       .select('ci.id', 'id')
-      .addSelect(
-        `CASE 
-          WHEN COALESCE(uni."commissionType", '${CommissionType.AMOUNT}') = '${CommissionType.AMOUNT}' 
-            THEN LEAST(COALESCE(CAST(uni.commission AS DECIMAL), 0), ${this.COMMISSION_MAX_WEIGHT})
-          ELSE 
-            LEAST(COALESCE(CAST(uni.commission AS DECIMAL), 0) * ${this.COMMISSION_MULTIPLIER}, ${this.COMMISSION_MAX_WEIGHT})
-        END`,
-        'commissionScore',
-      )
+      .addSelect(commissionExpr, 'commissionScore')
       .innerJoin('ci.UniCourse', 'course')
       .innerJoin('course.SysUniversity', 'uni')
       .innerJoin('uni.SysCountry', 'country')
@@ -277,20 +300,36 @@ export class SearchPipelineExecutor {
       .innerJoin('uniIntake.SysIntake', 'sysIntake')
       .where('ci.isActive = :isActive', { isActive: true });
 
-    // Apply filters
-    query = this.applyFilters(query, params);
+    innerQb = this.applyFilters(innerQb, params);
+    const innerSql = innerQb.getQuery();
+    const innerParams = innerQb.getParameters();
 
-    // Sort by commission score (DB-level ranking!)
-    query
-      .orderBy('"commissionScore"', 'DESC')
-      .addOrderBy('ci.id', 'ASC') // Tie-breaker
-      .limit(this.CANDIDATE_LIMIT);
+    let outerQb = this.dataSource
+      .createQueryBuilder()
+      .select('sub.id', 'id')
+      .addSelect('sub."commissionScore"', 'commissionScore')
+      .from(`(${innerSql})`, 'sub')
+      .setParameters(innerParams);
 
-    const results = await query.getRawMany<{ id: string; commissionScore: string }>();
+    if (cursorScore !== null && cursorId !== null) {
+      outerQb = outerQb.andWhere(
+        '(sub."commissionScore", sub.id) < (:cursorScore, :cursorId)',
+        { cursorScore: Math.floor(Number(cursorScore)), cursorId },
+      );
+    }
+    outerQb = outerQb
+      .orderBy('sub."commissionScore"', 'DESC')
+      .addOrderBy('sub.id', 'ASC')
+      .limit(limitPlusOne);
+
+    const results = await outerQb.getRawMany<{
+      id: string;
+      commissionScore: string;
+    }>();
 
     return results.map((r) => ({
       id: r.id,
-      commissionScore: parseFloat(r.commissionScore) || 0,
+      commissionScore: parseInt(r.commissionScore, 10) || 0,
     }));
   }
 
@@ -299,52 +338,63 @@ export class SearchPipelineExecutor {
   // =========================================================================
 
   /**
-   * Execute pipeline with in-memory ranking
+   * Execute pipeline with DB-driven ranking (logged-in users)
    *
-   * Used for logged-in users where eligibility and preference
-   * matching affect ranking. Full ranking happens in memory.
+   * Eligibility, ranking, listType filter, and cursor pagination are done in SQL.
+   * Phase-2 hydrates only the final page IDs (limit+1).
    */
-  private async executeWithInMemoryRanking(
+  private async executeWithDbDrivenRanking(
     params: PipelineParams,
   ): Promise<SearchResponseDto> {
-    // Phase 1: Get candidate IDs
-    const candidateIds = await this.getCandidateIds(params);
+    const effectiveLimit = this.paginationService.getEffectiveLimit(
+      params.limit,
+    );
+    const limitPlusOne = effectiveLimit + 1;
 
-    if (candidateIds.length === 0) {
+    const cursorData: CursorData | null = params.cursor
+      ? this.paginationService.decodeCursor(params.cursor)
+      : null;
+    const cursorScore = cursorData !== null ? cursorData.rankScore : null;
+    const cursorId = cursorData !== null ? cursorData.courseIntakeId : null;
+
+    const rows = await this.getRankedCandidatesDbDriven(
+      params,
+      cursorScore,
+      cursorId,
+      limitPlusOne,
+    );
+
+    if (rows.length === 0) {
       return this.responseMapper.toEmptyResponse(
         params.context,
         params.listType,
       );
     }
 
-    // Phase 2: Hydrate
-    const hydrated = await this.hydrateByIds(candidateIds);
+    const pageIds = rows.map((r) => r.courseIntakeId);
+    const hydrated = await this.hydrateByIdsPreservingOrder(pageIds);
+    const scoreMap = new Map(rows.map((r) => [r.courseIntakeId, r]));
+    const rankedCourses: RankedCourse[] = hydrated.map((courseIntake) => {
+      const row = scoreMap.get(courseIntake.id)!;
+      return {
+        courseIntake,
+        rankScore: row.rankScore,
+        isEligible: row.isEligible,
+      };
+    });
 
-    // Phase 3: Full in-memory processing
-    // 3a. Apply weight-based ranking
-    const rankedCourses = this.rankingService.rankCourses(
-      hydrated,
-      params.context,
-    );
+    const paginated: PaginatedResult<RankedCourse> =
+      this.paginationService.buildPaginatedResult(rankedCourses, params.limit);
 
-    // 3b. Classify eligibility
-    const classifiedCourses = this.eligibilityClassifier.classify(
-      rankedCourses,
-      params.context,
-    );
-
-    // 3c. Filter by listType
-    const filteredCourses = this.filterByListType(
-      classifiedCourses,
-      params.listType,
-    );
-
-    // 3d. Apply pagination
-    const paginated = this.paginationService.applyPagination(
-      filteredCourses,
-      params.cursor,
-      params.limit,
-    );
+    this.logger.LogDebug('Pipeline execution complete', {
+      context: 'SearchPipelineExecutor.executeWithDbDrivenRanking',
+      executionPath: 'DB_DRIVEN_RANKING',
+      paginatedCourses: paginated.items.map((c) => ({
+        courseName: c.courseIntake.UniCourse.courseName,
+        universityName: c.courseIntake.UniCourse.SysUniversity.uniName,
+        score: c.rankScore,
+      })),
+    });
 
     return this.responseMapper.toSearchResponse(
       params.context,
@@ -354,34 +404,156 @@ export class SearchPipelineExecutor {
   }
 
   /**
-   * Phase 1 (Memory Ranking): Get candidate IDs without scores
-   *
-   * Returns only IDs; scoring/ranking happens in-memory.
-   * Default ordering is by createdAt (newest first) as a baseline,
-   * but the final order is determined by the ranking service.
+   * Phase 1 (DB-driven, logged-in): Optimized 3-level query.
+   * L1: Compute each score ONCE (no repeated EXISTS). L2: rankScore as BIGINT, eligible from columns. L3: listType + cursor + ORDER + LIMIT.
+   * Matches WeightCalculatorRegistry and CourseEligibilityClassifier 1:1. rankScore is integer for cursor safety.
    */
-  private async getCandidateIds(params: PipelineParams): Promise<string[]> {
-    let query = this.dataSource
+  private async getRankedCandidatesDbDriven(
+    params: PipelineParams,
+    cursorScore: number | null,
+    cursorId: string | null,
+    limitPlusOne: number,
+  ): Promise<RankedCandidateRow[]> {
+    const leadId = params.context.normalizedProfile?.leadId;
+    if (!leadId) {
+      return [];
+    }
+
+    const rankingMode = params.context.rankingMode;
+    const listTypeEligible =
+      params.listType === ListType.ELIGIBLE_ONLY
+        ? true
+        : params.listType === ListType.INELIGIBLE_ONLY
+          ? false
+          : null;
+
+    // Academic: min degree first (degree exists AND (minGpa NULL OR gpa >= minGpa)); only if that fails, try higher degree (AcademicMatchWeightCalculator 1:1)
+    const academicExpr = `(CASE
+      WHEN :rankingMode <> '${RankingMode.ELIGIBILITY_PLUS_BUSINESS}' THEN 0
+      WHEN course."minSysDegreeId" IS NULL THEN ${ACADEMIC_WEIGHT}
+      WHEN EXISTS (
+        SELECT 1 FROM "LeadAcademicResults" lar
+        WHERE lar.lead_id = :leadId AND lar.degree_id = course."minSysDegreeId"
+        AND (course."minGpa" IS NULL OR CAST(lar.gpa AS DECIMAL) >= CAST(course."minGpa" AS DECIMAL))
+      ) THEN ${ACADEMIC_WEIGHT}
+      WHEN course."higherSysDegreeId" IS NOT NULL AND EXISTS (
+        SELECT 1 FROM "LeadAcademicResults" lar2
+        WHERE lar2.lead_id = :leadId AND lar2.degree_id = course."higherSysDegreeId"
+        AND (course."higherGpa" IS NULL OR CAST(lar2.gpa AS DECIMAL) >= CAST(course."higherGpa" AS DECIMAL))
+      ) THEN ${ACADEMIC_WEIGHT}
+      ELSE 0 END)`;
+
+    // English: no reqs → 3000; else any req satisfied (overallScore >= minOverallReq AND section check when minSectionReq exists)
+    const englishExpr = `(CASE
+      WHEN :rankingMode <> '${RankingMode.ELIGIBILITY_PLUS_BUSINESS}' THEN 0
+      WHEN NOT EXISTS (SELECT 1 FROM "CourseEngReq" cer WHERE cer."uniCourseId" = course.id) THEN ${ENGLISH_WEIGHT}
+      WHEN EXISTS (
+        SELECT 1 FROM "CourseEngReq" cer
+        INNER JOIN "LeadEnglishTestResults" letr ON letr."leadId" = :leadId AND letr."sysEngTestId" = cer."sysEngTestId"
+          AND CAST(letr."overallScore" AS DECIMAL) >= CAST(COALESCE(cer."minOverallReq", 0) AS DECIMAL)
+        WHERE cer."uniCourseId" = course.id
+        AND (
+          cer."minSectionReq" IS NULL
+          OR (
+            EXISTS (SELECT 1 FROM "LeadEnglishTestSectionResults" sec WHERE sec."resultId" = letr.id)
+            AND NOT EXISTS (
+              SELECT 1 FROM "LeadEnglishTestSectionResults" sec2
+              WHERE sec2."resultId" = letr.id
+              AND CAST(sec2."sectionScore" AS DECIMAL) < CAST(cer."minSectionReq" AS DECIMAL)
+            )
+          )
+        )
+      ) THEN ${ENGLISH_WEIGHT}
+      ELSE 0 END)`;
+
+    const preferenceExpr = `(CASE
+      WHEN :rankingMode <> '${RankingMode.ELIGIBILITY_PLUS_BUSINESS}' THEN 0
+      ELSE
+        (CASE WHEN EXISTS (SELECT 1 FROM "LeadPreferredCountries" lpc WHERE lpc.lead_id = :leadId AND lpc.country_id = uni."sysCountryId") THEN ${COUNTRY_PREFERENCE_WEIGHT} ELSE 0 END)
+        + (CASE WHEN EXISTS (SELECT 1 FROM "LeadPreferredPrograms" lpp WHERE lpp.lead_id = :leadId AND lpp.programme_id = course."sysProgrammeId") THEN ${PROGRAMME_PREFERENCE_WEIGHT} ELSE 0 END)
+      END)`;
+
+    const commissionExpr = `(CASE
+      WHEN COALESCE(uni."commissionType", '${CommissionType.AMOUNT}') = '${CommissionType.AMOUNT}'
+      THEN LEAST(COALESCE(CAST(uni.commission AS DECIMAL), 0), ${this.COMMISSION_MAX_WEIGHT})
+      ELSE LEAST(COALESCE(CAST(uni.commission AS DECIMAL), 0) * ${this.COMMISSION_MULTIPLIER}, ${this.COMMISSION_MAX_WEIGHT})
+      END)`;
+
+    // L1: scores computed once (no inlining)
+    let l1 = this.dataSource
       .createQueryBuilder(UniCourseIntakes, 'ci')
-      .select('ci.id', 'id')
+      .select('ci.id', 'courseIntakeId')
+      .addSelect(academicExpr, 'academicScore')
+      .addSelect(englishExpr, 'englishScore')
+      .addSelect(preferenceExpr, 'preferenceScore')
+      .addSelect(commissionExpr, 'commissionScore')
       .innerJoin('ci.UniCourse', 'course')
       .innerJoin('course.SysUniversity', 'uni')
       .innerJoin('uni.SysCountry', 'country')
       .innerJoin('ci.UniIntake', 'uniIntake')
       .innerJoin('uniIntake.SysIntake', 'sysIntake')
-      .where('ci.isActive = :isActive', { isActive: true });
+      .where('ci.isActive = :isActive', { isActive: true })
+      .setParameter('leadId', leadId)
+      .setParameter('rankingMode', rankingMode);
 
-    // Apply filters
-    query = this.applyFilters(query, params);
+    l1 = this.applyFilters(l1, params);
+    const l1Sql = l1.getQuery();
+    const l1Params = l1.getParameters();
 
-    // Default ordering (will be re-sorted by ranking in memory)
-    query
-      .orderBy('ci.createdAt', 'DESC')
-      .addOrderBy('ci.id', 'ASC')
-      .limit(this.CANDIDATE_LIMIT);
+    // L2: rankScore as BIGINT (deterministic cursor), eligible from columns
+    const l2Qb = this.dataSource
+      .createQueryBuilder()
+      .select('s1."courseIntakeId"', 'courseIntakeId')
+      .addSelect(
+        'CAST(s1."academicScore" + s1."englishScore" + s1."preferenceScore" + s1."commissionScore" AS BIGINT)',
+        'rankScore',
+      )
+      .addSelect(
+        '(s1."academicScore" > 0 AND s1."englishScore" > 0)',
+        'eligible',
+      )
+      .from(`(${l1Sql})`, 's1')
+      .setParameters(l1Params);
 
-    const results = await query.getRawMany<{ id: string }>();
-    return results.map((r) => r.id);
+    const l2Sql = l2Qb.getQuery();
+    const l2Params = l2Qb.getParameters();
+
+    // L3: listType (BEFORE LIMIT), cursor, ORDER BY rankScore DESC, courseIntakeId ASC, LIMIT+1
+    let l3 = this.dataSource
+      .createQueryBuilder()
+      .select('s2."courseIntakeId"', 'courseIntakeId')
+      .addSelect('s2."rankScore"', 'rankScore')
+      .addSelect('s2.eligible', 'eligible')
+      .from(`(${l2Sql})`, 's2')
+      .setParameters(l2Params);
+
+    if (listTypeEligible !== null) {
+      l3 = l3.andWhere('s2.eligible = :listTypeEligible', {
+        listTypeEligible,
+      });
+    }
+    if (cursorScore !== null && cursorId !== null) {
+      l3 = l3.andWhere(
+        '(s2."rankScore", s2."courseIntakeId") < (:cursorScore, :cursorId)',
+        { cursorScore: Math.floor(Number(cursorScore)), cursorId },
+      );
+    }
+    l3 = l3
+      .orderBy('s2."rankScore"', 'DESC')
+      .addOrderBy('s2."courseIntakeId"', 'ASC')
+      .limit(limitPlusOne);
+
+    const rows = await l3.getRawMany<{
+      courseIntakeId: string;
+      rankScore: string;
+      eligible: boolean;
+    }>();
+
+    return rows.map((r) => ({
+      courseIntakeId: r.courseIntakeId,
+      rankScore: parseInt(r.rankScore, 10) || 0,
+      isEligible: r.eligible,
+    }));
   }
 
   // =========================================================================
@@ -528,17 +700,15 @@ export class SearchPipelineExecutor {
       const r = params.ranges;
 
       if (r.tuitionFee?.min !== undefined) {
-        query.andWhere(
-          'CAST(ci.tuitionFee AS DECIMAL) >= :minTuitionFee',
-          { minTuitionFee: r.tuitionFee.min },
-        );
+        query.andWhere('CAST(ci.tuitionFee AS DECIMAL) >= :minTuitionFee', {
+          minTuitionFee: r.tuitionFee.min,
+        });
       }
 
       if (r.tuitionFee?.max !== undefined) {
-        query.andWhere(
-          'CAST(ci.tuitionFee AS DECIMAL) <= :maxTuitionFee',
-          { maxTuitionFee: r.tuitionFee.max },
-        );
+        query.andWhere('CAST(ci.tuitionFee AS DECIMAL) <= :maxTuitionFee', {
+          maxTuitionFee: r.tuitionFee.max,
+        });
       }
 
       if (r.durationMonths?.min !== undefined) {
@@ -566,26 +736,5 @@ export class SearchPipelineExecutor {
     }
 
     return query;
-  }
-
-  // =========================================================================
-  // Phase 3 Helpers
-  // =========================================================================
-
-  /**
-   * Filter courses by list type
-   */
-  private filterByListType(
-    courses: RankedCourse[],
-    listType: ListType,
-  ): RankedCourse[] {
-    switch (listType) {
-      case ListType.ELIGIBLE_ONLY:
-        return courses.filter((c) => c.isEligible);
-      case ListType.INELIGIBLE_ONLY:
-        return courses.filter((c) => !c.isEligible);
-      default:
-        return courses;
-    }
   }
 }

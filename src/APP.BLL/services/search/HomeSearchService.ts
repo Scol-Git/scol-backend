@@ -51,14 +51,19 @@ export class HomeSearchService {
       cursor: request.pagination?.cursor ? 'provided' : 'none',
     });
 
+    this.logger.LogDebug('Home Search Started : ', {
+      context: 'HomeSearchService.getHomeCourses',
+      listType: request.listType,
+      cursor: request.pagination?.cursor ? 'provided' : 'none',
+      userInfo: user,
+    });
+
     // 1. Resolve user context (cached for 2 minutes)
     const context = await this.contextResolver.resolve(user);
 
     this.logger.debug?.('Search context resolved', {
       context: 'HomeSearchService.getHomeCourses',
-      userState: context.userState,
-      formStatus: context.academicFormStatus,
-      rankingMode: context.rankingMode,
+      userContext: context,
     });
 
     // 2. Execute optimized search pipeline

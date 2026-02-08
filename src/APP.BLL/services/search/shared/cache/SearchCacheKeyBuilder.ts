@@ -4,6 +4,9 @@ import { SearchRangesDto } from '@shared/dtos/search/SearchRangesDto';
 import { SearchFlagsDto } from '@shared/dtos/search/SearchFlagsDto';
 import { ListType } from '@shared/enums/ListType.enum';
 import { RankingMode } from '@shared/enums/RankingMode.enum';
+import { UserState } from '@shared/enums/UserState.enum';
+import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
+import type { SearchContext } from '@shared/search/SearchTypes';
 
 /**
  * Search-specific cache key builder
@@ -64,6 +67,45 @@ export class SearchCacheKeyBuilder {
   }
 
   /**
+   * Build cache-relevant user context from SearchContext.
+   * Converts Maps/Sets to sorted arrays for deterministic cache key hashing.
+   */
+  static fromSearchContext(context: SearchContext): CacheRelevantUserContext {
+    const base = {
+      userState: context.userState,
+      academicFormStatus: context.academicFormStatus,
+      rankingMode: context.rankingMode,
+    };
+    const profile = context.normalizedProfile;
+    if (!profile) {
+      return base;
+    }
+    const academicResults = Array.from(profile.academicResultsByDegreeId.entries())
+      .map(([degreeId, r]) => ({ degreeId, gpa: r.gpa }))
+      .sort((a, b) => a.degreeId.localeCompare(b.degreeId));
+    const englishResults = Array.from(profile.englishResultsByTestId.entries())
+      .map(([testId, r]) => ({
+        testId,
+        overallScore: r.overallScore,
+        sectionScores: r.sectionScores.map((s) => ({
+          sectionId: s.sectionId,
+          score: s.score,
+        })),
+      }))
+      .sort((a, b) => a.testId.localeCompare(b.testId));
+    const preferredCountryIds = Array.from(profile.preferredCountryIds).sort();
+    const preferredProgrammeIds = Array.from(profile.preferredProgrammeIds).sort();
+    return {
+      ...base,
+      leadId: profile.leadId,
+      academicResults,
+      englishResults,
+      preferredCountryIds,
+      preferredProgrammeIds,
+    };
+  }
+
+  /**
    * Generate deterministic hash from search parameters
    *
    * Uses SHA-256 truncated to 16 chars for balance of:
@@ -73,6 +115,8 @@ export class SearchCacheKeyBuilder {
   private static hashSearchParams(params: SearchResultsKeyParams): string {
     // Normalize and sort for deterministic output
     const normalized = {
+      // Full user context: identity + all profile data that affects ranking/eligibility
+      uc: params.userContext,
       // Text search (lowercase for case-insensitive matching)
       t: params.searchText?.toLowerCase().trim() || null,
       // Filters (sorted for determinism)
@@ -170,9 +214,37 @@ export class SearchCacheKeyBuilder {
 }
 
 /**
+ * Serializable user context for cache key.
+ * Includes everything that affects search results (ranking/eligibility).
+ * Anonymous: userState, academicFormStatus, rankingMode only.
+ * Logged-in with profile: plus leadId and profile data (sorted arrays for deterministic hash).
+ */
+export interface CacheRelevantUserContext {
+  userState: UserState;
+  academicFormStatus: AcademicFormStatus;
+  rankingMode: RankingMode;
+  /** Set when user has a profile (logged-in, form complete or partial) */
+  leadId?: string | null;
+  /** Academic results sorted by degreeId for deterministic hash */
+  academicResults?: Array<{ degreeId: string; gpa: number }>;
+  /** English results sorted by testId for deterministic hash */
+  englishResults?: Array<{
+    testId: string;
+    overallScore: number;
+    sectionScores: Array<{ sectionId: string; score: number }>;
+  }>;
+  /** Sorted for deterministic hash */
+  preferredCountryIds?: string[];
+  /** Sorted for deterministic hash */
+  preferredProgrammeIds?: string[];
+}
+
+/**
  * Parameters for building search results cache key
  */
 export interface SearchResultsKeyParams {
+  /** Full user context so cached results are per-user and invalidate when profile/form changes */
+  userContext: CacheRelevantUserContext;
   /** Search text (optional) */
   searchText?: string;
   /** Filters (optional) */

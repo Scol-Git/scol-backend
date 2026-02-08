@@ -96,7 +96,10 @@ export class LeadProfileNormalizer {
    */
   static normalize(profile: LeadProfileData): NormalizedLeadProfile {
     // Index academic results by degree ID
-    const academicResultsByDegreeId = new Map<string, NormalizedAcademicResult>();
+    const academicResultsByDegreeId = new Map<
+      string,
+      NormalizedAcademicResult
+    >();
     for (const result of profile.academicResults) {
       academicResultsByDegreeId.set(result.degreeId, {
         degreeId: result.degreeId,
@@ -105,7 +108,10 @@ export class LeadProfileNormalizer {
     }
 
     // Index English test results by test ID
-    const englishResultsByTestId = new Map<string, NormalizedEnglishTestResult>();
+    const englishResultsByTestId = new Map<
+      string,
+      NormalizedEnglishTestResult
+    >();
     for (const result of profile.englishTestResults) {
       const sectionScores: NormalizedSectionScore[] = (
         result.LeadEnglishTestSectionResult ?? []
