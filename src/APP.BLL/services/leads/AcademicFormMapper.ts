@@ -4,6 +4,7 @@ import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
 import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { SysCountries } from '@entity/entities/SysCountries.entity';
 import { SysProgrammes } from '@entity/entities/SysProgrammes.entity';
+import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
 import { AcademicFormResponseDto } from '@shared/dtos/leads/AcademicFormResponseDto';
 import { DegreeResponseDto, DegreeValidationDto } from '@shared/dtos/leads/DegreeResponseDto';
 import {
@@ -28,6 +29,7 @@ export class AcademicFormMapper {
     allEnglishTests: SysEnglishTests[],
     allCountries: SysCountries[],
     allProgrammes: SysProgrammes[],
+    academicFormStatus: AcademicFormStatus,
   ): AcademicFormResponseDto {
     // Map degrees
     const degrees = this.mapDegrees(allDegrees, leadProfile);
@@ -48,6 +50,7 @@ export class AcademicFormMapper {
     );
 
     return {
+      academicFormStatus,
       degrees,
       englishTests,
       preferredCountries,

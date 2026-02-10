@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { LeadsModule } from '@bll/services/leads/LeadsModule.module';
+
 // Orchestrators
 import { HomeSearchService } from './HomeSearchService';
 import { CourseSearchService } from './CourseSearchService';
@@ -46,6 +48,7 @@ import { PreferenceMatchWeightCalculator } from './shared/ranking/calculators/Pr
  * for pluggable ranking system.
  */
 @Module({
+  imports: [LeadsModule],
   providers: [
     // =========================================================================
     // Orchestrators (public services)

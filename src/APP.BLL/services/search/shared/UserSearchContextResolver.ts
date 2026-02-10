@@ -15,6 +15,7 @@ import {
 import { SearchCacheKeyBuilder } from './cache/SearchCacheKeyBuilder';
 import { ILogger } from '@shared/interfaces';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
+import { LeadProfileService } from '@bll/services/leads/LeadProfileService';
 
 /**
  * Cacheable context (without Maps/Sets that don't survive JSON serialization)
@@ -56,6 +57,7 @@ export class UserSearchContextResolver {
     @Inject(ICacheToken)
     private readonly cache: ICacheService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
+    private readonly leadProfileService: LeadProfileService,
   ) {}
 
   /**
@@ -154,8 +156,9 @@ export class UserSearchContextResolver {
       };
     }
 
-    // Determine form status
-    const formStatus = this.determineFormStatus(leadProfile);
+    // Use same section-aware rule as auth/leads (single source of truth)
+    const formStatus =
+      await this.leadProfileService.determinedAcademicFormStatus(userId);
     const rankingMode = this.determineRankingMode(formStatus);
 
     // If form is incomplete (no data), treat same as "no profile"
@@ -185,23 +188,6 @@ export class UserSearchContextResolver {
       rankingMode,
       leadProfileData,
     };
-  }
-
-  /**
-   * Determine form completion status based on filled fields
-   */
-  private determineFormStatus(profile: {
-    LeadAcademicResult?: unknown[];
-    LeadEnglishTestResult?: unknown[];
-  }): AcademicFormStatus {
-    const hasAcademic = (profile.LeadAcademicResult?.length ?? 0) > 0;
-    const hasEnglishTest = (profile.LeadEnglishTestResult?.length ?? 0) > 0;
-    const fields = [hasAcademic, hasEnglishTest];
-    const filledCount = fields.filter(Boolean).length;
-
-    if (filledCount === 0) return AcademicFormStatus.INCOMPLETE;
-    if (filledCount === fields.length) return AcademicFormStatus.COMPLETED;
-    return AcademicFormStatus.PARTIALLY_COMPLETED;
   }
 
   /**

@@ -44,6 +44,7 @@ import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordReques
 
 // Response DTOs imports
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
+import { AuthResponseUserDto } from '@shared/dtos/auth/AuthResponseUserDto';
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
 import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
@@ -68,6 +69,7 @@ import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
   VerifyOtpRequestDto,
   LoginRequestDto,
   AuthResponseDto,
+  AuthResponseUserDto,
   TokenRefreshResponseDto,
   SuccessResponseDto,
   ErrorResponseDto,

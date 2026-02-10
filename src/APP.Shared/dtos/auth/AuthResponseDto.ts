@@ -1,23 +1,23 @@
 import { AutoMap } from '@automapper/classes';
 import { ApiProperty } from '@nestjs/swagger';
+import { AuthResponseUserDto } from './AuthResponseUserDto';
 
 /**
  * Auth Response DTO
  *
- * Response after successful authentication (login or OTP verification).
- * Contains access token, refresh token, and user information.
+ * Response after successful authentication (login, OTP verification, or reset-password verification).
+ * Contains user (userId + academicFormStatus), access token, and refresh token.
  */
 export class AuthResponseDto {
   /**
-   * User ID (UUID)
-   * @example "123e4567-e89b-12d3-a456-426614174000"
+   * User info (userId and academic form status for onboarding/eligibility UI)
    */
   @ApiProperty({
-    description: 'User ID (UUID)',
-    example: '123e4567-e89b-12d3-a456-426614174000',
+    description: 'User (userId and academic form status)',
+    type: AuthResponseUserDto,
   })
   @AutoMap()
-  userId!: string;
+  user!: AuthResponseUserDto;
 
   /**
    * Access token (JWT)
