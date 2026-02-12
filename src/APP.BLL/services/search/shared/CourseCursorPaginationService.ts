@@ -20,10 +20,17 @@ export class CourseCursorPaginationService {
    * Encode cursor from ranked course
    */
   encodeCursor(rankedCourse: RankedCourse): string {
-    const data: CursorData = {
-      rankScore: rankedCourse.rankScore,
-      courseIntakeId: rankedCourse.courseIntake.id,
-    };
+    return this.encodeCursorFromValues(
+      rankedCourse.rankScore,
+      rankedCourse.courseIntake.id,
+    );
+  }
+
+  /**
+   * Encode cursor from rankScore and courseIntakeId (e.g. when building from DB row)
+   */
+  encodeCursorFromValues(rankScore: number, courseIntakeId: string): string {
+    const data: CursorData = { rankScore, courseIntakeId };
     return Buffer.from(JSON.stringify(data)).toString('base64url');
   }
 
@@ -40,58 +47,24 @@ export class CourseCursorPaginationService {
   }
 
   /**
-   * Apply cursor pagination to ranked results
-   * @param rankedCourses - All ranked courses
-   * @param cursor - Cursor from previous page (optional)
-   * @param limit - Number of items per page
-   * @returns Paginated result with next cursor
+   * Build paginated result from an already-paginated list (e.g. from DB with LIMIT+1).
+   * No array slicing for cursor position; caller supplies exactly the page (or page+1 for hasNext).
+   *
+   * @param rankedCourses - Page of ranked courses (length = limit or limit+1)
+   * @param requestedLimit - Requested page size (will be clamped to getEffectiveLimit)
+   * @returns Paginated result with items trimmed to limit, nextCursor and hasNext
    */
-  applyPagination(
+  buildPaginatedResult(
     rankedCourses: RankedCourse[],
-    cursor?: string,
-    limit?: number,
+    requestedLimit?: number,
   ): PaginatedResult<RankedCourse> {
-    const effectiveLimit = Math.min(
-      limit ?? this.DEFAULT_LIMIT,
-      this.MAX_LIMIT,
-    );
-
-    let startIndex = 0;
-
-    if (cursor) {
-      const cursorData = this.decodeCursor(cursor);
-      if (cursorData) {
-        // Find the position after the cursor
-        // Courses are sorted by rankScore DESC, then by id ASC
-        startIndex = rankedCourses.findIndex((rc) => {
-          // Lower rank score = after cursor
-          if (rc.rankScore < cursorData.rankScore) {
-            return true;
-          }
-          // Same rank score: higher ID = after cursor
-          if (rc.rankScore === cursorData.rankScore) {
-            return rc.courseIntake.id > cursorData.courseIntakeId;
-          }
-          return false;
-        });
-
-        // If cursor not found, start from end (no more results)
-        if (startIndex === -1) {
-          startIndex = rankedCourses.length;
-        }
-      }
-    }
-
-    // Get items for this page
-    const items = rankedCourses.slice(startIndex, startIndex + effectiveLimit);
-    const hasNext = startIndex + effectiveLimit < rankedCourses.length;
-
-    // Generate next cursor if there are more results
+    const effectiveLimit = this.getEffectiveLimit(requestedLimit);
+    const items = rankedCourses.slice(0, effectiveLimit);
+    const hasNext = rankedCourses.length > effectiveLimit;
     const nextCursor =
       items.length > 0 && hasNext
         ? this.encodeCursor(items[items.length - 1])
         : null;
-
     return {
       items,
       cursor: nextCursor,
