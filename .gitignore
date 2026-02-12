@@ -59,4 +59,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 migrations/*
 dist/migrations/*
 
+# uploadUniCourse - ignore entire folder
+uploadUniCourse/
+
 # Note: package-lock.json is NOT ignored - it ensures reproducible builds
