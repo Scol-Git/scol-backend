@@ -125,8 +125,13 @@ export class SearchCacheKeyBuilder {
             c: params.filters.countryIds?.sort() || null,
             ci: params.filters.cityIds?.sort() || null,
             p: params.filters.programmeIds?.sort() || null,
-            i: params.filters.intakeIds?.sort() || null,
-            y: params.filters.intakeYear ?? null,
+            intake: params.filters.intake
+              ? {
+                  y: params.filters.intake.year ?? null,
+                  fm: params.filters.intake.fromMonth ?? null,
+                  tm: params.filters.intake.toMonth ?? null,
+                }
+              : null,
           }
         : null,
       // Ranges
@@ -179,7 +184,7 @@ export class SearchCacheKeyBuilder {
    * @returns Cache key string
    */
   static forFilterOptions(
-    filterType: 'countries' | 'cities' | 'programmes' | 'intakes',
+    filterType: 'countries' | 'cities' | 'programmes',
   ): string {
     return `${this.PREFIX}:${this.DOMAINS.FILTERS}:${filterType}`;
   }

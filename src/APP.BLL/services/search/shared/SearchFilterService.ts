@@ -75,17 +75,19 @@ export class SearchFilterService {
       });
     }
 
-    // Intake filter
-    if (filters.intakeIds?.length) {
-      query.andWhere('sysIntake.id IN (:...intakeIds)', {
-        intakeIds: filters.intakeIds,
-      });
-    }
+    // Intake filter (month range)
+    const intake = filters.intake;
+    if (
+      intake?.year != null &&
+      intake.fromMonth != null &&
+      intake.toMonth != null
+    ) {
+      const fromKey = intake.year * 12 + intake.fromMonth;
+      const toKey = intake.year * 12 + intake.toMonth;
 
-    // Intake year filter
-    if (filters.intakeYear !== undefined) {
-      query.andWhere('courseIntake.intakeYear = :intakeYear', {
-        intakeYear: filters.intakeYear,
+      query.andWhere('courseIntake.intakeKey BETWEEN :fromKey AND :toKey', {
+        fromKey,
+        toKey,
       });
     }
 

@@ -1,5 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsUUID, IsNumber, IsArray, IsOptional } from 'class-validator';
+import { IsUUID, IsArray, IsOptional, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IntakeMonthRangeDto } from './IntakeMonthRangeDto';
 
 /**
  * Filters for search/advanced search
@@ -36,20 +38,11 @@ export class SearchFiltersDto {
   programmeIds?: string[];
 
   @ApiPropertyOptional({
-    description: 'Filter by intake IDs',
-    type: [String],
-    example: ['uuid1', 'uuid2'],
+    description: 'Filter by intake month range (year, fromMonth, toMonth)',
+    type: IntakeMonthRangeDto,
   })
-  @IsArray()
-  @IsUUID('4', { each: true })
+  @ValidateNested()
+  @Type(() => IntakeMonthRangeDto)
   @IsOptional()
-  intakeIds?: string[];
-
-  @ApiPropertyOptional({
-    description: 'Filter by intake year',
-    example: 2026,
-  })
-  @IsNumber()
-  @IsOptional()
-  intakeYear?: number;
+  intake?: IntakeMonthRangeDto | null;
 }

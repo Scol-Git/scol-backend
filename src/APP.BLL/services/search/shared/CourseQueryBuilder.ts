@@ -30,9 +30,6 @@ export class CourseQueryBuilder {
         .innerJoinAndSelect('uni.SysCountry', 'country')
         .leftJoinAndSelect('uni.SysState', 'state')
         .leftJoinAndSelect('uni.SysCity', 'city')
-        // Intake info
-        .innerJoinAndSelect('courseIntake.UniIntake', 'uniIntake')
-        .innerJoinAndSelect('uniIntake.SysIntake', 'sysIntake')
         // Scholarships (only active)
         .leftJoinAndSelect(
           'courseIntake.CourseIntakeScholarship',

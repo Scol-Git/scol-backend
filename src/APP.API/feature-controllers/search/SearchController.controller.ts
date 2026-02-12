@@ -1,5 +1,10 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiExtraModels, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiExtraModels,
+  ApiBearerAuth,
+  ApiOperation,
+} from '@nestjs/swagger';
 
 // Guards
 import { OptionalJwtAuthGuard } from '@api/common/guards/OptionalJwtAuthGuard.guard';
@@ -17,6 +22,7 @@ import { CourseSearchService } from '@bll/services/search/CourseSearchService';
 import { SearchRequestDto } from '@shared/dtos/search/SearchRequestDto';
 import { AdvancedSearchRequestDto } from '@shared/dtos/search/AdvancedSearchRequestDto';
 import { SearchResponseDto } from '@shared/dtos/search/SearchResponseDto';
+import { AdvancedFiltersResponseDto } from '@shared/dtos/search/AdvancedFiltersResponseDto';
 import { CourseResultDto } from '@shared/dtos/search/CourseResultDto';
 import { CursorPaginationDto } from '@shared/dtos/search/CursorPaginationDto';
 import { SearchFiltersDto } from '@shared/dtos/search/SearchFiltersDto';
@@ -82,5 +88,17 @@ export class SearchController {
     @CurrentUser() user?: ICurrentUser,
   ): Promise<SearchResponseDto> {
     return this.courseSearchService.advancedSearch(request, user);
+  }
+
+  /**
+   * Get available filter options for advanced search
+   * GET /search/advanced/filters
+   *
+   * Returns available countries and programmes for filtering.
+   */
+  @Get('advanced/filters')
+  @ApiOperation({ summary: 'Get available filter options for advanced search' })
+  async getAdvancedFilters(): Promise<AdvancedFiltersResponseDto> {
+    return this.courseSearchService.getAdvancedFilters();
   }
 }
