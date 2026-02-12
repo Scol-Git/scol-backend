@@ -1,4 +1,4 @@
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
@@ -7,8 +7,12 @@ import { SysStates } from './SysStates.entity';
 /**
  * @class SysCountries
  * @extends {BaseEntity}
+ *
+ * **Search Indexes:**
+ * - countryName: Search pipeline ILIKE searchText
  */
 @Entity('sys_Countries')
+@Index('IX_SysCountries_countryName', ['countryName'])
 export class SysCountries extends BaseEntity {
   @Column({
     name: 'countryName',

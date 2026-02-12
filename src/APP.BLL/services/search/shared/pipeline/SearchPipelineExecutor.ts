@@ -35,7 +35,7 @@ import {
 } from '../cache/SearchCacheKeyBuilder';
 
 /**
- * Parameters for executing the search pipeline
+ * Parameters for executing the search pipeline.
  */
 export interface PipelineParams {
   searchText?: string;
@@ -49,16 +49,30 @@ export interface PipelineParams {
 }
 
 /**
- * Candidate with commission score (DB ranking)
+ * Pre-computed intake window bounds, calculated once per request.
+ * Stores both the raw year/month bounds (for index-friendly WHERE)
+ * and the integer key (for DISTINCT ON ordering only).
  */
+interface IntakeWindow {
+  /** Minimum year (inclusive). */
+  minYear: number;
+  /** Minimum month (inclusive, 1–12). */
+  minMonth: number;
+  /** Maximum year (inclusive). */
+  maxYear: number;
+  /** Maximum month (inclusive, 1–12). */
+  maxMonth: number;
+  /** Integer key for min bound (year*12+month) — used in DISTINCT ON ORDER BY only. */
+  nowKey: number;
+}
+
+/** Candidate with commission score (DB ranking). */
 interface CandidateWithScore {
   id: string;
   commissionScore: number;
 }
 
-/**
- * Row from DB-driven eligibility ranking (logged-in)
- */
+/** Row from DB-driven eligibility ranking (logged-in). */
 interface RankedCandidateRow {
   courseIntakeId: string;
   rankScore: number;
@@ -69,11 +83,24 @@ interface RankedCandidateRow {
 const COUNTRY_PREFERENCE_WEIGHT = 1500;
 const PROGRAMME_PREFERENCE_WEIGHT = 1500;
 
+/** Default horizon (months ahead) for next-intake rule. */
+const DEFAULT_MAX_MONTHS_AHEAD = 9;
+
+/** Quoted alias so PostgreSQL matches TypeORM-generated "sysIntake" (case-sensitive). */
+const INTAKE_MONTH_COL = '"sysIntake"."intakeMonth"';
+
+/** SQL expression: integer key for (year, month) comparison. */
+const INTAKE_MONTH_EXPR = `COALESCE(${INTAKE_MONTH_COL}, 1)`;
+const INTAKE_KEY_EXPR = `(COALESCE(ci.intakeYear, 0) * 12 + ${INTAKE_MONTH_EXPR})`;
+
 @Injectable()
 export class SearchPipelineExecutor {
   /** Commission constants */
   private readonly COMMISSION_MULTIPLIER = 100;
   private readonly COMMISSION_MAX_WEIGHT = 5000;
+
+  /** Max months ahead for next-intake window. */
+  private readonly maxMonthsAhead: number = DEFAULT_MAX_MONTHS_AHEAD;
 
   constructor(
     @InjectDataSource()
@@ -114,10 +141,11 @@ export class SearchPipelineExecutor {
       cacheKey,
       async () => {
         const useDbRanking = this.canUseDbRanking(params);
+        const intakeWindow = this.computeIntakeWindow();
 
         const result = useDbRanking
-          ? await this.executeWithDbRanking(params)
-          : await this.executeWithDbDrivenRanking(params);
+          ? await this.executeWithDbRanking(params, intakeWindow)
+          : await this.executeWithDbDrivenRanking(params, intakeWindow);
 
         this.logger.LogDebug('Pipeline execution complete', {
           context: 'SearchPipelineExecutor.execute',
@@ -132,6 +160,10 @@ export class SearchPipelineExecutor {
     );
   }
 
+  // =========================================================================
+  // DECISION HELPERS
+  // =========================================================================
+
   /**
    * DB Ranking applies when:
    * - BUSINESS_ONLY mode
@@ -144,9 +176,34 @@ export class SearchPipelineExecutor {
     );
   }
 
+  /** Whether to apply the next-intake horizon (no intake filters set by user). */
+  private shouldApplyNextIntakeRule(params: PipelineParams): boolean {
+    const f = params.filters;
+    return !f?.intakeIds?.length && f?.intakeYear === undefined;
+  }
+
   // =========================================================================
   // SHARED HELPERS
   // =========================================================================
+
+  /** Compute intake window bounds once per request. */
+  private computeIntakeWindow(): IntakeWindow {
+    const now = new Date();
+    const minYear = now.getFullYear();
+    const minMonth = now.getMonth() + 1; // 1-based
+
+    const maxKey = minYear * 12 + minMonth + this.maxMonthsAhead;
+    const maxYear = Math.floor((maxKey - 1) / 12);
+    const maxMonth = ((maxKey - 1) % 12) + 1;
+
+    return {
+      minYear,
+      minMonth,
+      maxYear,
+      maxMonth,
+      nowKey: minYear * 12 + minMonth,
+    };
+  }
 
   private getSqlPagination(params: PipelineParams): {
     effectiveLimit: number;
@@ -155,10 +212,7 @@ export class SearchPipelineExecutor {
     const effectiveLimit = this.paginationService.getEffectiveLimit(
       params.limit,
     );
-    return {
-      effectiveLimit,
-      limitPlusOne: effectiveLimit + 1,
-    };
+    return { effectiveLimit, limitPlusOne: effectiveLimit + 1 };
   }
 
   private getCursor(params: PipelineParams): {
@@ -173,6 +227,34 @@ export class SearchPipelineExecutor {
       cursorRank: cursorData?.rankScore ?? null,
       cursorCourseIntakeId: cursorData?.courseIntakeId ?? null,
     };
+  }
+
+  /** Formats raw SQL for readable debug logging. */
+  private formatSqlForLog(sql: string): string {
+    return sql
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\s+FROM\s+/gi, '\nFROM ')
+      .replace(/\s+WHERE\s+/gi, '\nWHERE ')
+      .replace(/\s+INNER JOIN\s+/gi, '\nINNER JOIN ')
+      .replace(/\s+LEFT JOIN\s+/gi, '\nLEFT JOIN ')
+      .replace(/\s+ORDER BY\s+/gi, '\nORDER BY ')
+      .replace(/\s+LIMIT\s+/gi, '\nLIMIT ')
+      .replace(/\s+AND\s+/gi, '\n  AND ')
+      .replace(/\s+OR\s+/gi, '\n  OR ');
+  }
+
+  private logCandidateSql(
+    label: string,
+    qb: SelectQueryBuilder<any>,
+    logContext: string,
+  ): void {
+    const sqlFormatted = this.formatSqlForLog(qb.getQuery());
+    const paramsJson = JSON.stringify(qb.getParameters(), null, 2);
+    this.logger.LogDebug(
+      `${label}\n\n${sqlFormatted}\n\nParams:\n${paramsJson}`,
+      { context: logContext },
+    );
   }
 
   private buildResponseFromCandidates(
@@ -202,13 +284,55 @@ export class SearchPipelineExecutor {
   }
 
   // =========================================================================
+  // SHARED QUERY BUILDER: base joins + filters + intake window
+  // =========================================================================
+
+  /**
+   * Builds the base query with:
+   *   1. Required joins (course, uni, country, uniIntake, sysIntake)
+   *   2. isActive filter
+   *   3. User-supplied filters
+   *   4. Intake horizon restriction (if applicable)
+   *
+   * NOTE: Does NOT apply DISTINCT ON or ORDER BY.
+   * Callers add SELECT columns, then apply dedup + ranking ordering.
+   */
+  private buildBaseQuery(
+    params: PipelineParams,
+    intakeWindow: IntakeWindow,
+  ): SelectQueryBuilder<UniCourseIntakes> {
+    let qb = this.dataSource
+      .createQueryBuilder(UniCourseIntakes, 'ci')
+      .innerJoin('ci.UniCourse', 'course')
+      .innerJoin('course.SysUniversity', 'uni')
+      .innerJoin('uni.SysCountry', 'country')
+      .innerJoin('ci.UniIntake', 'uniIntake')
+      .innerJoin('uniIntake.SysIntake', 'sysIntake')
+      .where('ci.isActive = true');
+
+    // --- User filters ---
+    qb = this.applySearchTextFilter(qb, params);
+    qb = this.applyLocationFilters(qb, params);
+    qb = this.applyProgrammeFilter(qb, params);
+    qb = this.applyIntakeFilters(qb, params);
+    qb = this.applyScholarshipFlag(qb, params);
+
+    // --- Intake horizon (WHERE only, no DISTINCT ON / ORDER BY) ---
+    if (this.shouldApplyNextIntakeRule(params)) {
+      qb = this.applyNextIntakeWindow(qb, intakeWindow);
+    }
+
+    return qb;
+  }
+
+  // =========================================================================
   // PATH 1: DB COMMISSION RANKING (BUSINESS_ONLY or missing leadId)
   // =========================================================================
 
   private async executeWithDbRanking(
     params: PipelineParams,
+    intakeWindow: IntakeWindow,
   ): Promise<SearchResponseDto> {
-    // BUSINESS_ONLY has no "ineligible" concept
     if (
       params.listType === ListType.INELIGIBLE_ONLY &&
       params.context.rankingMode === RankingMode.BUSINESS_ONLY
@@ -224,6 +348,7 @@ export class SearchPipelineExecutor {
 
     const candidates = await this.getCandidateIdsWithCommissionRanking(
       params,
+      intakeWindow,
       cursorRank,
       cursorCourseIntakeId,
       limitPlusOne,
@@ -257,46 +382,38 @@ export class SearchPipelineExecutor {
 
   private async getCandidateIdsWithCommissionRanking(
     params: PipelineParams,
+    intakeWindow: IntakeWindow,
     cursorRank: number | null,
     cursorCourseIntakeId: string | null,
     limitPlusOne: number,
   ): Promise<CandidateWithScore[]> {
     const commissionExpr = this.buildCommissionExpr();
+    const needsDedup = this.shouldApplyNextIntakeRule(params);
 
-    let qb = this.dataSource
-      .createQueryBuilder(UniCourseIntakes, 'ci')
-      .select('ci.id', 'id')
-      .addSelect(commissionExpr, 'commissionScore')
-      .innerJoin('ci.UniCourse', 'course')
-      .innerJoin('course.SysUniversity', 'uni')
-      .innerJoin('uni.SysCountry', 'country')
-      .innerJoin('ci.UniIntake', 'uniIntake')
-      .innerJoin('uniIntake.SysIntake', 'sysIntake')
-      .where('ci.isActive = true');
+    // --- Inner: filtered candidates + commission score ---
+    const innerQb = this.buildBaseQuery(params, intakeWindow);
+    innerQb.select('ci.id', 'id').addSelect(commissionExpr, 'commissionScore');
 
-    qb = this.applyFilters(qb, params);
-
-    const applyNextIntake = this.shouldApplyNextIntakeRule(params);
-    if (applyNextIntake) {
-      qb = this.applyNextIntakeWindow(qb, params);
+    if (needsDedup) {
+      innerQb
+        .distinctOn(['course.id'])
+        .orderBy('course.id', 'ASC')
+        .addOrderBy(INTAKE_KEY_EXPR, 'ASC');
     }
 
-    let sql = qb.getQuery();
-    const sqlParams = qb.getParameters();
+    // --- Outer: ranking + cursor + pagination ---
+    const innerSql = innerQb.getQuery();
+    const innerParams = innerQb.getParameters();
 
-    if (applyNextIntake) {
-      sql = this.wrapWithRnFilter(sql, 'sub.id, sub."commissionScore"');
-    }
-
-    let outer = this.dataSource
+    let rankQb = this.dataSource
       .createQueryBuilder()
       .select('sub.id', 'id')
       .addSelect('sub."commissionScore"', 'commissionScore')
-      .from(`(${sql})`, 'sub')
-      .setParameters(sqlParams);
+      .from(`(${innerSql})`, 'sub')
+      .setParameters(innerParams);
 
     if (cursorRank !== null && cursorCourseIntakeId !== null) {
-      outer = outer.andWhere(
+      rankQb = rankQb.andWhere(
         '(sub."commissionScore", sub.id) < (:cursorRank, :cursorCourseIntakeId)',
         {
           cursorRank: Math.floor(cursorRank),
@@ -305,12 +422,18 @@ export class SearchPipelineExecutor {
       );
     }
 
-    outer = outer
+    rankQb = rankQb
       .orderBy('sub."commissionScore"', 'DESC')
       .addOrderBy('sub.id', 'ASC')
       .limit(limitPlusOne);
 
-    const results = await outer.getRawMany<{
+    this.logCandidateSql(
+      'Candidate SQL for DB_RANKING',
+      rankQb,
+      'SearchPipelineExecutor.getCandidateIdsWithCommissionRanking',
+    );
+
+    const results = await rankQb.getRawMany<{
       id: string;
       commissionScore: string;
     }>();
@@ -327,12 +450,14 @@ export class SearchPipelineExecutor {
 
   private async executeWithDbDrivenRanking(
     params: PipelineParams,
+    intakeWindow: IntakeWindow,
   ): Promise<SearchResponseDto> {
     const { limitPlusOne } = this.getSqlPagination(params);
     const { cursorRank, cursorCourseIntakeId } = this.getCursor(params);
 
     const rows = await this.getRankedCandidatesDbDriven(
       params,
+      intakeWindow,
       cursorRank,
       cursorCourseIntakeId,
       limitPlusOne,
@@ -346,9 +471,7 @@ export class SearchPipelineExecutor {
     }
 
     const orderedIds = rows.map((r) => r.courseIntakeId);
-
     const hydrated = await this.hydrateByIdsPreservingOrder(orderedIds);
-
     const rowMap = new Map(rows.map((r) => [r.courseIntakeId, r]));
 
     const rankedCourses: RankedCourse[] = hydrated.map((ci) => {
@@ -369,6 +492,7 @@ export class SearchPipelineExecutor {
 
   private async getRankedCandidatesDbDriven(
     params: PipelineParams,
+    intakeWindow: IntakeWindow,
     cursorRank: number | null,
     cursorCourseIntakeId: string | null,
     limitPlusOne: number,
@@ -383,48 +507,51 @@ export class SearchPipelineExecutor {
           ? false
           : null;
 
+    const commissionExpr = this.buildCommissionExpr();
+    const preferenceExpr = this.buildPreferenceExpr();
     const academicExpr = this.buildAcademicEligibilityExpr();
     const englishExpr = this.buildEnglishEligibilityExpr();
-    const preferenceExpr = this.buildPreferenceExpr();
-    const commissionExpr = this.buildCommissionExpr();
+
+    const needsDedup = this.shouldApplyNextIntakeRule(params);
 
     // ---------------------------
-    // Layer 1: Eligibility + Raw Scores
+    // Layer 1: base + eligibility + raw scores (scalar only)
     // ---------------------------
-    let eligibilityQb = this.dataSource
-      .createQueryBuilder(UniCourseIntakes, 'ci')
+    const baseQb = this.buildBaseQuery(params, intakeWindow);
+
+    // Preference LEFT JOINs (replaces correlated EXISTS subqueries)
+    baseQb
+      .leftJoin(
+        'LeadPreferredCountries',
+        'lpc',
+        'lpc.lead_id = :leadId AND lpc.country_id = uni."sysCountryId"',
+      )
+      .leftJoin(
+        'LeadPreferredPrograms',
+        'lpp',
+        'lpp.lead_id = :leadId AND lpp.programme_id = course."sysProgrammeId"',
+      );
+
+    baseQb
       .select('ci.id', 'courseIntakeId')
       .addSelect(academicExpr, 'academicEligible')
       .addSelect(englishExpr, 'englishEligible')
       .addSelect(preferenceExpr, 'preferenceScore')
       .addSelect(commissionExpr, 'commissionScore')
-      .innerJoin('ci.UniCourse', 'course')
-      .innerJoin('course.SysUniversity', 'uni')
-      .innerJoin('uni.SysCountry', 'country')
-      .innerJoin('ci.UniIntake', 'uniIntake')
-      .innerJoin('uniIntake.SysIntake', 'sysIntake')
-      .where('ci.isActive = true')
       .setParameter('leadId', leadId);
 
-    eligibilityQb = this.applyFilters(eligibilityQb, params);
-
-    const applyNextIntake = this.shouldApplyNextIntakeRule(params);
-    if (applyNextIntake) {
-      eligibilityQb = this.applyNextIntakeWindow(eligibilityQb, params);
+    if (needsDedup) {
+      baseQb
+        .distinctOn(['course.id'])
+        .orderBy('course.id', 'ASC')
+        .addOrderBy(INTAKE_KEY_EXPR, 'ASC');
     }
 
-    let eligibilitySql = eligibilityQb.getQuery();
-    const eligibilityParams = eligibilityQb.getParameters();
-
-    if (applyNextIntake) {
-      eligibilitySql = this.wrapWithRnFilter(
-        eligibilitySql,
-        'sub."courseIntakeId", sub."academicEligible", sub."englishEligible", sub."preferenceScore", sub."commissionScore"',
-      );
-    }
+    const baseSql = baseQb.getQuery();
+    const baseParams = baseQb.getParameters();
 
     // ---------------------------
-    // Layer 2: Final RankScore + Eligible Flag
+    // Layer 2: rankScore + eligible flag
     // ---------------------------
     const scoringQb = this.dataSource
       .createQueryBuilder()
@@ -437,14 +564,14 @@ export class SearchPipelineExecutor {
         '(s1."academicEligible" > 0 AND s1."englishEligible" > 0)',
         'eligible',
       )
-      .from(`(${eligibilitySql})`, 's1')
-      .setParameters(eligibilityParams);
+      .from(`(${baseSql})`, 's1')
+      .setParameters(baseParams);
 
     const scoringSql = scoringQb.getQuery();
     const scoringParams = scoringQb.getParameters();
 
     // ---------------------------
-    // Layer 3: Paging + Cursor
+    // Layer 3: paging + cursor
     // ---------------------------
     let pagingQb = this.dataSource
       .createQueryBuilder()
@@ -475,6 +602,12 @@ export class SearchPipelineExecutor {
       .addOrderBy('s2."courseIntakeId"', 'ASC')
       .limit(limitPlusOne);
 
+    this.logCandidateSql(
+      'Candidate SQL for DB_DRIVEN_RANKING',
+      pagingQb,
+      'SearchPipelineExecutor.getRankedCandidatesDbDriven',
+    );
+
     const rows = await pagingQb.getRawMany<{
       courseIntakeId: string;
       rankScore: string;
@@ -503,21 +636,17 @@ export class SearchPipelineExecutor {
     END)`;
   }
 
+  /**
+   * Preference score expression using LEFT JOIN aliases (lpc, lpp).
+   * Callers must add the corresponding LEFT JOINs before using this expression.
+   */
   private buildPreferenceExpr(): string {
     return `(
-      (CASE WHEN EXISTS (
-        SELECT 1 FROM "LeadPreferredCountries" lpc
-        WHERE lpc.lead_id = :leadId
-          AND lpc.country_id = uni."sysCountryId"
-      ) THEN ${COUNTRY_PREFERENCE_WEIGHT} ELSE 0 END)
-
+      (CASE WHEN lpc.lead_id IS NOT NULL
+        THEN ${COUNTRY_PREFERENCE_WEIGHT} ELSE 0 END)
       +
-
-      (CASE WHEN EXISTS (
-        SELECT 1 FROM "LeadPreferredPrograms" lpp
-        WHERE lpp.lead_id = :leadId
-          AND lpp.programme_id = course."sysProgrammeId"
-      ) THEN ${PROGRAMME_PREFERENCE_WEIGHT} ELSE 0 END)
+      (CASE WHEN lpp.lead_id IS NOT NULL
+        THEN ${PROGRAMME_PREFERENCE_WEIGHT} ELSE 0 END)
     )`;
   }
 
@@ -574,7 +703,7 @@ export class SearchPipelineExecutor {
   }
 
   // =========================================================================
-  // HYDRATION
+  // HYDRATION (separate from ranking — loads full relations)
   // =========================================================================
 
   private async hydrateByIds(
@@ -613,7 +742,6 @@ export class SearchPipelineExecutor {
     orderedIds: string[],
   ): Promise<UniCourseIntakes[]> {
     const hydrated = await this.hydrateByIds(orderedIds);
-
     const byId = new Map(hydrated.map((c) => [c.id, c]));
 
     return orderedIds
@@ -622,119 +750,160 @@ export class SearchPipelineExecutor {
   }
 
   // =========================================================================
-  // NEXT INTAKE DEDUPLICATION
+  // NEXT INTAKE: horizon window (WHERE only)
   // =========================================================================
 
-  /** Quoted alias so PostgreSQL matches TypeORM-generated "sysIntake" (case-sensitive). */
-  private static readonly INTAKE_MONTH_COL = '"sysIntake"."intakeMonth"';
-
-  private shouldApplyNextIntakeRule(params: PipelineParams): boolean {
-    const f = params.filters;
-    return !f?.intakeIds?.length && f?.intakeYear === undefined;
-  }
-
+  /**
+   * Restricts to intakes within the future horizon using index-friendly
+   * year/month range logic (avoids computed expression in WHERE).
+   *
+   * Only adds WHERE clauses — no DISTINCT ON or ORDER BY.
+   * DISTINCT ON is applied by each ranking path's inner layer.
+   */
   private applyNextIntakeWindow(
     qb: SelectQueryBuilder<UniCourseIntakes>,
-    params: PipelineParams,
+    intakeWindow: IntakeWindow,
   ): SelectQueryBuilder<UniCourseIntakes> {
-    void params;
+    const intakeMonthExpr = INTAKE_MONTH_EXPR;
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
+    // Lower bound: (year > minYear) OR (year = minYear AND month >= minMonth)
+    qb.andWhere(
+      new Brackets((sub) => {
+        sub
+          .where('ci.intakeYear > :minYear', {
+            minYear: intakeWindow.minYear,
+          })
+          .orWhere(
+            new Brackets((inner) => {
+              inner
+                .where('ci.intakeYear = :minYear')
+                .andWhere(`${intakeMonthExpr} >= :minMonth`, {
+                  minMonth: intakeWindow.minMonth,
+                });
+            }),
+          );
+      }),
+    );
 
-    const intakeMonthExpr = `COALESCE(${SearchPipelineExecutor.INTAKE_MONTH_COL}, 1)`;
-
-    const isFutureExpr = `
-      (ci.intakeYear > :currentYear
-       OR (ci.intakeYear = :currentYear AND ${intakeMonthExpr} >= :currentMonth))
-    `;
-
-    const intakeKey = `(COALESCE(ci.intakeYear, 0) * 12 + ${intakeMonthExpr})`;
-
-    qb.setParameter('currentYear', currentYear);
-    qb.setParameter('currentMonth', currentMonth);
-
-    qb.addSelect(
-      `ROW_NUMBER() OVER (
-        PARTITION BY course.id
-        ORDER BY
-          (${isFutureExpr}) DESC,
-          CASE WHEN (${isFutureExpr}) THEN ${intakeKey} END ASC,
-          CASE WHEN NOT (${isFutureExpr}) THEN ${intakeKey} END DESC
-      )`,
-      'rn',
+    // Upper bound: (year < maxYear) OR (year = maxYear AND month <= maxMonth)
+    qb.andWhere(
+      new Brackets((sub) => {
+        sub
+          .where('ci.intakeYear < :maxYear', {
+            maxYear: intakeWindow.maxYear,
+          })
+          .orWhere(
+            new Brackets((inner) => {
+              inner
+                .where('ci.intakeYear = :maxYear')
+                .andWhere(`${intakeMonthExpr} <= :maxMonth`, {
+                  maxMonth: intakeWindow.maxMonth,
+                });
+            }),
+          );
+      }),
     );
 
     return qb;
   }
 
-  private wrapWithRnFilter(innerSql: string, selectList: string): string {
-    return `SELECT ${selectList} FROM (${innerSql}) sub WHERE sub.rn = 1`;
-  }
-
   // =========================================================================
-  // FILTERS
+  // FILTERS (split for readability — no logic change)
   // =========================================================================
 
-  private applyFilters(
-    query: SelectQueryBuilder<UniCourseIntakes>,
+  private applySearchTextFilter(
+    qb: SelectQueryBuilder<UniCourseIntakes>,
     params: PipelineParams,
   ): SelectQueryBuilder<UniCourseIntakes> {
-    if (params.searchText?.trim()) {
-      const pattern = `%${params.searchText.trim()}%`;
+    if (!params.searchText?.trim()) return qb;
 
-      query.andWhere(
-        new Brackets((qb) => {
-          qb.where('course.courseName ILIKE :pattern', { pattern })
-            .orWhere('uni.uniName ILIKE :pattern', { pattern })
-            .orWhere('country.countryName ILIKE :pattern', { pattern });
-        }),
-      );
-    }
+    const pattern = `%${params.searchText.trim()}%`;
 
+    qb.innerJoin('course.SysProgramme', 'programme');
+    qb.andWhere(
+      new Brackets((sub) => {
+        sub
+          .where('course.courseName ILIKE :pattern', { pattern })
+          .orWhere('uni.uniName ILIKE :pattern', { pattern })
+          .orWhere('country.countryName ILIKE :pattern', { pattern })
+          .orWhere('programme.name ILIKE :pattern', { pattern });
+      }),
+    );
+
+    return qb;
+  }
+
+  private applyLocationFilters(
+    qb: SelectQueryBuilder<UniCourseIntakes>,
+    params: PipelineParams,
+  ): SelectQueryBuilder<UniCourseIntakes> {
     const f = params.filters;
 
     if (f?.countryIds?.length) {
-      query.andWhere('uni.sysCountryId IN (:...countryIds)', {
+      qb.andWhere('uni.sysCountryId IN (:...countryIds)', {
         countryIds: f.countryIds,
       });
     }
 
     if (f?.cityIds?.length) {
-      query.andWhere('uni.sysCityId IN (:...cityIds)', {
+      qb.andWhere('uni.sysCityId IN (:...cityIds)', {
         cityIds: f.cityIds,
       });
     }
 
+    return qb;
+  }
+
+  private applyProgrammeFilter(
+    qb: SelectQueryBuilder<UniCourseIntakes>,
+    params: PipelineParams,
+  ): SelectQueryBuilder<UniCourseIntakes> {
+    const f = params.filters;
+
     if (f?.programmeIds?.length) {
-      query.andWhere('course.sysProgrammeId IN (:...programmeIds)', {
+      qb.andWhere('course.sysProgrammeId IN (:...programmeIds)', {
         programmeIds: f.programmeIds,
       });
     }
 
+    return qb;
+  }
+
+  private applyIntakeFilters(
+    qb: SelectQueryBuilder<UniCourseIntakes>,
+    params: PipelineParams,
+  ): SelectQueryBuilder<UniCourseIntakes> {
+    const f = params.filters;
+
     if (f?.intakeIds?.length) {
-      query.andWhere('sysIntake.id IN (:...intakeIds)', {
+      qb.andWhere('sysIntake.id IN (:...intakeIds)', {
         intakeIds: f.intakeIds,
       });
     }
 
     if (f?.intakeYear !== undefined) {
-      query.andWhere('ci.intakeYear = :intakeYear', {
+      qb.andWhere('ci.intakeYear = :intakeYear', {
         intakeYear: f.intakeYear,
       });
     }
 
-    if (params.flags?.hasScholarship === true) {
-      query.andWhere(
-        `EXISTS (
-          SELECT 1 FROM "CourseIntakeScholarships" sch
-          WHERE sch."courseIntakeId" = ci.id
-            AND sch."isActive" = true
-        )`,
-      );
-    }
+    return qb;
+  }
 
-    return query;
+  private applyScholarshipFlag(
+    qb: SelectQueryBuilder<UniCourseIntakes>,
+    params: PipelineParams,
+  ): SelectQueryBuilder<UniCourseIntakes> {
+    if (params.flags?.hasScholarship !== true) return qb;
+
+    qb.andWhere(
+      `EXISTS (
+        SELECT 1 FROM "CourseIntakeScholarships" sch
+        WHERE sch."courseIntakeId" = ci.id
+          AND sch."isActive" = true
+      )`,
+    );
+
+    return qb;
   }
 }

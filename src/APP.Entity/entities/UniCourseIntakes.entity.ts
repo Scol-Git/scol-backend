@@ -24,10 +24,12 @@ import { CourseIntakeScholarships } from './CourseIntakeScholarships.entity';
  * - courseDuration: Duration range queries
  * - createdAt: Default sorting (newest first)
  * - Composite (isActive, createdAt): Common query pattern
+ * - Composite (uniCourseId, intakeYear): Search pipeline next-intake horizon
  */
 @Entity('UniCourseIntakes')
 @Index('IX_UniCourseIntakes_isActive', ['isActive'])
 @Index('IX_UniCourseIntakes_uniCourseId', ['uniCourseId'])
+@Index('IX_UniCourseIntakes_uniCourseId_intakeYear', ['uniCourseId', 'intakeYear'])
 @Index('IX_UniCourseIntakes_uniIntakeId', ['uniIntakeId'])
 @Index('IX_UniCourseIntakes_intakeYear', ['intakeYear'])
 @Index('IX_UniCourseIntakes_courseDuration', ['courseDuration'])
