@@ -13,7 +13,6 @@ import {
 } from '@shared/dtos/search/CourseResultDto';
 import { CursorPaginationResponseDto } from '@shared/dtos/search/CursorPaginationDto';
 import { ListType } from '@shared/enums/ListType.enum';
-import { UniIntakes } from '@entity/entities/UniIntakes.entity';
 
 /**
  * Maps course entities to response DTOs
@@ -77,7 +76,6 @@ export class CourseResponseMapper {
     const courseIntake = rankedCourse.courseIntake;
     const course = courseIntake.UniCourse;
     const university = course?.SysUniversity;
-    const uniIntake = courseIntake.UniIntake;
     const scholarships = courseIntake.CourseIntakeScholarship ?? [];
     const engReqs = course?.CourseEngReq ?? [];
 
@@ -86,7 +84,7 @@ export class CourseResponseMapper {
       courseName: course?.courseName ?? '',
       university: this.toUniversityDto(university),
       imgUrl: university?.coverImageUrl ?? null,
-      intake: this.toIntakeDto(uniIntake, courseIntake.intakeYear),
+      intake: this.toIntakeDto(courseIntake.intakeMonth, courseIntake.intakeYear),
       tuitionFee:
         courseIntake.tuitionFee != null
           ? parseFloat(courseIntake.tuitionFee)
@@ -135,12 +133,27 @@ export class CourseResponseMapper {
   /**
    * Map to IntakeDto
    */
-  private toIntakeDto(uniIntake?: UniIntakes, intakeYear?: number): IntakeDto {
-    const intakeName =
-      uniIntake?.intakeName ?? uniIntake?.SysIntake?.name ?? 'Unknown';
+  private toIntakeDto(intakeMonth: number, intakeYear: number): IntakeDto {
+    const monthNames = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC',
+    ];
+
+    const monthName = monthNames[intakeMonth - 1] ?? 'UNK';
+
     return {
-      name: intakeYear ? `${intakeName} ${intakeYear}` : intakeName,
-      year: intakeYear ?? new Date().getFullYear(),
+      name: `${monthName} ${intakeYear}`,
+      year: intakeYear,
     };
   }
   /**

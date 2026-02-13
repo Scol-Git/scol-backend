@@ -11,7 +11,6 @@ import { BaseEntity } from './BaseEntity.template';
 import { SysCountries } from './SysCountries.entity';
 import { SysStates } from './SysStates.entity';
 import { SysCities } from './SysCities.entity';
-import { UniIntakes } from './UniIntakes.entity';
 import { UniCourses } from './UniCourses.entity';
 import { UniAcademicReq } from './UniAcademicReq.entity';
 import { UniEngReq } from './UniEngReq.entity';
@@ -166,13 +165,6 @@ export class SysUniversities extends BaseEntity {
   @ManyToOne(() => SysCities)
   @JoinColumn({ name: 'sysCityId' })
   SysCity?: SysCities;
-
-  /**
-   * One-to-Many: University intakes
-   * A university can have multiple intake periods
-   */
-  @OneToMany(() => UniIntakes, (uniIntake) => uniIntake.SysUniversity)
-  UniIntake!: UniIntakes[];
 
   /**
    * One-to-Many: University courses

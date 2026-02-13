@@ -5,6 +5,7 @@ import { OtpService } from './OtpService';
 import { TokenService } from './TokenService';
 import { OtpSessionCleanupService } from './OtpSessionCleanupService';
 import { MappingModule } from '@bll/mappings/MappingModule.module';
+import { LeadsModule } from '@bll/services/leads/LeadsModule.module';
 import { SmsModule } from '@infra/sms/SmsModule.module';
 
 /**
@@ -21,7 +22,7 @@ import { SmsModule } from '@infra/sms/SmsModule.module';
  * OTP cleanup is triggered via /internal/cron/otp-sessions endpoint by Vercel Cron.
  */
 @Module({
-  imports: [MappingModule, SmsModule],
+  imports: [MappingModule, LeadsModule, SmsModule],
   providers: [
     AuthService,
     AuthValidationService,

@@ -32,9 +32,7 @@ import { SysCities } from '@entity/entities/SysCities.entity';
 import { SysEnglishTestSections } from '@entity/entities/SysEnglishTestSections.entity';
 import { LeadEnglishTestResults } from '@entity/entities/LeadEnglishTestResults.entity';
 import { LeadEnglishTestSectionResults } from '@entity/entities/LeadEnglishTestSectionResults.entity';
-import { SysIntakes } from '@entity/entities/SysIntakes.entity';
 import { SysUniversities } from '@entity/entities/SysUniversities.entity';
-import { UniIntakes } from '@entity/entities/UniIntakes.entity';
 import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
@@ -80,9 +78,7 @@ import { AppDbContext } from './AppDbContext';
             SysEnglishTestSections,
             LeadEnglishTestResults,
             LeadEnglishTestSectionResults,
-            SysIntakes,
             SysUniversities,
-            UniIntakes,
             UniCourses,
             UniCourseIntakes,
             CourseIntakeScholarships,
@@ -126,9 +122,7 @@ import { AppDbContext } from './AppDbContext';
       SysEnglishTestSections,
       LeadEnglishTestResults,
       LeadEnglishTestSectionResults,
-      SysIntakes,
       SysUniversities,
-      UniIntakes,
       UniCourses,
       UniCourseIntakes,
       CourseIntakeScholarships,

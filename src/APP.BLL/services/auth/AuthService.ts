@@ -18,6 +18,7 @@ import { ISecurityConfig as ISecurityConfigToken } from '@shared/tokens/injectio
 import { OtpService } from './OtpService';
 import { TokenService } from './TokenService';
 import { AuthValidationService } from './AuthValidationService';
+import { LeadProfileService } from '@bll/services/leads/LeadProfileService';
 import { OtpPurpose } from '@entity/entities/OtpSession.entity';
 import { AuthResponseMapper } from '@bll/mappings/auth/AuthResponseMapper';
 import { UserResponseMapper } from '@bll/mappings/auth/UserResponseMapper';
@@ -68,6 +69,7 @@ export class AuthService {
     private readonly validation: AuthValidationService,
     private readonly authResponseMapper: AuthResponseMapper,
     private readonly userMapper: UserResponseMapper,
+    private readonly leadProfileService: LeadProfileService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
     @Inject(IApplicationConfigToken)
     private readonly appConfig: IApplicationConfig,
@@ -294,7 +296,14 @@ export class AuthService {
         action: 'VERIFY_OTP_PASSWORD_RESET_SUCCESS',
       });
 
-      return this.authResponseMapper.toAuthResponse(user, tokens, profile);
+      const academicFormStatus =
+        await this.leadProfileService.determinedAcademicFormStatus(user.id);
+      return this.authResponseMapper.toAuthResponse(
+        user,
+        tokens,
+        profile,
+        academicFormStatus,
+      );
     }
 
     // Handle registration flow (phone_verify)
@@ -434,10 +443,13 @@ export class AuthService {
         action: 'VERIFY_OTP_SUCCESS',
       });
 
+      const academicFormStatus =
+        await this.leadProfileService.determinedAcademicFormStatus(user.id);
       return this.authResponseMapper.toAuthResponse(
         user,
         tokens,
         result.profile,
+        academicFormStatus,
       );
     }
 
@@ -637,7 +649,14 @@ export class AuthService {
       action: 'LOGIN_SUCCESS',
     });
 
-    return this.authResponseMapper.toAuthResponse(user, tokens, profile);
+    const academicFormStatus =
+      await this.leadProfileService.determinedAcademicFormStatus(user.id);
+    return this.authResponseMapper.toAuthResponse(
+      user,
+      tokens,
+      profile,
+      academicFormStatus,
+    );
   }
 
   /**
@@ -713,7 +732,13 @@ export class AuthService {
       action: 'REFRESH_TOKEN_SUCCESS',
     });
 
+    const academicFormStatus =
+      await this.leadProfileService.determinedAcademicFormStatus(session.SysUser.id);
     return {
+      user: {
+        userId: session.SysUser.id,
+        academicFormStatus,
+      },
       accessToken: newAccessToken,
     };
   }

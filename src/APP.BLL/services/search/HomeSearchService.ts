@@ -44,7 +44,6 @@ export class HomeSearchService {
     request: HomeRequestDto,
     user?: ICurrentUser,
   ): Promise<SearchResponseDto> {
-
     this.logger.LogDebug('Home Search Started : ', {
       context: 'HomeSearchService.getHomeCourses',
       listType: request.listType,

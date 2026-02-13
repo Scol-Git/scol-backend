@@ -55,8 +55,8 @@ export class LeadProfileService {
       },
     });
 
-    // Get all master data for the form
-    const [allDegrees, allEnglishTests, allCountries, allProgrammes] =
+    // Get all master data for the form and academic form status
+    const [allDegrees, allEnglishTests, allCountries, allProgrammes, academicFormStatus] =
       await Promise.all([
         this.db.academicDegrees.find({ order: { levelOrder: 'ASC' } }),
         this.db.englishTests.find({
@@ -64,6 +64,7 @@ export class LeadProfileService {
         }),
         this.db.countries.find({ order: { countryName: 'ASC' } }),
         this.db.programmes.find({ order: { name: 'ASC' } }),
+        this.determinedAcademicFormStatus(userId),
       ]);
 
     return this.mapper.toAcademicFormResponse(
@@ -72,6 +73,7 @@ export class LeadProfileService {
       allEnglishTests,
       allCountries,
       allProgrammes,
+      academicFormStatus,
     );
   }
 
@@ -389,7 +391,97 @@ export class LeadProfileService {
   }
 
   /**
-   * Determine academic form status for a lead
+   * Academic form status for auth/search (2-field rule: academic + English only).
+   * English: if test has sections, all sections must be filled for that test to count as complete;
+   * if test has no sections, overall score filled is enough.
+   */
+  async determinedAcademicFormStatus(userId: string): Promise<AcademicFormStatus> {
+    const profile = await this.db.leadProfiles.findOne({
+      where: { userId },
+      relations: {
+        LeadAcademicResult: true,
+        LeadEnglishTestResult: {
+          SysEnglishTest: { SysEnglishTestSection: true },
+          LeadEnglishTestSectionResult: true,
+        },
+      },
+    });
+
+    if (!profile) {
+      return AcademicFormStatus.INCOMPLETE;
+    }
+
+    const hasAcademic = (profile.LeadAcademicResult?.length ?? 0) > 0;
+    const hasEnglishTest = this.isAnyEnglishTestFullyComplete(
+      profile.LeadEnglishTestResult ?? [],
+    );
+    const fields = [hasAcademic, hasEnglishTest];
+    const filledCount = fields.filter(Boolean).length;
+
+    if (filledCount === 0) return AcademicFormStatus.INCOMPLETE;
+    if (filledCount === fields.length) return AcademicFormStatus.COMPLETED;
+    return AcademicFormStatus.PARTIALLY_COMPLETED;
+  }
+
+  /**
+   * True if at least one English test result is "fully complete":
+   * - Test has no sections: overall score (or test date) filled is enough.
+   * - Test has sections: user must have filled all section scores for that test.
+   */
+  private isAnyEnglishTestFullyComplete(
+    results: Array<{
+      overallScore?: string | null;
+      SysEnglishTest?: {
+        SysEnglishTestSection?: Array<{ id: string }>;
+      } | null;
+      LeadEnglishTestSectionResult?: Array<{
+        sysEngTestSectionId: string;
+        sectionScore?: string | null;
+      }>;
+    }>,
+  ): boolean {
+    return results.some((r) => this.isOneEnglishTestFullyComplete(r));
+  }
+
+  private isOneEnglishTestFullyComplete(
+    result: {
+      overallScore?: string | null;
+      SysEnglishTest?: {
+        SysEnglishTestSection?: Array<{ id: string }>;
+      } | null;
+      LeadEnglishTestSectionResult?: Array<{
+        sysEngTestSectionId: string;
+        sectionScore?: string | null;
+      }>;
+    },
+  ): boolean {
+    const sections = result.SysEnglishTest?.SysEnglishTestSection ?? [];
+    const sectionResults = result.LeadEnglishTestSectionResult ?? [];
+
+    if (sections.length === 0) {
+      return (
+        (result.overallScore != null && String(result.overallScore).trim() !== '') ||
+        false
+      );
+    }
+
+    const requiredSectionIds = new Set(sections.map((s) => s.id));
+    const filledSectionIds = new Set(
+      sectionResults
+        .filter(
+          (sr) =>
+            sr.sectionScore != null && String(sr.sectionScore).trim() !== '',
+        )
+        .map((sr) => sr.sysEngTestSectionId),
+    );
+    return (
+      requiredSectionIds.size > 0 &&
+      [...requiredSectionIds].every((id) => filledSectionIds.has(id))
+    );
+  }
+
+  /**
+   * Determine full profile form status for a lead (4-field: academic, English, countries, programmes)
    */
   async getFormStatus(userId: string): Promise<AcademicFormStatus> {
     const profile = await this.db.leadProfiles.findOne({

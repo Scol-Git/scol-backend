@@ -1,13 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
 import { DegreeResponseDto } from './DegreeResponseDto';
 import { EnglishTestResponseDto } from './EnglishTestResponseDto';
 import { SelectableItemDto } from './SelectableItemDto';
 
 /**
- * Response DTO for GET /api/leads/profile/academic-form
- * Contains all form data with validation rules
+ * Response DTO for GET/PUT /api/leads/profile/academic-form
+ * Contains all form data with validation rules and academic form completion status
  */
 export class AcademicFormResponseDto {
+  @ApiProperty({
+    description: 'Academic form completion status (2-field: academic + English)',
+    enum: AcademicFormStatus,
+  })
+  academicFormStatus!: AcademicFormStatus;
+
   @ApiProperty({
     description: 'All available degrees with user saved values',
     type: [DegreeResponseDto],

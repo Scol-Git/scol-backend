@@ -36,9 +36,7 @@ import { OtpSession } from '@entity/entities/OtpSession.entity';
 import { SysUniversities } from '@entity/entities/SysUniversities.entity';
 import { SysStates } from '@entity/entities/SysStates.entity';
 import { SysCities } from '@entity/entities/SysCities.entity';
-import { SysIntakes } from '@entity/entities/SysIntakes.entity';
 import { UniCourses } from '@entity/entities/UniCourses.entity';
-import { UniIntakes } from '@entity/entities/UniIntakes.entity';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
 import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
@@ -140,14 +138,8 @@ export class AppDbContext {
     @InjectRepository(SysCities)
     public readonly cities: Repository<SysCities>,
 
-    @InjectRepository(SysIntakes)
-    public readonly intakes: Repository<SysIntakes>,
-
     @InjectRepository(UniCourses)
     public readonly courses: Repository<UniCourses>,
-
-    @InjectRepository(UniIntakes)
-    public readonly uniIntakes: Repository<UniIntakes>,
 
     @InjectRepository(UniCourseIntakes)
     public readonly courseIntakes: Repository<UniCourseIntakes>,

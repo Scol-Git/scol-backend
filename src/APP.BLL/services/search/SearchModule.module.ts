@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { LeadsModule } from '@bll/services/leads/LeadsModule.module';
+
 // Orchestrators
 import { HomeSearchService } from './HomeSearchService';
 import { CourseSearchService } from './CourseSearchService';
@@ -33,6 +35,7 @@ import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor
  * - Database indexes optimize Phase 1 candidate selection
  */
 @Module({
+  imports: [LeadsModule],
   providers: [
     // Orchestrators (public services)
     HomeSearchService,

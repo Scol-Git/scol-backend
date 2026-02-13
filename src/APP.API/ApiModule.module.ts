@@ -10,6 +10,7 @@ import { AuthModule } from './feature-controllers/auth/AuthModule.module';
 import { LeadsModule } from './feature-controllers/leads/LeadsModule.module';
 import { HomeModule } from './feature-controllers/home/HomeModule.module';
 import { SearchModule } from './feature-controllers/search/SearchModule.module';
+import { CategoriesModule } from './feature-controllers/categories/CategoriesModule.module';
 
 // Standalone controllers
 import { HealthController } from './feature-controllers/health/HealthController.controller';
@@ -38,6 +39,7 @@ import { HealthCheckModule } from '@bll/services/health/HealthCheckModule.module
     LeadsModule, // Lead profile endpoints (academic form)
     HomeModule, // Home page endpoint
     SearchModule, // Search endpoints
+    CategoriesModule, // Category endpoints (cities, etc.)
 
     // BLL modules for standalone controllers
     AuthBllModule, // For InternalCronController
