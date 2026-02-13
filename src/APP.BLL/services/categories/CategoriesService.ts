@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { IsNull } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { CitiesResponseDto } from '@shared/dtos/categories/CitiesResponseDto';
 
@@ -7,27 +6,27 @@ import { CitiesResponseDto } from '@shared/dtos/categories/CitiesResponseDto';
  * Categories Service
  *
  * Handles category-related business logic:
- * - Get cities by country/state
+ * - Get cities by country
  */
 @Injectable()
 export class CategoriesService {
   constructor(private readonly db: AppDbContext) {}
 
   /**
-   * Get cities by state
+   * Get cities by country
    *
-   * @param stateId - State ID (UUID)
-   * @returns List of cities in the state
+   * @param countryId - Country ID (UUID)
+   * @returns List of cities in the country
    */
-  async getCitiesByState(stateId: string): Promise<CitiesResponseDto> {
-    const cities = await this.db.cities.find({
-      select: ['id', 'cityName'],
-      where: {
-        sysStateId: stateId,
-        deletedAt: IsNull(),
-      },
-      order: { cityName: 'ASC' },
-    });
+  async getCitiesByCountry(countryId: string): Promise<CitiesResponseDto> {
+    const cities = await this.db.cities
+      .createQueryBuilder('city')
+      .innerJoin('city.SysState', 'state')
+      .where('state.sysCountryId = :countryId', { countryId })
+      .andWhere('city.deletedAt IS NULL')
+      .select(['city.id', 'city.cityName'])
+      .orderBy('city.cityName', 'ASC')
+      .getMany();
 
     return {
       cities: cities.map((c) => ({ id: c.id, name: c.cityName })),

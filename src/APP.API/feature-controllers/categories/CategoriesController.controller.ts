@@ -7,7 +7,7 @@ import { CitiesResponseDto } from '@shared/dtos/categories/CitiesResponseDto';
  * Categories Controller
  *
  * Handles category-related endpoints:
- * - GET /categories/cities - Get cities by state
+ * - GET /categories/cities - Get cities by country
  */
 @ApiTags('categories')
 @Controller('categories')
@@ -15,22 +15,22 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   /**
-   * Get cities by state
-   * GET /categories/cities?stateId=123
+   * Get cities by country
+   * GET /categories/cities?countryId=123
    *
-   * Returns all cities for a given state.
+   * Returns all cities for a given country.
    */
   @Get('cities')
-  @ApiOperation({ summary: 'Get cities by state' })
+  @ApiOperation({ summary: 'Get cities by country' })
   @ApiQuery({
-    name: 'stateId',
+    name: 'countryId',
     required: true,
-    description: 'State ID (UUID)',
+    description: 'Country ID (UUID)',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  async getCitiesByState(
-    @Query('stateId') stateId: string,
+  async getCitiesByCountry(
+    @Query('countryId') countryId: string,
   ): Promise<CitiesResponseDto> {
-    return this.categoriesService.getCitiesByState(stateId);
+    return await this.categoriesService.getCitiesByCountry(countryId);
   }
 }
