@@ -10,10 +10,65 @@ export class AcademicFormValidator {
   constructor(private readonly db: AppDbContext) {}
 
   /**
-   * Validate the entire academic form request
+   * Validate the entire academic form request.
+   * Option A: Every PUT must include at least one valid gpa + lastAcademicInstitute (non-empty) + preferredCountryIds (non-empty, max 3) + preferredProgrammeIds (non-empty, max 3).
    */
   async validateAcademicForm(dto: AcademicFormRequestDto): Promise<void> {
     const errors: string[] = [];
+
+    // Option A: require all four with valid values
+    const degreeIds = dto.academicResults?.map((r) => r.degreeId) ?? [];
+    const degrees =
+      degreeIds.length > 0
+        ? await this.db.academicDegrees.find({
+            where: degreeIds.map((id) => ({ id })),
+          })
+        : [];
+    const degreeMap = new Map(degrees.map((d) => [d.id, d]));
+    const hasValidGpa =
+      dto.academicResults?.some((r) => {
+        const degree = degreeMap.get(r.degreeId);
+        const scale = degree?.gpaScale ? parseFloat(degree.gpaScale) : 5;
+        const gpa = r.gpa;
+        return (
+          gpa != null &&
+          typeof gpa === 'number' &&
+          gpa > 0 &&
+          gpa <= scale
+        );
+      }) ?? false;
+    const hasLastInstitute =
+      dto.lastAcademicInstitute != null &&
+      String(dto.lastAcademicInstitute).trim() !== '';
+    const hasCountries =
+      Array.isArray(dto.preferredCountryIds) &&
+      dto.preferredCountryIds.length > 0 &&
+      dto.preferredCountryIds.length <= 3;
+    const hasProgrammes =
+      Array.isArray(dto.preferredProgrammeIds) &&
+      dto.preferredProgrammeIds.length > 0 &&
+      dto.preferredProgrammeIds.length <= 3;
+
+    if (!hasValidGpa) {
+      errors.push(
+        'At least one academic result with valid GPA (greater than 0 and within degree scale) is required',
+      );
+    }
+    if (hasValidGpa && !hasLastInstitute) {
+      errors.push(
+        'lastAcademicInstitute is required and must be non-empty when at least one valid GPA is provided',
+      );
+    }
+    if (!hasCountries) {
+      errors.push(
+        'preferredCountryIds is required, must be non-empty and contain at most 3 valid UUIDs',
+      );
+    }
+    if (!hasProgrammes) {
+      errors.push(
+        'preferredProgrammeIds is required, must be non-empty and contain at most 3 valid UUIDs',
+      );
+    }
 
     // Validate degree IDs exist
     if (dto.academicResults?.length) {

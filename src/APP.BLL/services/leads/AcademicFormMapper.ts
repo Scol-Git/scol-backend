@@ -6,192 +6,258 @@ import { SysCountries } from '@entity/entities/SysCountries.entity';
 import { SysProgrammes } from '@entity/entities/SysProgrammes.entity';
 import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
 import { AcademicFormResponseDto } from '@shared/dtos/leads/AcademicFormResponseDto';
-import { DegreeResponseDto, DegreeValidationDto } from '@shared/dtos/leads/DegreeResponseDto';
-import {
-  EnglishTestResponseDto,
-  EnglishTestSectionScoreDto,
-  EnglishTestValidationDto,
-  EnglishTestSectionValidationDto,
-} from '@shared/dtos/leads/EnglishTestResponseDto';
-import { SelectableItemDto } from '@shared/dtos/leads/SelectableItemDto';
+import { AcademicResultItemDto } from '@shared/dtos/leads/AcademicResultItemDto';
+import { EnglishTestResultItemDto } from '@shared/dtos/leads/EnglishTestResultItemDto';
+import { EnglishTestSectionItemDto } from '@shared/dtos/leads/EnglishTestSectionItemDto';
+import { PreferredCountryItemDto } from '@shared/dtos/leads/PreferredCountryItemDto';
+import { PreferredProgrammeItemDto } from '@shared/dtos/leads/PreferredProgrammeItemDto';
+
+const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
 
 /**
- * Maps entities to Academic Form response DTOs
+ * Maps entities to Academic Form response DTO.
+ * academicResults = always 4 items (system degrees levelOrder 1-4); englishTestResults = all system tests;
+ * preferredCountries / preferredProgrammes = full lists with selected flag.
  */
 @Injectable()
 export class AcademicFormMapper {
   /**
-   * Map all data to AcademicFormResponseDto
+   * Map lead profile and system data to AcademicFormResponseDto.
    */
   toAcademicFormResponse(
     leadProfile: SysLeadProfiles | null,
-    allDegrees: SysAcademicDegrees[],
-    allEnglishTests: SysEnglishTests[],
-    allCountries: SysCountries[],
-    allProgrammes: SysProgrammes[],
     academicFormStatus: AcademicFormStatus,
+    systemDegrees: SysAcademicDegrees[],
+    systemEnglishTests: SysEnglishTests[],
+    systemCountries: SysCountries[],
+    systemProgrammes: SysProgrammes[],
   ): AcademicFormResponseDto {
-    // Map degrees
-    const degrees = this.mapDegrees(allDegrees, leadProfile);
-
-    // Map English tests
-    const englishTests = this.mapEnglishTests(allEnglishTests, leadProfile);
-
-    // Map preferred countries
-    const preferredCountries = this.mapCountries(
-      allCountries,
-      leadProfile?.LeadPreferredCountry?.map((pc) => pc.countryId) ?? [],
+    const academicResults = this.mapAcademicResults(
+      leadProfile,
+      systemDegrees,
     );
-
-    // Map preferred programs
-    const preferredPrograms = this.mapProgrammes(
-      allProgrammes,
-      leadProfile?.LeadPreferredProgram?.map((pp) => pp.programmeId) ?? [],
+    const englishTestResults = this.mapEnglishTestResults(
+      leadProfile,
+      systemEnglishTests,
     );
+    const preferredCountries = this.mapPreferredCountries(
+      leadProfile,
+      systemCountries,
+    );
+    const preferredProgrammes = this.mapPreferredProgrammes(
+      leadProfile,
+      systemProgrammes,
+    );
+    const lastAcademicInstitute = this.deriveLastAcademicInstitute(leadProfile);
 
     return {
       academicFormStatus,
-      degrees,
-      englishTests,
+      academicResults,
+      englishTestResults,
       preferredCountries,
-      preferredPrograms,
+      preferredProgrammes,
+      lastAcademicInstitute,
     };
   }
 
-  /**
-   * Map degrees with user's saved values
-   */
-  private mapDegrees(
-    allDegrees: SysAcademicDegrees[],
+  private mapAcademicResults(
     leadProfile: SysLeadProfiles | null,
-  ): DegreeResponseDto[] {
-    return allDegrees.map((degree) => {
-      // Find user's result for this degree
-      const userResult = leadProfile?.LeadAcademicResult?.find(
-        (r) => r.degreeId === degree.id,
-      );
+    systemDegrees: SysAcademicDegrees[],
+  ): AcademicResultItemDto[] {
+    const results = leadProfile?.LeadAcademicResult ?? [];
+    const byDegreeId = new Map(
+      results.map((r) => [r.degreeId, r] as const),
+    );
 
-      const validation: DegreeValidationDto = {
-        gpaScale: degree.gpaScale ? parseFloat(degree.gpaScale) : 5,
-      };
+    return systemDegrees.map((degree) => {
+      const r = byDegreeId.get(degree.id);
+      if (!r) {
+        return {
+          degreeId: degree.id,
+          degreeName: degree.degreeName,
+          gpa: null,
+          institute: null,
+          passingDate: null,
+          gpaFilled: false,
+          instituteFilled: false,
+          passingDateFilled: false,
+        };
+      }
+      const gpaScale = degree.gpaScale
+        ? parseFloat(degree.gpaScale)
+        : 5;
+      const gpaVal =
+        r.gpa != null && String(r.gpa).trim() !== ''
+          ? parseFloat(r.gpa)
+          : null;
+      const validGpa =
+        gpaVal != null && gpaVal > 0 && gpaVal <= gpaScale;
+      const instituteVal =
+        r.institute != null && String(r.institute).trim() !== ''
+          ? r.institute
+          : null;
+      const passingDateVal = r.passingDate
+        ? this.formatDate(r.passingDate)
+        : null;
 
       return {
-        degreeId: degree.id,
-        name: degree.degreeName,
-        gpa: userResult?.gpa ? parseFloat(userResult.gpa) : undefined,
-        institute: userResult?.institute || undefined,
-        passingDate: userResult?.passingDate
-          ? this.formatDate(userResult.passingDate)
-          : undefined,
-        validation,
+        degreeId: r.degreeId,
+        degreeName: degree.degreeName,
+        gpa: gpaVal,
+        institute: instituteVal,
+        passingDate: passingDateVal,
+        gpaFilled: validGpa,
+        instituteFilled: instituteVal != null,
+        passingDateFilled: passingDateVal != null,
       };
     });
   }
 
-  /**
-   * Map English tests with user's saved values
-   */
-  private mapEnglishTests(
-    allTests: SysEnglishTests[],
+  private mapEnglishTestResults(
     leadProfile: SysLeadProfiles | null,
-  ): EnglishTestResponseDto[] {
-    return allTests.map((test) => {
-      // Find user's result for this test
-      const userResult = leadProfile?.LeadEnglishTestResult?.find(
-        (r) => r.sysEngTestId === test.id,
-      );
+    systemEnglishTests: SysEnglishTests[],
+  ): EnglishTestResultItemDto[] {
+    const results = leadProfile?.LeadEnglishTestResult ?? [];
+    const byTestId = new Map(results.map((r) => [r.sysEngTestId, r] as const));
 
-      // Map sections with scores (use SysEnglishTestSection navigation property)
-      const sections: EnglishTestSectionScoreDto[] = (test.SysEnglishTestSection ?? []).map(
-        (section) => {
-          const userSectionResult = userResult?.LeadEnglishTestSectionResult?.find(
-            (sr) => sr.sysEngTestSectionId === section.id,
+    return systemEnglishTests.map((test) => {
+      const r = byTestId.get(test.id);
+      const sections = (test as any).SysEnglishTestSection ?? [];
+
+      if (!r) {
+        return {
+          testId: test.id,
+          testName: test.testName,
+          overallScore: null,
+          testDate: null,
+          overallScoreFilled: false,
+          testDateFilled: false,
+          sections: sections.map((section: any) => ({
+            id: section.id,
+            name: section.sectionName,
+            score: null,
+            scoreFilled: false,
+          })),
+        };
+      }
+
+      const maxScore = test.maxScore ? parseFloat(test.maxScore) : 9;
+      const overallVal =
+        r.overallScore != null && String(r.overallScore).trim() !== ''
+          ? parseFloat(r.overallScore)
+          : null;
+      const validOverall =
+        overallVal != null && overallVal > 0 && overallVal <= maxScore;
+      const testDateVal = r.testDate
+        ? this.formatDate(r.testDate)
+        : null;
+
+      const sectionDtos: EnglishTestSectionItemDto[] = sections.map(
+        (section: any) => {
+          const sectionResult = (r.LeadEnglishTestSectionResult ?? []).find(
+            (sr: any) => sr.sysEngTestSectionId === section.id,
           );
-
+          const sectionMax = section?.maxScore
+            ? parseFloat(section.maxScore)
+            : 9;
+          const scoreVal =
+            sectionResult?.sectionScore != null &&
+            String(sectionResult.sectionScore).trim() !== ''
+              ? parseFloat(sectionResult.sectionScore)
+              : null;
+          const validScore =
+            scoreVal != null && scoreVal > 0 && scoreVal <= sectionMax;
           return {
             id: section.id,
             name: section.sectionName,
-            score: userSectionResult?.sectionScore
-              ? parseFloat(userSectionResult.sectionScore)
-              : undefined,
+            score: scoreVal,
+            scoreFilled: validScore,
           };
         },
       );
 
-      // Build validation
-      const validation: EnglishTestValidationDto = {
-        maxScore: test.maxScore ? parseFloat(test.maxScore) : 9,
-        sections: (test.SysEnglishTestSection ?? []).map(
-          (section): EnglishTestSectionValidationDto => ({
-            id: section.id,
-            name: section.sectionName,
-            maxScore: section.maxScore ? parseFloat(section.maxScore) : 9,
-          }),
-        ),
-      };
-
       return {
-        testId: test.id,
+        testId: r.sysEngTestId,
         testName: test.testName,
-        overallScore: userResult?.overallScore
-          ? parseFloat(userResult.overallScore)
-          : undefined,
-        testDate: userResult?.testDate
-          ? this.formatDate(userResult.testDate)
-          : undefined,
-        sections,
-        validation,
+        overallScore: overallVal,
+        testDate: testDateVal,
+        overallScoreFilled: validOverall,
+        testDateFilled: testDateVal != null,
+        sections: sectionDtos,
       };
     });
   }
 
-  /**
-   * Map countries with selection state
-   */
-  private mapCountries(
-    allCountries: SysCountries[],
-    selectedIds: string[],
-  ): SelectableItemDto[] {
-    const selectedSet = new Set(selectedIds);
+  private mapPreferredCountries(
+    leadProfile: SysLeadProfiles | null,
+    systemCountries: SysCountries[],
+  ): PreferredCountryItemDto[] {
+    const selectedIds = new Set(
+      leadProfile?.LeadPreferredCountry?.map((pc) => pc.countryId) ?? [],
+    );
+    return systemCountries.map((c) => ({
+      id: c.id,
+      name: c.countryName,
+      selected: selectedIds.has(c.id),
+    }));
+  }
 
-    return allCountries.map((country) => ({
-      id: country.id,
-      name: country.countryName,
-      selected: selectedSet.has(country.id),
+  private mapPreferredProgrammes(
+    leadProfile: SysLeadProfiles | null,
+    systemProgrammes: SysProgrammes[],
+  ): PreferredProgrammeItemDto[] {
+    const selectedIds = new Set(
+      leadProfile?.LeadPreferredProgram?.map((pp) => pp.programmeId) ?? [],
+    );
+    return systemProgrammes.map((p) => ({
+      id: p.id,
+      name: p.name,
+      selected: selectedIds.has(p.id),
     }));
   }
 
   /**
-   * Map programmes with selection state
+   * lastAcademicInstitute = institute of the academic result whose degree has the highest levelOrder (1-4) with valid GPA. If none, null.
    */
-  private mapProgrammes(
-    allProgrammes: SysProgrammes[],
-    selectedIds: string[],
-  ): SelectableItemDto[] {
-    const selectedSet = new Set(selectedIds);
+  private deriveLastAcademicInstitute(
+    leadProfile: SysLeadProfiles | null,
+  ): string | null {
+    const results = leadProfile?.LeadAcademicResult ?? [];
+    const withDegree = results
+      .map((r) => {
+        const degree = (r as any).SysAcademicDegree;
+        const order =
+          degree?.levelOrder != null ? Number(degree.levelOrder) : null;
+        if (order == null || !LEVEL_ORDER_1_4.has(order)) return null;
+        const gpaScale = degree?.gpaScale
+          ? parseFloat(degree.gpaScale)
+          : 5;
+        const gpaVal =
+          r.gpa != null && String(r.gpa).trim() !== ''
+            ? parseFloat(r.gpa)
+            : null;
+        const valid = gpaVal != null && gpaVal > 0 && gpaVal <= gpaScale;
+        if (!valid) return null;
+        const institute =
+          r.institute != null && String(r.institute).trim() !== ''
+            ? r.institute
+            : null;
+        return { levelOrder: order, institute };
+      })
+      .filter(
+        (x): x is { levelOrder: number; institute: string | null } => x != null,
+      );
 
-    return allProgrammes.map((programme) => ({
-      id: programme.id,
-      name: programme.name,
-      selected: selectedSet.has(programme.id),
-    }));
+    if (withDegree.length === 0) return null;
+    const highest = withDegree.reduce((a, b) =>
+      a.levelOrder > b.levelOrder ? a : b,
+    );
+    return highest.institute;
   }
 
-  /**
-   * Format date to ISO string (YYYY-MM-DD)
-   *
-   * Handles both Date objects and string values from database.
-   * Some database drivers return date columns as strings.
-   */
   private formatDate(date: Date | string): string {
-    if (typeof date === 'string') {
-      // Already a string - extract date part if it's ISO format
-      return date.split('T')[0];
-    }
-    if (date instanceof Date) {
-      return date.toISOString().split('T')[0];
-    }
-    // Fallback: try to parse as date
+    if (typeof date === 'string') return date.split('T')[0];
+    if (date instanceof Date) return date.toISOString().split('T')[0];
     return new Date(date).toISOString().split('T')[0];
   }
 }

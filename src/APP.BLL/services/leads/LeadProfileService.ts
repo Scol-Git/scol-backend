@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ILogger } from '@shared/interfaces/logging';
 import type { ICacheService } from '@shared/interfaces/infrastructure';
@@ -17,7 +17,11 @@ import { LeadEnglishTestResults } from '@entity/entities/LeadEnglishTestResults.
 import { LeadEnglishTestSectionResults } from '@entity/entities/LeadEnglishTestSectionResults.entity';
 import { LeadPreferredCountries } from '@entity/entities/LeadPreferredCountries.entity';
 import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.entity';
+import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
+import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { SearchCacheKeyBuilder } from '../search/shared/cache/SearchCacheKeyBuilder';
+
+const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
 
 /**
  * Service for managing lead academic profile
@@ -33,7 +37,8 @@ export class LeadProfileService {
   ) {}
 
   /**
-   * GET Academic Form - Returns all form data with validation rules
+   * GET Academic Form - Returns all form data with validation rules.
+   * Loads system degrees (levelOrder 1-4), English tests, countries, programmes for full-list response.
    */
   async getAcademicForm(userId: string): Promise<AcademicFormResponseDto> {
     this.logger.info('Getting academic form', {
@@ -41,39 +46,40 @@ export class LeadProfileService {
       userId,
     });
 
-    // Get lead profile with all related data
-    const leadProfile = await this.db.leadProfiles.findOne({
-      where: { userId },
-      relations: {
-        LeadAcademicResult: { SysAcademicDegree: true },
-        LeadEnglishTestResult: {
-          SysEnglishTest: true,
-          LeadEnglishTestSectionResult: { SysEnglishTestSection: true },
-        },
-        LeadPreferredCountry: true,
-        LeadPreferredProgram: true,
-      },
-    });
-
-    // Get all master data for the form and academic form status
-    const [allDegrees, allEnglishTests, allCountries, allProgrammes, academicFormStatus] =
+    const [leadProfile, systemDegrees, systemEnglishTests, systemCountries, systemProgrammes] =
       await Promise.all([
-        this.db.academicDegrees.find({ order: { levelOrder: 'ASC' } }),
+        this.db.leadProfiles.findOne({
+          where: { userId },
+          relations: {
+            LeadAcademicResult: { SysAcademicDegree: true },
+            LeadEnglishTestResult: {
+              SysEnglishTest: { SysEnglishTestSection: true },
+              LeadEnglishTestSectionResult: { SysEnglishTestSection: true },
+            },
+            LeadPreferredCountry: true,
+            LeadPreferredProgram: true,
+          },
+        }),
+        this.db.academicDegrees.find({
+          where: { levelOrder: In([1, 2, 3, 4]) },
+          order: { levelOrder: 'ASC' },
+        }),
         this.db.englishTests.find({
           relations: { SysEnglishTestSection: true },
         }),
-        this.db.countries.find({ order: { countryName: 'ASC' } }),
-        this.db.programmes.find({ order: { name: 'ASC' } }),
-        this.determinedAcademicFormStatus(userId),
+        this.db.countries.find(),
+        this.db.programmes.find(),
       ]);
+
+    const academicFormStatus = await this.determinedAcademicFormStatus(userId);
 
     return this.mapper.toAcademicFormResponse(
       leadProfile,
-      allDegrees,
-      allEnglishTests,
-      allCountries,
-      allProgrammes,
       academicFormStatus,
+      systemDegrees,
+      systemEnglishTests,
+      systemCountries,
+      systemProgrammes,
     );
   }
 
@@ -131,10 +137,11 @@ export class LeadProfileService {
   }
 
   /**
-   * Save academic form data within a transaction (UPSERT strategy)
-   *
-   * Only processes fields that are provided in the request.
-   * Fields not provided are left untouched.
+   * Save academic form data within a transaction.
+   * Option A: academic + lastAcademicInstitute + preferredCountryIds + preferredProgrammeIds are required (validated before).
+   * Academic: only valid gpa (levelOrder 1-4); highest levelOrder gets lastAcademicInstitute; others institute null; invalid payload leaves existing as-is.
+   * English: persist only when overall + all section scores valid.
+   * Preferred: replace entire selection (max 3).
    */
   private async saveAcademicFormInTransaction(
     manager: EntityManager,
@@ -147,83 +154,146 @@ export class LeadProfileService {
     const preferredCountriesRepo = manager.getRepository(LeadPreferredCountries);
     const preferredProgramsRepo = manager.getRepository(LeadPreferredPrograms);
 
-    // Upsert academic results (if provided)
-    if (dto.academicResults !== undefined) {
-      await this.upsertAcademicResults(
-        academicResultsRepo,
-        leadId,
-        dto.academicResults ?? [],
+    // Academic: filter to valid gpa (levelOrder 1-4), apply lastAcademicInstitute to highest
+    const degreeIds = dto.academicResults?.map((r) => r.degreeId) ?? [];
+    const degrees =
+      degreeIds.length > 0
+        ? await manager.getRepository(SysAcademicDegrees).find({
+            where: degreeIds.map((id) => ({ id })),
+          })
+        : [];
+    const degreeMap = new Map(degrees.map((d) => [d.id, d]));
+    const validAcademic = (dto.academicResults ?? []).filter((r) => {
+      const degree = degreeMap.get(r.degreeId);
+      if (!degree || !LEVEL_ORDER_1_4.has(degree.levelOrder)) return false;
+      const scale = degree.gpaScale ? parseFloat(degree.gpaScale) : 5;
+      const gpa = r.gpa;
+      return gpa != null && gpa > 0 && gpa <= scale;
+    });
+    const maxLevelOrder = validAcademic.length
+      ? Math.max(
+          ...validAcademic.map(
+            (r) => degreeMap.get(r.degreeId)!.levelOrder,
+          ),
+        )
+      : 0;
+    await this.upsertAcademicResults(
+      academicResultsRepo,
+      leadId,
+      validAcademic.map((r) => ({
+        ...r,
+        institute:
+          degreeMap.get(r.degreeId)!.levelOrder === maxLevelOrder
+            ? (dto.lastAcademicInstitute?.trim() ?? '')
+            : '',
+      })),
+    );
+
+    // English: filter to only results with valid overall + all section scores valid
+    const englishTestIds = dto.englishTestResults?.map((r) => r.testId) ?? [];
+    const englishTests =
+      englishTestIds.length > 0
+        ? await manager.getRepository(SysEnglishTests).find({
+            where: englishTestIds.map((id) => ({ id })),
+            relations: { SysEnglishTestSection: true },
+          })
+        : [];
+    const testMap = new Map(englishTests.map((t) => [t.id, t]));
+    const validEnglish = (dto.englishTestResults ?? []).filter((result) => {
+      const test = testMap.get(result.testId);
+      if (!test) return false;
+      const maxScore = test.maxScore ? parseFloat(test.maxScore) : 9;
+      const overall =
+        result.overallScore != null &&
+        result.overallScore > 0 &&
+        result.overallScore <= maxScore;
+      const sections = test.SysEnglishTestSection ?? [];
+      if (sections.length === 0) return overall;
+      const sectionIds = new Set(sections.map((s) => s.id));
+      const sectionScores = result.sections ?? [];
+      const allValid = sectionIds.size > 0 && sectionScores.every((s) => {
+        const sec = sections.find((x) => x.id === s.id);
+        const max = sec?.maxScore ? parseFloat(sec.maxScore) : 9;
+        return s.score > 0 && s.score <= max;
+      });
+      const allSectionsFilled =
+        sectionScores.length >= sectionIds.size &&
+        [...sectionIds].every((id) =>
+          sectionScores.some((s) => s.id === id && s.score > 0),
+        );
+      return overall && allValid && allSectionsFilled;
+    });
+    await this.upsertEnglishTestResults(
+      englishTestResultsRepo,
+      sectionResultsRepo,
+      leadId,
+      validEnglish,
+    );
+
+    // Preferred: replace (Option A: already validated non-empty, max 3)
+    const countryIds = (dto.preferredCountryIds ?? []).slice(0, 3);
+    await preferredCountriesRepo.delete({ leadId });
+    if (countryIds.length > 0) {
+      await preferredCountriesRepo.save(
+        countryIds.map((countryId) =>
+          preferredCountriesRepo.create({ leadId, countryId }),
+        ),
       );
     }
-
-    // Upsert English test results (if provided)
-    if (dto.englishTestResults !== undefined) {
-      await this.upsertEnglishTestResults(
-        englishTestResultsRepo,
-        sectionResultsRepo,
-        leadId,
-        dto.englishTestResults ?? [],
-      );
-    }
-
-    // Upsert preferred countries (if provided)
-    if (dto.preferredCountryIds !== undefined) {
-      await this.upsertPreferredCountries(
-        preferredCountriesRepo,
-        leadId,
-        dto.preferredCountryIds ?? [],
-      );
-    }
-
-    // Upsert preferred programmes (if provided)
-    if (dto.preferredProgrammeIds !== undefined) {
-      await this.upsertPreferredProgrammes(
-        preferredProgramsRepo,
-        leadId,
-        dto.preferredProgrammeIds ?? [],
+    const programmeIds = (dto.preferredProgrammeIds ?? []).slice(0, 3);
+    await preferredProgramsRepo.delete({ leadId });
+    if (programmeIds.length > 0) {
+      await preferredProgramsRepo.save(
+        programmeIds.map((programmeId) =>
+          preferredProgramsRepo.create({ leadId, programmeId }),
+        ),
       );
     }
   }
 
   /**
-   * Upsert academic results (keyed by degreeId)
-   * - Empty/undefined array = skip (no changes)
-   * - Values provided = upsert (update existing by degreeId, insert new)
+   * Upsert academic results (keyed by degreeId).
+   * Only the provided results are written; existing rows for other degrees are left as-is.
    */
   private async upsertAcademicResults(
     repo: Repository<LeadAcademicResults>,
     leadId: string,
-    results: AcademicFormRequestDto['academicResults'],
+    results: Array<{
+      degreeId: string;
+      gpa?: number;
+      institute?: string;
+      passingDate?: string;
+    }>,
   ): Promise<void> {
-    if (!results || results.length === 0) {
-      // Empty or undefined = skip, don't touch existing data
-      return;
-    }
+    if (!results || results.length === 0) return;
 
     const existingResults = await repo.find({ where: { leadId } });
     const existingByDegreeId = new Map(
       existingResults.map((r) => [r.degreeId, r]),
     );
 
-    // Upsert each result (update existing, insert new)
     for (const result of results) {
       const existing = existingByDegreeId.get(result.degreeId);
+      const gpaStr =
+        result.gpa != null ? String(result.gpa) : undefined;
+      const instituteVal = result.institute ?? '';
+      const passingDateVal = result.passingDate
+        ? new Date(result.passingDate)
+        : undefined;
       if (existing) {
-        // Update existing
         await repo.update(existing.id, {
-          gpa: result.gpa?.toString(),
-          institute: result.institute ?? '',
-          passingDate: result.passingDate ? new Date(result.passingDate) : undefined,
+          gpa: gpaStr,
+          institute: instituteVal,
+          passingDate: passingDateVal,
         });
       } else {
-        // Insert new
         await repo.save(
           repo.create({
             leadId,
             degreeId: result.degreeId,
-            gpa: result.gpa?.toString(),
-            institute: result.institute ?? '',
-            passingDate: result.passingDate ? new Date(result.passingDate) : undefined,
+            gpa: gpaStr,
+            institute: instituteVal,
+            passingDate: passingDateVal,
           }),
         );
       }
@@ -231,9 +301,8 @@ export class LeadProfileService {
   }
 
   /**
-   * Upsert English test results (keyed by testId)
-   * - Empty/undefined array = skip (no changes)
-   * - Values provided = upsert (update existing by testId, insert new)
+   * Upsert English test results (keyed by testId).
+   * Caller must pass only results that pass validation (valid overall + all section scores valid).
    */
   private async upsertEnglishTestResults(
     testRepo: Repository<LeadEnglishTestResults>,
@@ -241,52 +310,52 @@ export class LeadProfileService {
     leadId: string,
     results: AcademicFormRequestDto['englishTestResults'],
   ): Promise<void> {
-    if (!results || results.length === 0) {
-      // Empty or undefined = skip, don't touch existing data
-      return;
-    }
+    if (!results || results.length === 0) return;
 
     const existingResults = await testRepo.find({ where: { leadId } });
     const existingByTestId = new Map(
       existingResults.map((r) => [r.sysEngTestId, r]),
     );
 
-    // Upsert each test result (update existing, insert new)
     for (const result of results) {
+      const overall =
+        result.overallScore != null && result.overallScore > 0
+          ? String(result.overallScore)
+          : undefined;
+      if (overall == null) continue;
+
       const existing = existingByTestId.get(result.testId);
+      const testDateVal = result.testDate
+        ? new Date(result.testDate)
+        : undefined;
 
       if (existing) {
-        // Update existing test
         await testRepo.update(existing.id, {
-          overallScore: result.overallScore.toString(),
-          testDate: result.testDate ? new Date(result.testDate) : undefined,
+          overallScore: overall,
+          testDate: testDateVal,
         });
-
-        // Upsert sections
         await this.upsertEnglishTestSections(
           sectionRepo,
           existing.id,
           result.sections ?? [],
         );
       } else {
-        // Insert new test
         const savedTest = await testRepo.save(
           testRepo.create({
             leadId,
             sysEngTestId: result.testId,
-            overallScore: result.overallScore.toString(),
-            testDate: result.testDate ? new Date(result.testDate) : undefined,
+            overallScore: overall,
+            testDate: testDateVal,
           }),
         );
-
-        // Insert sections
-        if (result.sections?.length) {
+        const sections = result.sections ?? [];
+        if (sections.length > 0) {
           await sectionRepo.save(
-            result.sections.map((s) =>
+            sections.map((s) =>
               sectionRepo.create({
                 resultId: savedTest.id,
                 sysEngTestSectionId: s.id,
-                sectionScore: s.score.toString(),
+                sectionScore: String(s.score),
               }),
             ),
           );
@@ -333,60 +402,6 @@ export class LeadProfileService {
           }),
         );
       }
-    }
-  }
-
-  /**
-   * Upsert preferred countries
-   * - Empty/undefined array = skip (no changes)
-   * - Values provided = add new countries (keeps existing, adds missing)
-   */
-  private async upsertPreferredCountries(
-    repo: Repository<LeadPreferredCountries>,
-    leadId: string,
-    countryIds: string[],
-  ): Promise<void> {
-    if (!countryIds || countryIds.length === 0) {
-      // Empty = skip, don't touch existing data
-      return;
-    }
-
-    const existing = await repo.find({ where: { leadId } });
-    const existingIds = new Set(existing.map((e) => e.countryId));
-
-    // Insert only new ones (don't delete existing)
-    const toInsert = countryIds.filter((id) => !existingIds.has(id));
-    if (toInsert.length > 0) {
-      await repo.save(
-        toInsert.map((countryId) => repo.create({ leadId, countryId })),
-      );
-    }
-  }
-
-  /**
-   * Upsert preferred programmes
-   * - Empty/undefined array = skip (no changes)
-   * - Values provided = add new programmes (keeps existing, adds missing)
-   */
-  private async upsertPreferredProgrammes(
-    repo: Repository<LeadPreferredPrograms>,
-    leadId: string,
-    programmeIds: string[],
-  ): Promise<void> {
-    if (!programmeIds || programmeIds.length === 0) {
-      // Empty = skip, don't touch existing data
-      return;
-    }
-
-    const existing = await repo.find({ where: { leadId } });
-    const existingIds = new Set(existing.map((e) => e.programmeId));
-
-    // Insert only new ones (don't delete existing)
-    const toInsert = programmeIds.filter((id) => !existingIds.has(id));
-    if (toInsert.length > 0) {
-      await repo.save(
-        toInsert.map((programmeId) => repo.create({ leadId, programmeId })),
-      );
     }
   }
 
