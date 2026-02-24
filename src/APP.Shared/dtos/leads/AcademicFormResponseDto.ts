@@ -1,12 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
-import { DegreeResponseDto } from './DegreeResponseDto';
-import { EnglishTestResponseDto } from './EnglishTestResponseDto';
-import { SelectableItemDto } from './SelectableItemDto';
+import { AcademicResultItemDto } from './AcademicResultItemDto';
+import { EnglishTestResultItemDto } from './EnglishTestResultItemDto';
+import { PreferredCountryItemDto } from './PreferredCountryItemDto';
+import { PreferredProgrammeItemDto } from './PreferredProgrammeItemDto';
 
 /**
  * Response DTO for GET/PUT /api/leads/profile/academic-form
- * Contains all form data with validation rules and academic form completion status
+ * academicResults (always 4 items), englishTestResults (all system tests), preferredCountries, preferredProgrammes, lastAcademicInstitute, academicFormStatus.
+ * Filled booleans per value field; lastAcademicInstitute derived from highest levelOrder valid degree's institute (null if none).
  */
 export class AcademicFormResponseDto {
   @ApiProperty({
@@ -16,26 +18,33 @@ export class AcademicFormResponseDto {
   academicFormStatus!: AcademicFormStatus;
 
   @ApiProperty({
-    description: 'All available degrees with user saved values',
-    type: [DegreeResponseDto],
+    description: 'Always 4 items (SSC, HSC, BSC, Master). Value fields null when not filled; filled booleans.',
+    type: [AcademicResultItemDto],
   })
-  degrees!: DegreeResponseDto[];
+  academicResults!: AcademicResultItemDto[];
 
   @ApiProperty({
-    description: 'All available English tests with user saved values',
-    type: [EnglishTestResponseDto],
+    description: 'One per system English test. Value fields null when not filled; filled booleans.',
+    type: [EnglishTestResultItemDto],
   })
-  englishTests!: EnglishTestResponseDto[];
+  englishTestResults!: EnglishTestResultItemDto[];
 
   @ApiProperty({
-    description: 'All countries with selection state',
-    type: [SelectableItemDto],
+    description: 'All system countries with id, name, selected (true if in lead’s preferred list). Never null.',
+    type: [PreferredCountryItemDto],
   })
-  preferredCountries!: SelectableItemDto[];
+  preferredCountries!: PreferredCountryItemDto[];
 
   @ApiProperty({
-    description: 'All programmes with selection state',
-    type: [SelectableItemDto],
+    description: 'All system programmes with id, name, selected (true if in lead’s preferred list). Never null.',
+    type: [PreferredProgrammeItemDto],
   })
-  preferredPrograms!: SelectableItemDto[];
+  preferredProgrammes!: PreferredProgrammeItemDto[];
+
+  @ApiPropertyOptional({
+    description: "Derived from highest levelOrder valid degree's institute. Null if no such degree.",
+    example: 'Daffodil University',
+    nullable: true,
+  })
+  lastAcademicInstitute!: string | null;
 }

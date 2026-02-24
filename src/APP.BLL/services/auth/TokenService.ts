@@ -4,6 +4,8 @@ import { IJwtService, JwtPayload } from '@shared/interfaces/security';
 import { IJwtService as IJwtServiceToken } from '@shared/tokens/injection.tokens';
 import { IPasswordHasher } from '@shared/interfaces/security';
 import { IPasswordHasher as IPasswordHasherToken } from '@shared/tokens/injection.tokens';
+import { ISecurityConfig } from '@shared/interfaces/config/ISecurityConfig.interface';
+import { ISecurityConfig as ISecurityConfigToken } from '@shared/tokens/injection.tokens';
 import { SysUsers } from '@entity/entities/SysUsers.entity';
 import { UserSessions } from '@entity/entities/UserSessions.entity';
 
@@ -11,6 +13,21 @@ export interface TokenPair {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+}
+
+/** Parse JWT-style expiry string (e.g. 15m, 1h, 7d, 90d) to milliseconds */
+function parseExpiryToMs(expiresIn: string): number {
+  const m = expiresIn.trim().match(/^(\d+)(s|m|h|d)$/i);
+  if (!m) return 7 * 24 * 60 * 60 * 1000; // fallback 7 days
+  const n = parseInt(m[1], 10);
+  const unit = m[2].toLowerCase();
+  const multipliers: Record<string, number> = {
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
+  };
+  return n * (multipliers[unit] ?? multipliers.d);
 }
 
 /**
@@ -25,6 +42,7 @@ export class TokenService {
     private readonly db: AppDbContext,
     @Inject(IJwtServiceToken) private readonly jwt: IJwtService,
     @Inject(IPasswordHasherToken) private readonly hasher: IPasswordHasher,
+    @Inject(ISecurityConfigToken) private readonly securityConfig: ISecurityConfig,
   ) {}
 
   /**
@@ -78,10 +96,13 @@ export class TokenService {
 
     await this.db.userSessions.save(session);
 
+    const accessTokenMs = parseExpiryToMs(
+      this.securityConfig.jwt.accessTokenExpiresIn,
+    );
     return {
       accessToken,
       refreshToken,
-      expiresIn: 900, // 15 minutes default - should match JWT config
+      expiresIn: Math.floor(accessTokenMs / 1000), // seconds until access token expires
     };
   }
 
@@ -109,13 +130,11 @@ export class TokenService {
   }
 
   /**
-   * Get refresh token expiry date
-   * @returns Date 7 days from now (default)
+   * Get refresh token expiry date from JWT_REFRESH_TOKEN_EXPIRES_IN (e.g. 90d)
    */
   private getRefreshTokenExpiry(): Date {
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 7); // 7 days
-    return expiryDate;
+    const ms = parseExpiryToMs(this.securityConfig.jwt.refreshTokenExpiresIn);
+    return new Date(Date.now() + ms);
   }
 }
 
