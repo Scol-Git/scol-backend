@@ -47,8 +47,8 @@ export class LeadsProfileController {
    * Get academic form data
    * GET /leads/profile/academic-form
    *
-   * academicResults: always 4 items (SSC, HSC, BSC, Master) with degreeId, degreeName, gpa/institute/passingDate (null when not filled), *Filled booleans.
-   * englishTestResults: one per system English test with testId, testName, overallScore/testDate (null when not filled), sections with id, name, score (null), *Filled booleans.
+   * academicResults: always 4 items (SSC, HSC, BSC, Master) with degreeId, degreeName, gpa/institute/passingDate (null when not filled), isEditable (true when no valid GPA yet).
+   * englishTestResults: one per system English test with testId, testName, overallScore/testDate, sections (id, name, score), isEditable (false only when overall and all section scores are set and non-zero).
    * preferredCountries: all system countries with id, name, selected (never null).
    * preferredProgrammes: all system programmes with id, name, selected (never null).
    * lastAcademicInstitute: derived from highest levelOrder valid degree's institute (null if none).

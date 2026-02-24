@@ -1,8 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { DegreeValidationDto } from './DegreeValidationDto';
 
 /**
  * Single academic result item in GET /leads/profile/academic-form response.
- * One per user-saved degree (levelOrder 1-4 only). Value fields null when missing; filled booleans indicate valid stored value.
+ * One per system degree (levelOrder 1-4). Value fields null when not filled.
  */
 export class AcademicResultItemDto {
   @ApiProperty({ description: 'Degree ID', example: 'uuid-ssc' })
@@ -36,20 +37,15 @@ export class AcademicResultItemDto {
   passingDate!: string | null;
 
   @ApiProperty({
-    description: 'True when gpa is present and valid (e.g. > 0 and <= gpaScale)',
+    description:
+      'True when this row can be edited (no valid GPA yet). False when gpa is set and non-zero.',
     example: true,
   })
-  gpaFilled!: boolean;
+  isEditable!: boolean;
 
   @ApiProperty({
-    description: 'True when institute is present and non-empty',
-    example: true,
+    description: 'Validation rules for this degree (e.g. max GPA scale)',
+    type: DegreeValidationDto,
   })
-  instituteFilled!: boolean;
-
-  @ApiProperty({
-    description: 'True when passingDate is present',
-    example: true,
-  })
-  passingDateFilled!: boolean;
+  validation!: DegreeValidationDto;
 }

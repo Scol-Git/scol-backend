@@ -19,10 +19,4 @@ export class EnglishTestSectionItemDto {
     nullable: true,
   })
   score!: number | null;
-
-  @ApiProperty({
-    description: 'True when score is present and valid (e.g. > 0 and <= section max)',
-    example: true,
-  })
-  scoreFilled!: boolean;
 }

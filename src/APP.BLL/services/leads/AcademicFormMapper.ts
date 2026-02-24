@@ -13,6 +13,8 @@ import { PreferredCountryItemDto } from '@shared/dtos/leads/PreferredCountryItem
 import { PreferredProgrammeItemDto } from '@shared/dtos/leads/PreferredProgrammeItemDto';
 
 const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
+const DEFAULT_GPA_SCALE = 5;
+const DEFAULT_MAX_SCORE = 9;
 
 /**
  * Maps entities to Academic Form response DTO.
@@ -32,10 +34,7 @@ export class AcademicFormMapper {
     systemCountries: SysCountries[],
     systemProgrammes: SysProgrammes[],
   ): AcademicFormResponseDto {
-    const academicResults = this.mapAcademicResults(
-      leadProfile,
-      systemDegrees,
-    );
+    const academicResults = this.mapAcademicResults(leadProfile, systemDegrees);
     const englishTestResults = this.mapEnglishTestResults(
       leadProfile,
       systemEnglishTests,
@@ -65,12 +64,12 @@ export class AcademicFormMapper {
     systemDegrees: SysAcademicDegrees[],
   ): AcademicResultItemDto[] {
     const results = leadProfile?.LeadAcademicResult ?? [];
-    const byDegreeId = new Map(
-      results.map((r) => [r.degreeId, r] as const),
-    );
+    const byDegreeId = new Map(results.map((r) => [r.degreeId, r] as const));
 
     return systemDegrees.map((degree) => {
       const r = byDegreeId.get(degree.id);
+      const validation = this.toDegreeValidation(degree);
+
       if (!r) {
         return {
           degreeId: degree.id,
@@ -78,20 +77,13 @@ export class AcademicFormMapper {
           gpa: null,
           institute: null,
           passingDate: null,
-          gpaFilled: false,
-          instituteFilled: false,
-          passingDateFilled: false,
+          isEditable: true,
+          validation,
         };
       }
-      const gpaScale = degree.gpaScale
-        ? parseFloat(degree.gpaScale)
-        : 5;
+
       const gpaVal =
-        r.gpa != null && String(r.gpa).trim() !== ''
-          ? parseFloat(r.gpa)
-          : null;
-      const validGpa =
-        gpaVal != null && gpaVal > 0 && gpaVal <= gpaScale;
+        r.gpa != null && String(r.gpa).trim() !== '' ? parseFloat(r.gpa) : null;
       const instituteVal =
         r.institute != null && String(r.institute).trim() !== ''
           ? r.institute
@@ -99,6 +91,7 @@ export class AcademicFormMapper {
       const passingDateVal = r.passingDate
         ? this.formatDate(r.passingDate)
         : null;
+      const isEditable = this.isAcademicRowEditable(gpaVal);
 
       return {
         degreeId: r.degreeId,
@@ -106,11 +99,23 @@ export class AcademicFormMapper {
         gpa: gpaVal,
         institute: instituteVal,
         passingDate: passingDateVal,
-        gpaFilled: validGpa,
-        instituteFilled: instituteVal != null,
-        passingDateFilled: passingDateVal != null,
+        isEditable,
+        validation,
       };
     });
+  }
+
+  /** Build validation object for a degree (gpaScale from entity or default). */
+  private toDegreeValidation(degree: SysAcademicDegrees): { gpaScale: number } {
+    const gpaScale = degree.gpaScale
+      ? parseFloat(degree.gpaScale)
+      : DEFAULT_GPA_SCALE;
+    return { gpaScale };
+  }
+
+  /** Editable when no valid GPA is set (null or zero). */
+  private isAcademicRowEditable(gpa: number | null): boolean {
+    return gpa == null || gpa === 0;
   }
 
   private mapEnglishTestResults(
@@ -123,6 +128,7 @@ export class AcademicFormMapper {
     return systemEnglishTests.map((test) => {
       const r = byTestId.get(test.id);
       const sections = (test as any).SysEnglishTestSection ?? [];
+      const validation = this.toEnglishTestValidation(test);
 
       if (!r) {
         return {
@@ -130,50 +136,48 @@ export class AcademicFormMapper {
           testName: test.testName,
           overallScore: null,
           testDate: null,
-          overallScoreFilled: false,
-          testDateFilled: false,
+          isEditable: true,
           sections: sections.map((section: any) => ({
             id: section.id,
             name: section.sectionName,
             score: null,
-            scoreFilled: false,
           })),
+          validation,
         };
       }
 
-      const maxScore = test.maxScore ? parseFloat(test.maxScore) : 9;
+      const maxScore = test.maxScore
+        ? parseFloat(test.maxScore)
+        : DEFAULT_MAX_SCORE;
       const overallVal =
         r.overallScore != null && String(r.overallScore).trim() !== ''
           ? parseFloat(r.overallScore)
           : null;
-      const validOverall =
-        overallVal != null && overallVal > 0 && overallVal <= maxScore;
-      const testDateVal = r.testDate
-        ? this.formatDate(r.testDate)
-        : null;
+      const testDateVal = r.testDate ? this.formatDate(r.testDate) : null;
 
       const sectionDtos: EnglishTestSectionItemDto[] = sections.map(
         (section: any) => {
           const sectionResult = (r.LeadEnglishTestSectionResult ?? []).find(
             (sr: any) => sr.sysEngTestSectionId === section.id,
           );
-          const sectionMax = section?.maxScore
-            ? parseFloat(section.maxScore)
-            : 9;
           const scoreVal =
             sectionResult?.sectionScore != null &&
             String(sectionResult.sectionScore).trim() !== ''
               ? parseFloat(sectionResult.sectionScore)
               : null;
-          const validScore =
-            scoreVal != null && scoreVal > 0 && scoreVal <= sectionMax;
           return {
             id: section.id,
             name: section.sectionName,
             score: scoreVal,
-            scoreFilled: validScore,
           };
         },
+      );
+
+      const isEditable = this.isEnglishTestEditable(
+        overallVal,
+        sectionDtos,
+        maxScore,
+        sections,
       );
 
       return {
@@ -181,11 +185,64 @@ export class AcademicFormMapper {
         testName: test.testName,
         overallScore: overallVal,
         testDate: testDateVal,
-        overallScoreFilled: validOverall,
-        testDateFilled: testDateVal != null,
+        isEditable,
         sections: sectionDtos,
+        validation,
       };
     });
+  }
+
+  /** Build validation object for an English test (maxScore + section maxScores). */
+  private toEnglishTestValidation(
+    test: SysEnglishTests & {
+      SysEnglishTestSection?: Array<{
+        id: string;
+        sectionName?: string;
+        maxScore?: string;
+      }>;
+    },
+  ): {
+    maxScore: number;
+    sections: Array<{ id: string; name: string; maxScore: number }>;
+  } {
+    const sections = test.SysEnglishTestSection ?? [];
+    const maxScore = test.maxScore
+      ? parseFloat(test.maxScore)
+      : DEFAULT_MAX_SCORE;
+    const sectionValidations = sections.map((section) => ({
+      id: section.id,
+      name: section.sectionName ?? '',
+      maxScore: section.maxScore
+        ? parseFloat(section.maxScore)
+        : DEFAULT_MAX_SCORE,
+    }));
+    return { maxScore, sections: sectionValidations };
+  }
+
+  /**
+   * Editable unless overall score and every section score are set and non-zero.
+   */
+  private isEnglishTestEditable(
+    overallScore: number | null,
+    sectionDtos: EnglishTestSectionItemDto[],
+    testMaxScore: number,
+    systemSections: Array<{ id: string; maxScore?: string }>,
+  ): boolean {
+    const overallFilled =
+      overallScore != null && overallScore > 0 && overallScore <= testMaxScore;
+
+    if (systemSections.length === 0) {
+      return !overallFilled;
+    }
+
+    const allSectionsFilled = sectionDtos.every((dto) => {
+      const section = systemSections.find((s) => s.id === dto.id);
+      const max = section?.maxScore ? parseFloat(section.maxScore) : 9;
+      const score = dto.score;
+      return score != null && score > 0 && score <= max;
+    });
+
+    return !(overallFilled && allSectionsFilled);
   }
 
   private mapPreferredCountries(
@@ -229,9 +286,7 @@ export class AcademicFormMapper {
         const order =
           degree?.levelOrder != null ? Number(degree.levelOrder) : null;
         if (order == null || !LEVEL_ORDER_1_4.has(order)) return null;
-        const gpaScale = degree?.gpaScale
-          ? parseFloat(degree.gpaScale)
-          : 5;
+        const gpaScale = degree?.gpaScale ? parseFloat(degree.gpaScale) : 5;
         const gpaVal =
           r.gpa != null && String(r.gpa).trim() !== ''
             ? parseFloat(r.gpa)
