@@ -3,6 +3,9 @@
 /node_modules
 /build
 
+# Data entry output (downloaded + generated CSVs)
+/data
+
 # Logs
 logs
 *.log
