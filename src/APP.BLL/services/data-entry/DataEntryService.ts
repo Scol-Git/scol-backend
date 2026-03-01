@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { parse } from 'csv-parse/sync';
 import { EntityManager } from 'typeorm';
 import * as path from 'path';
@@ -63,6 +63,32 @@ export class DataEntryService {
   ) {}
 
   async importUniCsv(uniCsvUrl: string): Promise<DataEntryImportResult> {
+    try {
+      return await this.doImportUniCsv(uniCsvUrl);
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      if (this.isNotCsvFileError(err)) {
+        throw new BadRequestException(
+          'The URL does not point to a valid CSV file. For Google Sheets, use the export link: .../export?format=csv&gid=0',
+        );
+      }
+      this.logger.LogError('Uni CSV import failed', err as Error, { uniCsvUrl });
+      throw new ServiceUnavailableException(
+        'Service temporarily unavailable. Please try again later.',
+      );
+    }
+  }
+
+  private isNotCsvFileError(err: unknown): boolean {
+    const msg = err instanceof Error ? err.message : String(err);
+    return (
+      msg.includes('Invalid Opening Quote') ||
+      msg.includes('quote is found on field') ||
+      msg.includes('INVALID_OPENING_QUOTE')
+    );
+  }
+
+  private async doImportUniCsv(uniCsvUrl: string): Promise<DataEntryImportResult> {
     this.logger.info(`${LOG_PREFIX} Starting uni import from URL: ${uniCsvUrl}`);
 
     // 1. Fetch CSV and save to data folder (live update)
@@ -82,7 +108,7 @@ export class DataEntryService {
     // 3. Validate headers
     const missingHeaders = REQUIRED_HEADERS.filter((h) => !headers.includes(h));
     if (missingHeaders.length > 0) {
-      throw new Error(
+      throw new BadRequestException(
         `Missing required CSV headers: ${missingHeaders.join(', ')}. Found: ${headers.join(', ')}`,
       );
     }
@@ -225,13 +251,58 @@ export class DataEntryService {
   // CSV fetch & parse
   // ──────────────────────────────────────────────
 
+  /**
+   * Converts Google Drive / Sheets share links to direct download URLs so we get
+   * the file content instead of the HTML page.
+   */
+  private resolveCsvUrl(url: string): string {
+    try {
+      const u = new URL(url);
+      // Google Drive file: .../file/d/FILE_ID/view...
+      const driveFileMatch = u.pathname.match(/^\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (u.hostname === 'drive.google.com' && driveFileMatch) {
+        const fileId = driveFileMatch[1];
+        return `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+      // Google Drive open: .../open?id=FILE_ID
+      if (u.hostname === 'drive.google.com' && u.pathname === '/open' && u.searchParams.has('id')) {
+        const fileId = u.searchParams.get('id')!;
+        return `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+      // Google Sheets edit: .../d/SPREADSHEET_ID/edit...
+      const sheetsMatch = u.pathname.match(/^\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      if (u.hostname === 'docs.google.com' && sheetsMatch) {
+        const sheetId = sheetsMatch[1];
+        const gid = u.searchParams.get('gid') ?? '0';
+        return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+      }
+    } catch {
+      // Invalid URL; let fetch fail
+    }
+    return url;
+  }
+
   private async fetchCsv(url: string): Promise<string> {
-    const response = await fetch(url);
+    const resolvedUrl = this.resolveCsvUrl(url);
+    const response = await fetch(resolvedUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch CSV from ${url}: ${response.status} ${response.statusText}`);
+      throw new BadRequestException(
+        `Failed to fetch CSV from URL: ${response.status} ${response.statusText}`,
+      );
     }
     const text = await response.text();
-    return text.replace(/^\uFEFF/, '');
+    const normalized = text.replace(/^\uFEFF/, '');
+    if (this.looksLikeHtml(normalized.trim())) {
+      throw new BadRequestException(
+        'The URL does not point to a valid CSV file. The response appears to be HTML (e.g. a web page). For Google Sheets, use the export link: .../export?format=csv&gid=0',
+      );
+    }
+    return normalized;
+  }
+
+  private looksLikeHtml(text: string): boolean {
+    const start = text.slice(0, 200).toLowerCase();
+    return start.startsWith('<!doctype') || start.startsWith('<html');
   }
 
   private parseCsv(csvText: string): UniCsvRow[] {
@@ -442,32 +513,38 @@ export class DataEntryService {
       const existing = await repo.findOne({
         where: { uniName, sysCountryId, sysCityId },
       });
+      const campusLifeLinksArr = key.campusLifeLinks
+        ? key.campusLifeLinks.split(',').map((s) => s.trim()).filter(Boolean)
+        : [];
+      const commissionType =
+        key.commissionType === 'AMOUNT'
+          ? CommissionType.AMOUNT
+          : key.commissionType === 'PERCENTAGE'
+            ? CommissionType.PERCENTAGE
+            : undefined;
+      const updatePayload = {
+        commission: key.commission || undefined,
+        commissionType,
+        logoUrl: key.logoUrl || undefined,
+        website: key.website || undefined,
+        aboutUs: key.aboutUs || undefined,
+        address: key.address || undefined,
+        coverImageUrl: key.coverImageUrl || undefined,
+        campusLifeLinks: campusLifeLinksArr.length > 0 ? campusLifeLinksArr : undefined,
+      };
+
       if (existing) {
-        this.logger.info(`${LOG_PREFIX}   "${uniName}" (country: ${sysCountryId}, city: ${sysCityId}) → found id ${existing.id}`);
-        map.set(mapKey, existing.id);
+        Object.assign(existing, updatePayload);
+        const saved = await repo.save(existing);
+        this.logger.info(`${LOG_PREFIX}   "${uniName}" (country: ${sysCountryId}, city: ${sysCityId}) → updated id ${saved.id}`);
+        map.set(mapKey, saved.id);
       } else {
-        const campusLifeLinksArr = key.campusLifeLinks
-          ? key.campusLifeLinks.split(',').map((s) => s.trim()).filter(Boolean)
-          : [];
-        const commissionType =
-          key.commissionType === 'AMOUNT'
-            ? CommissionType.AMOUNT
-            : key.commissionType === 'PERCENTAGE'
-              ? CommissionType.PERCENTAGE
-              : undefined;
         const entity = repo.create({
           uniName,
           sysCountryId,
           sysStateId,
           sysCityId,
-          commission: key.commission || undefined,
-          commissionType,
-          logoUrl: key.logoUrl || undefined,
-          website: key.website || undefined,
-          aboutUs: key.aboutUs || undefined,
-          address: key.address || undefined,
-          coverImageUrl: key.coverImageUrl || undefined,
-          campusLifeLinks: campusLifeLinksArr.length > 0 ? campusLifeLinksArr : undefined,
+          ...updatePayload,
         });
         const saved = await repo.save(entity);
         this.logger.info(`${LOG_PREFIX}   "${uniName}" (country: ${sysCountryId}, city: ${sysCityId}) → inserted, id ${saved.id}`);
