@@ -149,3 +149,25 @@ export const ISecurityConfig = Symbol('ISecurityConfig');
  * Provides API/presentation layer configuration (CORS, rate limiting)
  */
 export const IApiConfig = Symbol('IApiConfig');
+
+// ============================================================================
+// Bulk Import (Data Entry)
+// ============================================================================
+
+/**
+ * Token for IFileStore
+ * File operations for bulk import (Staging, Reviewed, Errors, Archive)
+ */
+export const IFileStore = Symbol('IFileStore');
+
+/**
+ * Token for ICsvImportProcessor
+ * Processes import rows in a transaction (e.g. university resolution)
+ */
+export const ICsvImportProcessor = Symbol('ICsvImportProcessor');
+
+/**
+ * Token for UniversityImportConfig
+ * Folder names and behaviour for university CSV import
+ */
+export const UniversityImportConfig = Symbol('UniversityImportConfig');

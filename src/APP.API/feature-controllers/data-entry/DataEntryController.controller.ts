@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
@@ -6,7 +6,6 @@ import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 import { Role } from '@shared/enums/Role.enum';
 import { DataEntryService } from '@bll/services/data-entry/DataEntryService';
-import { DataEntryImportRequestDto } from '@shared/dtos/data-entry/DataEntryImportRequestDto';
 import { DataEntryImportResponseDto } from '@shared/dtos/data-entry/DataEntryImportResponseDto';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
 
@@ -20,16 +19,17 @@ export class DataEntryController {
   @RequireRole(Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'Import uni CSV from URL: download to data/, process, write reviewed + errors to data/, return counts',
+    summary: 'Trigger university CSV import from Staging folder',
+    description: 'Reads the single CSV in BulkImport/University/Staging, processes it, writes Reviewed/Errors, archives the file. No request body.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Import completed. Response body (in standard envelope) includes universityUpdated and errorsCount.',
+    description: 'Import completed or skipped (no file). Returns universityUpdated and errorsCount.',
     type: DataEntryImportResponseDto,
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad request (e.g. invalid CSV URL, fetch failed, or missing required CSV headers).',
+    description: 'Bad request (e.g. more than one file in Staging, or invalid CSV headers).',
     type: ErrorResponseDto,
   })
   @ApiResponse({
@@ -37,8 +37,8 @@ export class DataEntryController {
     description: 'Service unavailable (e.g. database unreachable).',
     type: ErrorResponseDto,
   })
-  async importCsv(@Body() dto: DataEntryImportRequestDto) {
-    const result = await this.dataEntryService.importUniCsv(dto.uniCsvUrl);
+  async importCsv() {
+    const result = await this.dataEntryService.importUniCsv();
     return {
       message: 'Import completed.',
       universityUpdated: result.reviewedCount,

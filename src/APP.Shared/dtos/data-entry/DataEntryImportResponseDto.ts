@@ -6,13 +6,13 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class DataEntryImportResponseDto {
   @ApiProperty({
-    description: 'Number of rows successfully processed (uni/city/state/country resolved, written to data/uni-reviewed.csv)',
+    description: 'Number of rows successfully processed (written to BulkImport/University/Reviewed/)',
     example: 42,
   })
   universityUpdated!: number;
 
   @ApiProperty({
-    description: 'Number of rows that failed validation (written to data/uni-errors.csv)',
+    description: 'Number of rows that failed validation (written to BulkImport/University/Errors/)',
     example: 3,
   })
   errorsCount!: number;
