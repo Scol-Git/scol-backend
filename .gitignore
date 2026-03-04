@@ -49,6 +49,9 @@ lerna-debug.log*
 .temp
 .tmp
 
+# Scripts (merge outputs, local helpers)
+/scripts
+
 # Runtime data
 pids
 *.pid
