@@ -1,7 +1,11 @@
+/**
+ * IFileStore implementation using the local filesystem. Base path is the root for Staging, Reviewed, Errors, Archive.
+ */
+
 import { Injectable } from '@nestjs/common';
 import * as path from 'path';
 import { readdir, readFile, writeFile, mkdir, rename, stat } from 'fs/promises';
-import type { IFileStore, FileEntry } from '../abstractions/IFileStore';
+import type { IFileStore, FileEntry } from '../abstractions/FileStore.interface';
 
 /**
  * File store backed by the local filesystem for bulk import folders.
@@ -17,38 +21,38 @@ export class LocalBulkImportFileStore implements IFileStore {
 
   async listFiles(folderPath: string): Promise<FileEntry[]> {
     const dir = this.resolvePath(folderPath);
-    let entries: Awaited<ReturnType<typeof readdir>>;
+    let directoryEntries: Awaited<ReturnType<typeof readdir>>;
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      directoryEntries = await readdir(dir, { withFileTypes: true });
     } catch (err: unknown) {
       const code = (err as NodeJS.ErrnoException)?.code;
       if (code === 'ENOENT') return [];
       throw err;
     }
     const result: FileEntry[] = [];
-    for (const e of entries) {
-      if (!e.isFile()) continue;
-      const fullPath = path.join(dir, e.name);
-      const st = await stat(fullPath);
+    for (const dirent of directoryEntries) {
+      if (!dirent.isFile()) continue;
+      const fullPath = path.join(dir, dirent.name);
+      const fileStats = await stat(fullPath);
       result.push({
-        name: e.name,
+        name: dirent.name,
         path: fullPath,
-        lastModified: st.mtime,
+        lastModified: fileStats.mtime,
       });
     }
     return result;
   }
 
   async readFile(filePath: string): Promise<string> {
-    const full = path.isAbsolute(filePath) ? filePath : this.resolvePath(filePath);
-    const buf = await readFile(full, 'utf-8');
-    return buf.replace(/^\uFEFF/, '');
+    const resolvedPath = path.isAbsolute(filePath) ? filePath : this.resolvePath(filePath);
+    const content = await readFile(resolvedPath, 'utf-8');
+    return content.replace(/^\uFEFF/, '');
   }
 
   async writeFile(filePath: string, content: string | Buffer): Promise<void> {
-    const full = path.isAbsolute(filePath) ? filePath : this.resolvePath(filePath);
-    await mkdir(path.dirname(full), { recursive: true });
-    await writeFile(full, content, typeof content === 'string' ? 'utf-8' : undefined);
+    const resolvedPath = path.isAbsolute(filePath) ? filePath : this.resolvePath(filePath);
+    await mkdir(path.dirname(resolvedPath), { recursive: true });
+    await writeFile(resolvedPath, content, typeof content === 'string' ? 'utf-8' : undefined);
   }
 
   async moveFile(fromPath: string, toPath: string): Promise<void> {
@@ -59,7 +63,7 @@ export class LocalBulkImportFileStore implements IFileStore {
   }
 
   async ensureDir(dirPath: string): Promise<void> {
-    const full = path.isAbsolute(dirPath) ? dirPath : this.resolvePath(dirPath);
-    await mkdir(full, { recursive: true });
+    const resolvedPath = path.isAbsolute(dirPath) ? dirPath : this.resolvePath(dirPath);
+    await mkdir(resolvedPath, { recursive: true });
   }
 }

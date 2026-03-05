@@ -1,4 +1,4 @@
-import type { CsvRecord } from '../abstractions/ICsvImportProcessor';
+import type { CsvRecord } from '../abstractions/CsvImportProcessor.interface';
 
 function escapeCsvValue(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -17,7 +17,7 @@ export function buildCsvBuffer(rows: Record<string, string>[], headers: string[]
   }
   const lines: string[] = [headers.join(',')];
   for (const row of rows) {
-    const values = headers.map((h) => escapeCsvValue(String(row[h] ?? '')));
+    const values = headers.map((header) => escapeCsvValue(String(row[header] ?? '')));
     lines.push(values.join(','));
   }
   return Buffer.from(lines.join('\n') + '\n', 'utf-8');

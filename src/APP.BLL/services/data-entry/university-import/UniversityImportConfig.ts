@@ -14,6 +14,9 @@ export interface UniversityImportConfig {
   allowMultipleFiles: boolean;
 }
 
+/**
+ * Default configuration for university CSV import. Override via env (BULK_IMPORT_UNIVERSITY_BASE_PATH) or DI.
+ */
 export const defaultUniversityImportConfig: UniversityImportConfig = {
   folders: {
     staging: 'Staging',

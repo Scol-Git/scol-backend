@@ -6,6 +6,12 @@
 # Data entry output (downloaded + generated CSVs)
 /data
 
+# Bulk import staging / archive / errors / reviewed (runtime output)
+BulkImport/
+
+# Local documentation (optional; remove if you want to track docs)
+docs/
+
 # Logs
 logs
 *.log

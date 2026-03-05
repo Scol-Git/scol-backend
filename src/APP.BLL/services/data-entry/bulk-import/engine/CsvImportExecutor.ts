@@ -1,6 +1,10 @@
+/**
+ * Stateless pipeline: parse CSV → validate schema → process rows in transaction → build Reviewed/Errors CSV buffers.
+ */
+
 import { Injectable } from '@nestjs/common';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
-import type { ICsvImportProcessor } from '../abstractions/ICsvImportProcessor';
+import type { ICsvImportProcessor } from '../abstractions/CsvImportProcessor.interface';
 import type { CsvImportSchema } from '../abstractions/CsvImportSchema';
 import type { ImportResult } from '../abstractions/ImportResult';
 import { parseCsv } from './CsvParser';
@@ -15,6 +19,11 @@ import { buildCsvBuffer } from './CsvWriter';
 export class CsvImportExecutor {
   constructor(private readonly db: AppDbContext) {}
 
+  /**
+   * Runs the full import pipeline for the given CSV text and schema using the provided processor.
+   *
+   * @returns Buffers and counts for reviewed and error output CSVs.
+   */
   async execute(
     csvText: string,
     schema: CsvImportSchema,
