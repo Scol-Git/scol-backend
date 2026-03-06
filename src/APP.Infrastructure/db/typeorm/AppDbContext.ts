@@ -40,6 +40,9 @@ import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
 import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
+import { SysDocumentTypes } from '@entity/entities/SysDocumentTypes.entity';
+import { Document } from '@entity/entities/Document.entity';
+import { DocumentVersion } from '@entity/entities/DocumentVersion.entity';
 
 /**
  * AppDbContext - EF Core-style DbContext for TypeORM
@@ -149,6 +152,16 @@ export class AppDbContext {
 
     @InjectRepository(CourseIntakeScholarships)
     public readonly scholarships: Repository<CourseIntakeScholarships>,
+
+    // Document entities
+    @InjectRepository(SysDocumentTypes)
+    public readonly documentTypes: Repository<SysDocumentTypes>,
+
+    @InjectRepository(Document)
+    public readonly documents: Repository<Document>,
+
+    @InjectRepository(DocumentVersion)
+    public readonly documentVersions: Repository<DocumentVersion>,
   ) {}
 
   /**

@@ -82,6 +82,9 @@ import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarsh
 import { UniAcademicReq } from '@entity/entities/UniAcademicReq.entity';
 import { UniEngReq } from '@entity/entities/UniEngReq.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
+import { SysDocumentTypes } from '@entity/entities/SysDocumentTypes.entity';
+import { Document } from '@entity/entities/Document.entity';
+import { DocumentVersion } from '@entity/entities/DocumentVersion.entity';
 
 /**
  * AppDataSource - TypeORM DataSource for migrations and CLI operations
@@ -128,6 +131,9 @@ const AppDataSource = new DataSource({
     UniAcademicReq,
     UniEngReq,
     CourseEngReq,
+    SysDocumentTypes,
+    Document,
+    DocumentVersion,
   ],
 
   migrations: [migrationPath],

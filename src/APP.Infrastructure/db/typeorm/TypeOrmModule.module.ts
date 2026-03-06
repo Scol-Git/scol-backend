@@ -39,6 +39,9 @@ import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarsh
 import { UniAcademicReq } from '@entity/entities/UniAcademicReq.entity';
 import { UniEngReq } from '@entity/entities/UniEngReq.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
+import { SysDocumentTypes } from '@entity/entities/SysDocumentTypes.entity';
+import { Document } from '@entity/entities/Document.entity';
+import { DocumentVersion } from '@entity/entities/DocumentVersion.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -85,6 +88,9 @@ import { AppDbContext } from './AppDbContext';
             UniAcademicReq,
             UniEngReq,
             CourseEngReq,
+            SysDocumentTypes,
+            Document,
+            DocumentVersion,
           ],
           synchronize: false,
           logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
@@ -129,6 +135,9 @@ import { AppDbContext } from './AppDbContext';
       UniAcademicReq,
       UniEngReq,
       CourseEngReq,
+      SysDocumentTypes,
+      Document,
+      DocumentVersion,
     ]),
   ],
   providers: [AppDbContext],
