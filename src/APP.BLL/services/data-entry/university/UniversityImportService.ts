@@ -1,47 +1,39 @@
-/**
- * Orchestrates university CSV import: staging checks, execution, writing Reviewed/Errors CSVs, archiving input.
- */
-
 import { Injectable, Inject } from '@nestjs/common';
 import { BadRequestException } from '@nestjs/common';
 import {
   IFileStore as IFileStoreToken,
   UniversityImportConfig as UniversityImportConfigToken,
 } from '@shared/tokens/injection.tokens';
-import type { IFileStore } from '../bulk-import/abstractions/FileStore.interface';
-import type { ImportResult } from '../bulk-import/abstractions/ImportResult';
-import { CsvImportExecutor } from '../bulk-import/engine/CsvImportExecutor';
-import { buildCsvBuffer } from '../bulk-import/engine/CsvWriter';
-import { UniversityCsvImportSchema } from './UniversityCsvSchema';
-import { UniversityImportProcessor } from './UniversityImportProcessor';
+import type { FileStore } from '../common/abstractions/FileStore';
+import type { ImportResult } from '../common/abstractions/ImportResult';
+import { CsvImportPipeline } from '../common/engine/CsvImportPipeline';
+import { buildCsvBuffer } from '../common/engine/CsvWriter';
+import { UniversityImportSchema } from './UniversityImportSchema';
+import { UniversityImportProcessorService } from './UniversityImportProcessorService';
 import type { UniversityImportConfig } from './UniversityImportConfig';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
-/** Log prefix for bulk import orchestrator (grep-friendly). */
-const LOG_CONTEXT = '[BulkImport:University:Orchestrator]';
+const LOG_CONTEXT = '[BulkImport:University:Service]';
 
 @Injectable()
-export class UniversityCsvImportOrchestrator {
+export class UniversityImportService {
   private isRunning = false;
 
   constructor(
-    @Inject(IFileStoreToken) private readonly fileStore: IFileStore,
-    private readonly executor: CsvImportExecutor,
-    private readonly processor: UniversityImportProcessor,
+    @Inject(IFileStoreToken) private readonly fileStore: FileStore,
+    private readonly pipeline: CsvImportPipeline,
+    private readonly processor: UniversityImportProcessorService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
-    @Inject(UniversityImportConfigToken) private readonly config: UniversityImportConfig,
+    @Inject(UniversityImportConfigToken)
+    private readonly config: UniversityImportConfig,
   ) {}
 
-  /**
-   * Runs one university CSV import from Staging: validates file count and readiness, executes pipeline, writes outputs, archives file.
-   *
-   * @returns Import result with reviewed/error CSV buffers and counts; empty result if no file or file not ready.
-   * @throws BadRequestException when import already running, or multiple files in Staging when not allowed.
-   */
   async execute(): Promise<ImportResult> {
     if (this.isRunning) {
-      throw new BadRequestException('University CSV import is already in progress.');
+      throw new BadRequestException(
+        'University CSV import is already in progress.',
+      );
     }
     this.isRunning = true;
     try {
@@ -51,7 +43,6 @@ export class UniversityCsvImportOrchestrator {
     }
   }
 
-  /** Performs staging list, readiness check, executor run, write outputs, archive. */
   private async runImport(): Promise<ImportResult> {
     const { folders, readinessSeconds, allowMultipleFiles } = this.config;
     const stagingFileEntries = await this.fileStore.listFiles(folders.staging);
@@ -62,28 +53,27 @@ export class UniversityCsvImportOrchestrator {
     }
 
     if (!allowMultipleFiles && stagingFileEntries.length > 1) {
-      const fileNames = stagingFileEntries.map((fileEntry) => fileEntry.name).join(', ');
+      const fileNames = stagingFileEntries.map((e) => e.name).join(', ');
       throw new BadRequestException(
         `Exactly one CSV file is allowed in Staging. Found: ${stagingFileEntries.length} (${fileNames})`,
       );
     }
 
     const [stagingFile] = stagingFileEntries;
-    const fileAgeSeconds = (Date.now() - stagingFile.lastModified.getTime()) / 1000;
+    const fileAgeSeconds =
+      (Date.now() - stagingFile.lastModified.getTime()) / 1000;
     if (fileAgeSeconds < readinessSeconds) {
       this.logger.info(
-        `${LOG_CONTEXT} File ${stagingFile.name} last modified ${fileAgeSeconds.toFixed(1)}s ago; ` +
-          `waiting for ${readinessSeconds}s readiness. Skipping.`,
+        `${LOG_CONTEXT} File ${stagingFile.name} not ready (${fileAgeSeconds.toFixed(1)}s < ${readinessSeconds}s). Skipping.`,
       );
       return this.emptyResult();
     }
 
-    this.logger.info(`${LOG_CONTEXT} Starting university import from Staging: ${stagingFile.name}`);
+    this.logger.info(`${LOG_CONTEXT} Starting import: ${stagingFile.name}`);
     const csvText = await this.fileStore.readFile(stagingFile.path);
-
-    const result = await this.executor.execute(
+    const result = await this.pipeline.execute(
       csvText,
-      UniversityCsvImportSchema,
+      UniversityImportSchema,
       this.processor,
     );
 
@@ -102,21 +92,22 @@ export class UniversityCsvImportOrchestrator {
     const archivePath = `${folders.archive}/${importTimestamp}_${stagingFile.name}`;
     await this.fileStore.ensureDir(folders.archive);
     await this.fileStore.moveFile(stagingFile.path, archivePath);
-    this.logger.info(`${LOG_CONTEXT} Archived ${stagingFile.name} to ${archivePath}`);
+    this.logger.info(
+      `${LOG_CONTEXT} Archived ${stagingFile.name} to ${archivePath}`,
+    );
 
     return result;
   }
 
   private emptyResult(): ImportResult {
     return {
-      reviewedCsv: buildCsvBuffer([], UniversityCsvImportSchema.reviewedHeaders),
-      errorsCsv: buildCsvBuffer([], UniversityCsvImportSchema.errorHeaders),
+      reviewedCsv: buildCsvBuffer([], UniversityImportSchema.reviewedHeaders),
+      errorsCsv: buildCsvBuffer([], UniversityImportSchema.errorHeaders),
       reviewedCount: 0,
       errorsCount: 0,
     };
   }
 
-  /** Returns a compact timestamp for filenames (e.g. 20260305T143022). */
   private formatImportTimestamp(): string {
     return new Date()
       .toISOString()

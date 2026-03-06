@@ -4,16 +4,15 @@
 
 import { BadRequestException } from '@nestjs/common';
 
+import type { CsvRow } from '../abstractions/CsvImportProcessor';
+
 /**
  * Validates that the CSV has at least one data row and that the header row
  * contains all required schema headers. Extra columns allowed.
  *
  * @throws BadRequestException when no data rows or when required headers are missing.
  */
-export function validateSchema(
-  rows: Record<string, string>[],
-  requiredHeaders: string[],
-): void {
+export function validateSchema(rows: CsvRow[], requiredHeaders: string[]): void {
   if (rows.length === 0) {
     throw new BadRequestException('CSV contains no data rows.');
   }

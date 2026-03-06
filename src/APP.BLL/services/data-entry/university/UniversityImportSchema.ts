@@ -1,8 +1,4 @@
-/**
- * Defines the CSV column schema for university bulk import (input, reviewed, and error output headers).
- */
-
-import type { CsvImportSchema } from '../bulk-import/abstractions/CsvImportSchema';
+import type { CsvImportSchema } from '../common/abstractions/CsvImportSchema';
 
 const INPUT_HEADERS = [
   'countryName',
@@ -29,7 +25,7 @@ const REVIEWED_HEADERS = [
 
 const ERROR_HEADERS = [...INPUT_HEADERS, 'errorReason'];
 
-export const UniversityCsvImportSchema: CsvImportSchema = {
+export const UniversityImportSchema: CsvImportSchema = {
   inputHeaders: [...INPUT_HEADERS],
   reviewedHeaders: [...REVIEWED_HEADERS],
   errorHeaders: [...ERROR_HEADERS],

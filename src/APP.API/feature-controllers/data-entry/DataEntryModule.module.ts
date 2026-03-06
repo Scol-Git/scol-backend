@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DataEntryController } from './DataEntryController.controller';
-import { DataEntryModule as DataEntryBllModule } from '@bll/services/data-entry/DataEntryModule.module';
+import { BulkImportModule } from '@bll/services/data-entry/BulkImportModule.module';
 
 @Module({
-  imports: [DataEntryBllModule],
+  imports: [BulkImportModule],
   controllers: [DataEntryController],
 })
 export class DataEntryModule {}

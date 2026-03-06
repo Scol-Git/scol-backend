@@ -1,18 +1,10 @@
-/**
- * IFileStore implementation using the local filesystem. Base path is the root for Staging, Reviewed, Errors, Archive.
- */
-
 import { Injectable } from '@nestjs/common';
 import * as path from 'path';
 import { readdir, readFile, writeFile, mkdir, rename, stat } from 'fs/promises';
-import type { IFileStore, FileEntry } from '../abstractions/FileStore.interface';
+import type { FileStore, FileEntry } from '../abstractions/FileStore';
 
-/**
- * File store backed by the local filesystem for bulk import folders.
- * Base path is injected (e.g. from env or config) for configurability.
- */
 @Injectable()
-export class LocalBulkImportFileStore implements IFileStore {
+export class LocalFileStore implements FileStore {
   constructor(private readonly basePath: string) {}
 
   resolvePath(...relativeSegments: string[]): string {

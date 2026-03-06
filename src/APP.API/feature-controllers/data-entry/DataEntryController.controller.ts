@@ -5,14 +5,14 @@ import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 import { Role } from '@shared/enums/Role.enum';
-import { DataEntryService } from '@bll/services/data-entry/DataEntryService';
+import { BulkImportService } from '@bll/services/data-entry/BulkImportService';
 import { DataEntryImportResponseDto } from '@shared/dtos/data-entry/DataEntryImportResponseDto';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
 
 @ApiTags('data-entry')
 @Controller('data-entry')
 export class DataEntryController {
-  constructor(private readonly dataEntryService: DataEntryService) {}
+  constructor(private readonly bulkImportService: BulkImportService) {}
 
   @Post('csv/import')
   @UseGuards(JwtAuthGuard, RoleGuard)
@@ -38,7 +38,7 @@ export class DataEntryController {
     type: ErrorResponseDto,
   })
   async importCsv() {
-    const result = await this.dataEntryService.importUniCsv();
+    const result = await this.bulkImportService.importUniCsv();
     return {
       message: 'Import completed.',
       universityUpdated: result.reviewedCount,

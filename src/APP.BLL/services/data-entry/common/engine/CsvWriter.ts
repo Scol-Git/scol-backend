@@ -1,4 +1,4 @@
-import type { CsvRecord } from '../abstractions/CsvImportProcessor.interface';
+import type { CsvRow } from '../abstractions/CsvImportProcessor';
 
 function escapeCsvValue(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -11,7 +11,7 @@ function escapeCsvValue(value: string): string {
  * Build a CSV buffer from rows using the exact header order.
  * Does not use Object.keys; headers define column order.
  */
-export function buildCsvBuffer(rows: Record<string, string>[], headers: string[]): Buffer {
+export function buildCsvBuffer(rows: CsvRow[], headers: string[]): Buffer {
   if (rows.length === 0) {
     return Buffer.from(headers.join(',') + '\n', 'utf-8');
   }
