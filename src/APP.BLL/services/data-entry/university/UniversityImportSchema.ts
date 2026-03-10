@@ -13,6 +13,11 @@ const INPUT_HEADERS = [
   'address',
   'coverImageUrl',
   'campusLifeLinks',
+  'rankingMetaData',
+  'locationMapMetaData',
+  'establishedYear',
+  'universityType',
+  'currRanking',
 ] as const;
 
 const REVIEWED_HEADERS = [

@@ -1,5 +1,17 @@
 import type { CsvRow } from '../../common/abstractions/CsvImportProcessor';
 
+/** One item in rankingMetaData: subtitle optional, description array of strings. */
+export interface RankingMetaDataItem {
+  subtitle?: string;
+  description: string[];
+}
+
+/** locationMapMetaData: href and text strings. */
+export interface LocationMapMetaData {
+  href: string;
+  text: string;
+}
+
 /**
  * One university CSV row (input columns). Matches schema input headers.
  */
@@ -16,6 +28,11 @@ export interface UniversityCsvRow {
   address: string;
   coverImageUrl: string;
   campusLifeLinks: string;
+  rankingMetaData: string;
+  locationMapMetaData: string;
+  establishedYear: string;
+  universityType: string;
+  currRanking: string;
 }
 
 /**
@@ -37,6 +54,7 @@ export interface ErrorUniversityRow extends UniversityCsvRow {
 
 /**
  * University row with resolved location IDs, used for DB upsert in UniversityResolverService.
+ * Validation guarantees rankingMetaData and locationMapMetaData are present on valid rows.
  */
 export interface ResolvedUniversityRow {
   uniName: string;
@@ -51,6 +69,11 @@ export interface ResolvedUniversityRow {
   address: string;
   coverImageUrl: string;
   campusLifeLinks: string;
+  rankingMetaData: RankingMetaDataItem[];
+  locationMapMetaData: LocationMapMetaData;
+  establishedYear?: number;
+  universityType?: string;
+  currRanking?: number;
 }
 
 const UNIVERSITY_CSV_KEYS: (keyof UniversityCsvRow)[] = [
@@ -66,6 +89,11 @@ const UNIVERSITY_CSV_KEYS: (keyof UniversityCsvRow)[] = [
   'address',
   'coverImageUrl',
   'campusLifeLinks',
+  'rankingMetaData',
+  'locationMapMetaData',
+  'establishedYear',
+  'universityType',
+  'currRanking',
 ];
 
 /**

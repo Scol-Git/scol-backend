@@ -4,8 +4,12 @@ import { SysUniversities } from '@entity/entities/SysUniversities.entity';
 import { CommissionType } from '@shared/enums/CommissionType.enum';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
-import type { UniversityCsvRow } from '../dto/UniversityCsvRow';
-import type { ResolvedUniversityRow } from '../dto/UniversityCsvRow';
+import type {
+  UniversityCsvRow,
+  ResolvedUniversityRow,
+  RankingMetaDataItem,
+  LocationMapMetaData,
+} from '../dto/UniversityCsvRow';
 import type { LocationMaps } from './LocationMaps';
 import { stateKey, cityKey, universityKey } from './ImportKeys';
 
@@ -50,6 +54,23 @@ export class UniversityResolverService {
       const key = universityKey(uniName, sysCountryId, sysCityId);
       if (seen.has(key)) continue;
       seen.add(key);
+      const rankingMetaData = JSON.parse(
+        row.rankingMetaData.trim(),
+      ) as RankingMetaDataItem[];
+      const locationMapMetaData = JSON.parse(
+        row.locationMapMetaData.trim(),
+      ) as LocationMapMetaData;
+      const establishedYearRaw = row.establishedYear?.trim();
+      const establishedYear =
+        establishedYearRaw !== undefined && establishedYearRaw !== ''
+          ? parseInt(establishedYearRaw, 10)
+          : undefined;
+      const universityType = row.universityType?.trim() || undefined;
+      const currRankingRaw = row.currRanking?.trim();
+      const currRanking =
+        currRankingRaw !== undefined && currRankingRaw !== ''
+          ? parseInt(currRankingRaw, 10)
+          : undefined;
       result.push({
         uniName,
         sysCountryId,
@@ -63,6 +84,11 @@ export class UniversityResolverService {
         address: row.address.trim(),
         coverImageUrl: row.coverImageUrl.trim(),
         campusLifeLinks: row.campusLifeLinks.trim(),
+        rankingMetaData,
+        locationMapMetaData,
+        establishedYear: Number.isNaN(establishedYear) ? undefined : establishedYear,
+        universityType,
+        currRanking: Number.isNaN(currRanking) ? undefined : currRanking,
       });
     }
     return result;
@@ -107,6 +133,11 @@ export class UniversityResolverService {
         coverImageUrl: row.coverImageUrl || undefined,
         campusLifeLinks:
           campusLifeLinksArr.length > 0 ? campusLifeLinksArr : undefined,
+        rankingMetaData: row.rankingMetaData as unknown as Record<string, unknown>,
+        locationMapMetaData: row.locationMapMetaData as unknown as Record<string, unknown>,
+        establishedYear: row.establishedYear,
+        universityType: row.universityType,
+        currRanking: row.currRanking,
       };
       if (existing) {
         Object.assign(existing, payload);
