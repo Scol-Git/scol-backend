@@ -97,6 +97,23 @@ export class UniCourses extends BaseEntity {
   @AutoMap()
   higherGpa?: string;
 
+  @Column({
+    name: 'requirementMetaData',
+    type: 'jsonb',
+    nullable: true,
+  })
+  @AutoMap()
+  requirementMetaData?: Record<string, unknown>;
+
+  @Column({
+    name: 'externalUrl',
+    type: 'varchar',
+    length: 2048,
+    nullable: true,
+  })
+  @AutoMap()
+  externalUrl?: string;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================

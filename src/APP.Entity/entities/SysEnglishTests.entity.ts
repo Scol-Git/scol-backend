@@ -30,6 +30,14 @@ export class SysEnglishTests extends BaseEntity {
   @AutoMap()
   maxScore?: string;
 
+  @Column({
+    name: 'levelOrder',
+    type: 'int',
+    nullable: true,
+  })
+  @AutoMap()
+  levelOrder?: number;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================
