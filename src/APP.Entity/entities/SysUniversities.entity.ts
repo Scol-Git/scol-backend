@@ -138,6 +138,47 @@ export class SysUniversities extends BaseEntity {
   @AutoMap()
   commissionType?: CommissionType;
 
+  @Column({
+    name: 'establishedYear',
+    type: 'int',
+    nullable: true,
+  })
+  @AutoMap()
+  establishedYear?: number;
+
+  @Column({
+    name: 'universityType',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  @AutoMap()
+  universityType?: string;
+
+  @Column({
+    name: 'locationMapMetaData',
+    type: 'jsonb',
+    nullable: true,
+  })
+  @AutoMap()
+  locationMapMetaData?: Record<string, unknown>;
+
+  @Column({
+    name: 'currRanking',
+    type: 'int',
+    nullable: true,
+  })
+  @AutoMap()
+  currRanking?: number;
+
+  @Column({
+    name: 'rankingMetaData',
+    type: 'jsonb',
+    nullable: true,
+  })
+  @AutoMap()
+  rankingMetaData?: Record<string, unknown>;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================

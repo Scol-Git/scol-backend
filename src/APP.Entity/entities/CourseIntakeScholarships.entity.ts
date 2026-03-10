@@ -36,22 +36,40 @@ export class CourseIntakeScholarships extends BaseEntity {
   name!: string;
 
   @Column({
-    name: 'maxAmount',
+    name: 'amount',
     type: 'decimal',
     precision: 10,
     scale: 2,
     nullable: true,
   })
   @AutoMap()
-  maxAmount?: string;
+  amount?: string;
 
   @Column({
-    name: 'criteriaJson',
-    type: 'text',
+    name: 'amountType',
+    type: 'varchar',
+    length: 50,
     nullable: true,
   })
   @AutoMap()
-  criteriaJson?: string;
+  amountType?: string;
+
+  @Column({
+    name: 'frequency',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  @AutoMap()
+  frequency?: string;
+
+  @Column({
+    name: 'scholarshipMetaData',
+    type: 'jsonb',
+    nullable: true,
+  })
+  @AutoMap()
+  scholarshipMetaData?: Record<string, unknown>;
 
   @Column({
     name: 'isActive',

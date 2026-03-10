@@ -122,6 +122,31 @@ export class UniCourseIntakes extends BaseEntity {
   initialDeposit?: string;
 
   @Column({
+    name: 'initialDepositType',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  @AutoMap()
+  initialDepositType?: string;
+
+  @Column({
+    name: 'intakeMetaData',
+    type: 'jsonb',
+    nullable: true,
+  })
+  @AutoMap()
+  intakeMetaData?: Record<string, unknown>;
+
+  @Column({
+    name: 'feesMetaData',
+    type: 'jsonb',
+    nullable: true,
+  })
+  @AutoMap()
+  feesMetaData?: Record<string, unknown>;
+
+  @Column({
     name: 'applicationFee',
     type: 'decimal',
     precision: 10,
