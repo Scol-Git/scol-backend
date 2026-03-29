@@ -7,6 +7,14 @@ import { parseCsv } from './CsvParser';
 import { validateSchema } from './HeaderValidator';
 import { buildCsvBuffer } from './CsvWriter';
 
+export interface CsvImportPipelineOptions {
+  /**
+   * When false, the processor runs without an outer transaction (e.g. course import
+   * uses per-batch inner transactions). Default true (university import).
+   */
+  wrapInTransaction?: boolean;
+}
+
 @Injectable()
 export class CsvImportPipeline {
   constructor(private readonly db: AppDbContext) {}
@@ -15,13 +23,17 @@ export class CsvImportPipeline {
     csvText: string,
     schema: CsvImportSchema,
     processor: CsvImportProcessor,
+    options?: CsvImportPipelineOptions,
   ): Promise<ImportResult> {
     const rows = parseCsv(csvText);
     validateSchema(rows, schema.inputHeaders);
 
-    const { reviewedRows, errorRows } = await this.db.transaction((manager) =>
-      processor.processRows(manager, rows),
-    );
+    const wrap = options?.wrapInTransaction !== false;
+    const { reviewedRows, errorRows } = wrap
+      ? await this.db.transaction((manager) =>
+          processor.processRows(manager, rows),
+        )
+      : await processor.processRows(this.db.manager, rows);
 
     const reviewedCsv = buildCsvBuffer(reviewedRows, schema.reviewedHeaders);
     const errorsCsv = buildCsvBuffer(errorRows, schema.errorHeaders);

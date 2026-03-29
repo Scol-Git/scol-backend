@@ -16,7 +16,12 @@
     "typeorm:gen": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:generate -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts",
     "typeorm:run": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:run -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts",
     "typeorm:revert": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:revert -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts",
-    "seed": "ts-node -r tsconfig-paths/register --transpile-only ./seeders/database.seeder.ts"
+    "seed": "ts-node -r tsconfig-paths/register --transpile-only ./seeders/database.seeder.ts",
+    "csv:course-details": "ts-node --transpile-only ./scripts/generate-course-details-csv.ts --fill",
+    "csv:course-details:empty": "ts-node --transpile-only ./scripts/generate-course-details-csv.ts",
+    "add-admin": "ts-node -r tsconfig-paths/register --transpile-only ./scripts/add-admin.ts",
+    "csv:uni-bulk:inspect": "ts-node --transpile-only ./scripts/generate-uni-bulk-csv.ts --inspect --input ./uni.csv",
+    "csv:uni-bulk:fill": "ts-node --transpile-only ./scripts/generate-uni-bulk-csv.ts --inspect --fill --input ./uni.csv --output ./uni_bulk_filled.csv"
   },
   "dependencies": {
     "@automapper/classes": "8.8.1",

@@ -171,3 +171,14 @@ export const ICsvImportProcessor = Symbol('ICsvImportProcessor');
  * Folder names and behaviour for university CSV import
  */
 export const UniversityImportConfig = Symbol('UniversityImportConfig');
+
+/**
+ * Token for IFileStore (course bulk import — separate base path from university)
+ */
+export const IFileStoreCourse = Symbol('IFileStoreCourse');
+
+/**
+ * Token for CourseImportConfig
+ * Folder names and behaviour for course CSV import
+ */
+export const CourseImportConfig = Symbol('CourseImportConfig');
