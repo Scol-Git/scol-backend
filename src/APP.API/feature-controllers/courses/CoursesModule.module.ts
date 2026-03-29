@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { CourseDetailsModule } from '@bll/services/course-details/CourseDetailsModule.module';
+import { CourseServiceModule } from '@bll/services/CourseService/CourseServiceModule.module';
 import { CoursesController } from './CoursesController.controller';
 
 @Module({
-  imports: [CourseDetailsModule],
+  imports: [CourseServiceModule],
   controllers: [CoursesController],
 })
 export class CoursesModule {}

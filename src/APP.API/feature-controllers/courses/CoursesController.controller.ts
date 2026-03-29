@@ -11,19 +11,19 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
-import { CourseDetailsService } from '@bll/services/course-details/CourseDetailsService';
+import { CourseService } from '@bll/services/CourseService/CourseService';
 import { CourseDetailsResponseDto } from '@shared/dtos/course-details/CourseDetailsResponseDto';
 
 @ApiTags('courses')
 @ApiExtraModels(CourseDetailsResponseDto)
 @Controller('courses')
 export class CoursesController {
-  constructor(private readonly courseDetailsService: CourseDetailsService) {}
+  constructor(private readonly courseService: CourseService) {}
 
   /**
    * GET /courses/:id
    * :id must be UniCourseIntakes.id (same as home/search courseId).
-   * UniCourses.id / uniId are resolved inside CourseDetailsService from the loaded intake.
+   * UniCourses.id / uniId are resolved inside CourseService from the loaded intake.
    */
   @Get(':id')
   @ApiOperation({ summary: 'Get course details by ID' })
@@ -36,7 +36,7 @@ export class CoursesController {
   async getById(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<CourseDetailsResponseDto> {
-    const result = await this.courseDetailsService.getCourseDetails(id);
+    const result = await this.courseService.getCourseDetails(id);
     if (result == null) {
       throw new NotFoundException('Course not found');
     }

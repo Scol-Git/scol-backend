@@ -25,7 +25,7 @@ const COURSE_DETAILS_RELATIONS = {
 };
 
 @Injectable()
-export class CourseDetailsService {
+export class CourseService {
   constructor(
     private readonly db: AppDbContext,
     private readonly courseDetailsMapper: CourseDetailsMapper,
