@@ -16,6 +16,8 @@ export class UniversityDetailsDto {
 export class LocationCoordinatesDto {
   @ApiPropertyOptional() latitude?: number;
   @ApiPropertyOptional() longitude?: number;
+  /** Map URL from `locationMapMetaData.href` (or `link` when stored). */
+  @ApiPropertyOptional() link?: string | null;
 }
 
 export class LocationDto {
