@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { IsNull, Not } from 'typeorm';
+import { IsNull } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
@@ -55,10 +55,10 @@ export class CourseService {
       return null;
     }
 
-    const siblingIntakes = await this.db.courseIntakes.find({
+    /** All active intakes for this course (including current) — distinct month/years for intake UI/meta. */
+    const allCourseIntakes = await this.db.courseIntakes.find({
       where: {
         uniCourseId: intake.uniCourseId,
-        id: Not(intakeId),
         isActive: true,
         deletedAt: IsNull(),
       },
@@ -67,7 +67,7 @@ export class CourseService {
 
     return this.courseDetailsMapper.toCourseDetailsResponse(
       intake,
-      siblingIntakes,
+      allCourseIntakes,
     );
   }
 }

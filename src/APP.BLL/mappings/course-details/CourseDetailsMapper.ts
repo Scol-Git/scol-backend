@@ -13,6 +13,7 @@ import {
   MetaInformationItemDto,
 } from '@shared/dtos/course-details/MetaItemDto';
 
+/** Full English month names for intake lines, e.g. `April - 2026`, `September - 2026`. */
 const MONTH_NAMES = [
   'January',
   'February',
@@ -41,17 +42,17 @@ const COURSE_DETAIL_TABS: { key: string; label: string }[] = [
 export class CourseDetailsMapper {
   toCourseDetailsResponse(
     intake: UniCourseIntakes,
-    siblingIntakes: UniCourseIntakes[],
+    allCourseIntakes: UniCourseIntakes[],
   ): CourseDetailsResponseDto {
     return {
-      courseDetails: this.toCourseDetailsDto(intake, siblingIntakes),
-      meta: this.buildMeta(intake, siblingIntakes),
+      courseDetails: this.toCourseDetailsDto(intake, allCourseIntakes),
+      meta: this.buildMeta(intake, allCourseIntakes),
     };
   }
 
   private toCourseDetailsDto(
     intake: UniCourseIntakes,
-    siblingIntakes: UniCourseIntakes[],
+    allCourseIntakes: UniCourseIntakes[],
   ): CourseDetailsDto {
     const course = intake.UniCourse;
     const uni = course?.SysUniversity;
@@ -81,7 +82,7 @@ export class CourseDetailsMapper {
         intake,
         scholarships,
       ),
-      intakeDates: this.buildIntakeDatesSection(intake, siblingIntakes),
+      intakeDates: this.buildIntakeDatesSection(intake, allCourseIntakes),
     };
   }
 
@@ -102,7 +103,7 @@ export class CourseDetailsMapper {
 
   private buildMeta(
     intake: UniCourseIntakes,
-    siblingIntakes: UniCourseIntakes[],
+    allCourseIntakes: UniCourseIntakes[],
   ): MetaItemDto[] {
     const course = intake.UniCourse;
     const uni = course?.SysUniversity;
@@ -135,7 +136,7 @@ export class CourseDetailsMapper {
       });
     }
 
-    const intakes = this.buildIntakeDatesSection(intake, siblingIntakes);
+    const intakes = this.buildIntakeDatesSection(intake, allCourseIntakes);
     if (intakes.hasInfo) {
       meta.push({
         infoKey: 'intakeDatesMetaData',
@@ -179,7 +180,7 @@ export class CourseDetailsMapper {
     return parsed;
   }
 
-  /** Built from sibling intake rows (month/year), not `intakeMetaData` JSONB. */
+  /** Built from all active course intakes (month/year), not `intakeMetaData` JSONB. */
   private metaInformationForIntakes(
     section: ReturnType<CourseDetailsMapper['buildIntakeDatesSection']>,
   ): MetaInformationItemDto[] {
@@ -371,7 +372,10 @@ export class CourseDetailsMapper {
     };
   }
 
-  /** `month`/`year` from intakes with same `uniCourseId` and `id` ≠ current (see `CourseService` query). */
+  /**
+   * Unique (month, year) across all active intakes for the course; labels like `April - 2026`.
+   * Duplicate rows / same period collapse to one line.
+   */
   private buildIntakeDateLinesFromRows(rows: UniCourseIntakes[]): string[] {
     const pairs = new Map<
       string,
@@ -387,17 +391,20 @@ export class CourseDetailsMapper {
     const sorted = [...pairs.values()].sort((a, b) =>
       a.year !== b.year ? a.year - b.year : a.month - b.month,
     );
-    return sorted.map(
-      ({ month, year }) =>
-        `${MONTH_NAMES[month - 1]} - ${year}`,
+    return sorted.map(({ month, year }) =>
+      this.formatIntakePeriodLabel(month, year),
     );
+  }
+
+  private formatIntakePeriodLabel(month: number, year: number): string {
+    return `${MONTH_NAMES[month - 1]} - ${year}`;
   }
 
   private buildIntakeDatesSection(
     _intake: UniCourseIntakes,
-    siblingIntakes: UniCourseIntakes[],
+    allCourseIntakes: UniCourseIntakes[],
   ) {
-    const intakes = this.buildIntakeDateLinesFromRows(siblingIntakes);
+    const intakes = this.buildIntakeDateLinesFromRows(allCourseIntakes);
     const hasInfo = intakes.length > 0;
     return {
       hasInfo,
