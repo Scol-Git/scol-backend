@@ -166,7 +166,7 @@ export class AuthController {
   ): Promise<TokenRefreshResponseDto> {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new BadRequestException(
-        'Refresh token is required in Authorization header',
+        'Refresh token is required',
       );
     }
     const refreshToken = authHeader.substring(7);

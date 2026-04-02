@@ -20,7 +20,7 @@ export class LoginRequestDto {
   email?: string;
 
   @ValidateIf((o) => !o.email)
-  @IsPhoneNumber('BD', { message: 'phone must be a valid BD phone number if provided' })
+  @IsPhoneNumber('BD', { message: 'Invalid Bangladesh phone number' })
   @IsOptional()
   @ApiPropertyOptional({
     description: 'BD phone (required if email not provided)',

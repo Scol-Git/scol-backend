@@ -76,16 +76,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       // Specialize auth errors for clarity
       if (status === HttpStatus.UNAUTHORIZED) {
-        if (msgString?.toLowerCase().includes('missing authentication token')) {
-          detail =
-            'Missing authentication token. Include Authorization: Bearer <access-token>';
-        } else if (
-          msgString?.toLowerCase().includes('invalid or expired token')
+        const lowered = msgString?.toLowerCase() ?? '';
+        if (
+          lowered.includes('missing authentication token') ||
+          lowered.includes('authentication token is missing')
         ) {
-          detail =
-            'Invalid or expired authentication token. Please re-login or refresh the token.';
+          detail = 'Missing authentication token';
+        } else if (
+          lowered.includes('invalid or expired token') ||
+          lowered.includes('token is invalid or expired')
+        ) {
+          detail = 'Invalid or expired session';
         } else {
-          detail = msgString ?? 'Unauthorized';
+          detail = msgString ?? 'Unauthorized access denied';
         }
       } else {
         detail = msgString ?? 'Internal server error';
