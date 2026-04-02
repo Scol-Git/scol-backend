@@ -10,7 +10,7 @@ export class OtpAttemptsExceededException extends HttpException {
   constructor(maxAttempts: number) {
     super(
       {
-        message: `You have exceeded the maximum number of OTP verification attempts (${maxAttempts}). Please request a new OTP.`,
+        message: 'Maximum OTP attempts exceeded',
         error: { code: 'OTP_ATTEMPTS_EXCEEDED' },
       },
       HttpStatus.BAD_REQUEST,

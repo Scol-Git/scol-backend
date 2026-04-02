@@ -33,7 +33,7 @@ export class PhoneNumberUtil {
   static validate(phone: string): void {
     if (!this.isValid(phone)) {
       throw new ValidationException(
-        'Phone must be a valid 11-digit Bangladesh number starting with 01, third digit must be 3-9 (operator code: 013, 014, 015, 016, 017, 018, 019)',
+        'Invalid Bangladesh phone number format',
       );
     }
   }

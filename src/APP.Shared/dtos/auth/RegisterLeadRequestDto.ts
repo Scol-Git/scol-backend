@@ -22,7 +22,7 @@ export class RegisterLeadRequestDto {
   @IsNotEmpty({ message: 'Phone number is required' })
   @Matches(/^01[3-9]\d{8}$/, {
     message:
-      'Phone must be a valid 11-digit Bangladesh number starting with 01, third digit must be 3-9 (operator code: 013, 014, 015, 016, 017, 018, 019)',
+      'Invalid Bangladesh phone number format',
   })
   @AutoMap()
   @ApiProperty({
