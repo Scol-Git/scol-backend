@@ -40,7 +40,7 @@ export class UserContextAccessor {
     const context = this._storage.getStore();
     if (!context) {
       throw new UnauthorizedException(
-        'User context not found. Ensure UserContextMiddleware is registered and user is authenticated.',
+        'User context not found',
       );
     }
     return context;
@@ -116,9 +116,7 @@ export class UserContextAccessor {
       return;
     }
 
-    throw new UnauthorizedException(
-      `Access denied. You do not have permission to access resources in organization ${orgId}.`,
-    );
+    throw new UnauthorizedException('Organization access is denied');
   }
 
   /**

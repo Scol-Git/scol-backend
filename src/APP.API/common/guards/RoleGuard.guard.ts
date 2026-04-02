@@ -37,7 +37,7 @@ export class RoleGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      throw new ForbiddenException('User not authenticated');
+      throw new ForbiddenException('User is not authenticated');
     }
 
     // Check if user has any of the required roles
@@ -52,7 +52,7 @@ export class RoleGuard implements CanActivate {
 
     if (!hasRole) {
       throw new ForbiddenException(
-        `Missing required role. Required: ${requiredRoles.join(', ')}`,
+        'Required user role missing',
       );
     }
 

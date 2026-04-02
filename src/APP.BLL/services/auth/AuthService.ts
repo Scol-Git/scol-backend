@@ -155,7 +155,7 @@ export class AuthService {
       otpAccessToken: otpToken,
       expiresIn: this.securityConfig.otp.ttlSeconds,
       message:
-        'Registration successful. Push Test - Please verify your phone with the OTP sent via SMS.',
+        'Registration successful. Verify phone',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       //...(this.isDevelopment && { devOtp: plainOtp }),
       devOtp: plainOtp,
@@ -182,15 +182,15 @@ export class AuthService {
 
     // Validate token
     if (!otpUserPayload.purpose) {
-      throw new InvalidTokenException('Invalid Phone Verification Token');
+      throw new InvalidTokenException('Invalid phone verification token');
     }
 
     if (otpUserPayload.purpose == 'phone_verify' && !otpUserPayload.pendingId) {
-      throw new InvalidTokenException('Invalid Phone Verification Token');
+      throw new InvalidTokenException('Invalid phone verification token');
     }
 
     if (otpUserPayload.purpose == 'password_reset' && !otpUserPayload.userId) {
-      throw new InvalidTokenException('Invalid Password Reset Token');
+      throw new InvalidTokenException('Invalid password reset token');
     }
 
     // Handle password reset flow
@@ -254,7 +254,7 @@ export class AuthService {
           userPhone: PhoneNumberUtil.mask(user.phone),
           action: 'VERIFY_OTP_FAILED_PHONE_MISMATCH',
         });
-        throw new InvalidTokenException('Phone number mismatch');
+        throw new InvalidTokenException('Phone number mismatch detected');
       }
 
       // Revoke existing sessions before password change
@@ -309,7 +309,7 @@ export class AuthService {
     // Handle registration flow (phone_verify)
     if (otpUserPayload.purpose === 'phone_verify') {
       if (!otpUserPayload.pendingId) {
-        throw new InvalidTokenException('Pending ID missing from token');
+        throw new InvalidTokenException('Token missing pending ID');
       }
 
       // Verify OTP using unified method
@@ -328,7 +328,7 @@ export class AuthService {
           otpSessionId: purposeId,
           action: 'VERIFY_OTP_FAILED_OTP_MISMATCH',
         });
-        throw new InvalidTokenException('OTP does not match registration');
+        throw new InvalidTokenException('OTP registration mismatch');
       }
 
       // Get OTP session data (Redis-first with DB fallback)
@@ -366,7 +366,7 @@ export class AuthService {
 
       if (!pendingData.passwordHash || !pendingData.fullName) {
         throw new ValidationException(
-          'Invalid registration data',
+          'Registration data is invalid',
           {
             email: ['Email is invalid'],
             password: ['Password must be at least 8 characters'],
@@ -454,7 +454,7 @@ export class AuthService {
     }
 
     // Unknown purpose
-    throw new InvalidTokenException('Invalid token purpose');
+    throw new InvalidTokenException('Invalid token purpose assigned');
   }
 
   /**
@@ -480,7 +480,7 @@ export class AuthService {
       otpUserPayload.purpose !== 'password_reset'
     ) {
       throw new InvalidTokenException(
-        'Resend OTP is not allowed for this operation',
+        'Resend OTP not allowed',
       );
     }
 
@@ -490,14 +490,14 @@ export class AuthService {
 
     if (otpUserPayload.purpose === 'phone_verify') {
       if (!otpUserPayload.pendingId) {
-        throw new InvalidTokenException('Pending ID missing from token');
+        throw new InvalidTokenException('Token missing pending ID');
       }
       otpPurpose = OtpPurpose.Registration;
       purposeId = otpUserPayload.pendingId;
     } else {
       // password_reset
       if (!otpUserPayload.userId) {
-        throw new InvalidTokenException('User ID missing from token');
+        throw new InvalidTokenException('Token missing user ID');
       }
       otpPurpose = OtpPurpose.PasswordReset;
       purposeId = otpUserPayload.userId;
@@ -525,7 +525,7 @@ export class AuthService {
       );
 
       throw new BusinessException(
-        'OTP session expired. Please start again.',
+        'OTP session has expired',
         'OTP_EXPIRED',
       );
     }
@@ -553,7 +553,7 @@ export class AuthService {
 
     // 8. Response (NO TOKEN)
     return {
-      message: 'OTP resent successfully.',
+      message: 'OTP was resent successfully',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       //...(this.isDevelopment && { devOtp: plainOtp }),
       devOtp: plainOtp,
@@ -688,7 +688,7 @@ export class AuthService {
         userId: payload.sub,
         action: 'REFRESH_TOKEN_FAILED_NO_SESSION',
       });
-      throw new InvalidTokenException('Invalid refresh token');
+      throw new InvalidTokenException('Invalid refresh token provided');
     }
 
     const isValid = await this.hasher.verify(
@@ -702,7 +702,7 @@ export class AuthService {
         sessionId: session.id,
         action: 'REFRESH_TOKEN_FAILED_INVALID',
       });
-      throw new InvalidTokenException('Invalid refresh token');
+      throw new InvalidTokenException('Invalid refresh token provided');
     }
 
     if (session.expiresAt < new Date()) {
@@ -713,7 +713,7 @@ export class AuthService {
         expiresAt: session.expiresAt,
         action: 'REFRESH_TOKEN_FAILED_EXPIRED',
       });
-      throw new InvalidTokenException('Refresh token expired');
+      throw new InvalidTokenException('Refresh token has expired');
     }
 
     const newAccessToken = this.jwt.generateAccessToken({
@@ -835,7 +835,7 @@ export class AuthService {
 
       // Return 401 with generic message to prevent user enumeration
       throw new UnauthorizedException(
-        'If an account exists with this phone number, you will receive an OTP shortly.',
+        'OTP sent if account exists',
       );
     }
 
@@ -858,7 +858,7 @@ export class AuthService {
         action: 'FORGOT_PASSWORD_FAILED_SUSPENDED',
       });
       throw new BusinessException(
-        'Account is suspended. Please contact support.',
+        'This account is suspended',
         'ACCOUNT_SUSPENDED',
       );
     }
@@ -908,7 +908,7 @@ export class AuthService {
       otpAccessToken: otpToken,
       expiresIn: 300,
       message:
-        'If an account exists with this phone number, you will receive an OTP shortly.',
+        'OTP sent if account exists',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       // ...(this.isDevelopment && { devOtp: plainOtp }),
       devOtp: plainOtp,

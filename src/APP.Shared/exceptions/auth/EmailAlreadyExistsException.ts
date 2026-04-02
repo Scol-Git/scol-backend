@@ -8,7 +8,7 @@ import { BusinessException } from '../BusinessException';
 export class EmailAlreadyExistsException extends BusinessException {
   constructor(email: string) {
     super(
-      `Email ${email} is already registered. Please use a different email or login.`,
+      `Email is already registered.`,
       'EMAIL_ALREADY_EXISTS',
     );
   }

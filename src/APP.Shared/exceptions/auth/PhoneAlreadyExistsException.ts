@@ -8,7 +8,7 @@ import { ValidationException } from '../ValidationException';
 export class PhoneAlreadyExistsException extends ValidationException {
   constructor(phone: string) {
     super(
-      `Phone number ${phone} is already registered. Please use a different phone number or login.`,
+      `Phone number already registered.`,
       undefined,
       'PHONE_ALREADY_EXISTS',
     );

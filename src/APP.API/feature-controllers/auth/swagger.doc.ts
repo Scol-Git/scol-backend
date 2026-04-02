@@ -98,12 +98,12 @@ const docs: Record<string, SwaggerDocSet> = {
             value: {
               status: 'error',
               message:
-                'Phone must be a valid 11-digit Bangladesh number starting with 01',
+                'Invalid Bangladesh phone number format',
               statusCode: 400,
               error: {
                 details: {
                   phone: [
-                    'Phone must be a valid 11-digit Bangladesh number starting with 01',
+                    'Invalid Bangladesh phone number format',
                   ],
                 },
               },
@@ -162,7 +162,7 @@ const docs: Record<string, SwaggerDocSet> = {
             value: {
               status: 'error',
               message:
-                'The OTP you entered is incorrect. Please check and try again.',
+                'Incorrect OTP. Try again',
               statusCode: 400,
               error: {
                 code: 'INVALID_OTP',
@@ -173,7 +173,7 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'OTP expired',
             value: {
               status: 'error',
-              message: 'Your OTP has expired. Please request a new OTP.',
+              message: 'Your OTP has expired',
               statusCode: 400,
               error: {
                 code: 'OTP_EXPIRED',
@@ -185,7 +185,7 @@ const docs: Record<string, SwaggerDocSet> = {
             value: {
               status: 'error',
               message:
-                'You have exceeded the maximum number of OTP verification attempts (3). Please request a new OTP.',
+                'Maximum OTP attempts exceeded',
               statusCode: 400,
               error: {
                 code: 'OTP_ATTEMPTS_EXCEEDED',
@@ -241,7 +241,7 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Resend cooldown active (60 seconds)',
             value: {
               status: 'error',
-              message: 'Please wait 45 seconds before requesting a new OTP.',
+              message: 'Retry after 45 seconds',
               statusCode: 429,
               error: {
                 code: 'RATE_LIMIT_EXCEEDED',
@@ -309,12 +309,12 @@ const docs: Record<string, SwaggerDocSet> = {
             value: {
               status: 'error',
               message:
-                'Phone must be a valid 11-digit Bangladesh number starting with 01',
+                'Invalid Bangladesh phone number format',
               statusCode: 400,
               error: {
                 details: {
                   phone: [
-                    'Phone must be a valid 11-digit Bangladesh number starting with 01',
+                    'Invalid Bangladesh phone number format',
                   ],
                 },
               },
@@ -416,7 +416,7 @@ const docs: Record<string, SwaggerDocSet> = {
       },
     }),
     ApiBadRequestResponse({
-      description: 'Refresh token is required in Authorization header',
+      description: 'Refresh token is required',
       schema: { $ref: getSchemaPath(ErrorResponseDto) },
     }),
     ApiUnauthorizedResponse({
@@ -545,12 +545,12 @@ const docs: Record<string, SwaggerDocSet> = {
             value: {
               status: 'error',
               message:
-                'Phone must be a valid 11-digit Bangladesh number starting with 01',
+                'Invalid Bangladesh phone number format',
               statusCode: 400,
               error: {
                 details: {
                   phone: [
-                    'Phone must be a valid 11-digit Bangladesh number starting with 01',
+                    'Invalid Bangladesh phone number format',
                   ],
                 },
               },
@@ -580,7 +580,7 @@ const docs: Record<string, SwaggerDocSet> = {
             value: {
               status: 'error',
               message:
-                'Account locked due to multiple failed login attempts. Try again in 15 minute(s).',
+                'Account locked: too many attempts',
               statusCode: 401,
               error: {
                 code: 'ACCOUNT_LOCKED',
@@ -591,7 +591,7 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Account suspended',
             value: {
               status: 'error',
-              message: 'Account is suspended. Please contact support.',
+              message: 'This account is suspended',
               statusCode: 500,
               error: {
                 code: 'ACCOUNT_SUSPENDED',
@@ -611,7 +611,7 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Resend cooldown active',
             value: {
               status: 'error',
-              message: 'Please wait 45 seconds before requesting a new OTP.',
+              message: 'Retry after 45 seconds',
               statusCode: 429,
               error: {
                 code: 'RATE_LIMIT_EXCEEDED',

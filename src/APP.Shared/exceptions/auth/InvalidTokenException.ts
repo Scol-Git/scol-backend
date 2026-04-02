@@ -18,7 +18,7 @@ export class InvalidTokenException extends UnauthorizedException {
    * 
    * @param message - Optional custom error message
    */
-  constructor(message: string = 'Invalid or expired token') {
+  constructor(message: string = 'Token is invalid or expired') {
     super(message);
   }
 }

@@ -7,7 +7,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
  * Returns HTTP 429 Too Many Requests with Retry-After header.
  */
 export class OtpResendRateLimitException extends HttpException {
-  constructor(message: string, retryAfter: number) {
+  constructor(message: string = 'Missing message parameter', retryAfter: number) {
     super(
       {
         statusCode: HttpStatus.TOO_MANY_REQUESTS,
