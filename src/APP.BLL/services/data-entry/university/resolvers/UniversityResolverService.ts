@@ -15,6 +15,22 @@ import { stateKey, cityKey, universityKey } from './ImportKeys';
 
 const LOG_CONTEXT = '[BulkImport:University:UniversityResolver]';
 
+/**
+ * Multiple URLs in one CSV cell: split on comma and/or semicolon.
+ * **CSV gotcha:** unquoted `url1, url2` is parsed as *two columns* — only the first URL
+ * lands in `campusLifeLinks`. Use **quoted** comma-separated values, or **semicolon**-separated
+ * URLs in an unquoted cell (e.g. `https://a; https://b`).
+ */
+function splitCampusLifeLinksCell(raw: string): string[] {
+  if (!raw.trim()) {
+    return [];
+  }
+  return raw
+    .split(/[,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 @Injectable()
 export class UniversityResolverService {
   constructor(@Inject(ILoggerToken) private readonly logger: ILogger) {}
@@ -111,12 +127,7 @@ export class UniversityResolverService {
           sysCityId: row.sysCityId,
         },
       });
-      const campusLifeLinksArr = row.campusLifeLinks
-        ? row.campusLifeLinks
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
+      const campusLifeLinksArr = splitCampusLifeLinksCell(row.campusLifeLinks);
       const commissionType =
         row.commissionType === 'AMOUNT'
           ? CommissionType.AMOUNT

@@ -5,21 +5,22 @@ import type {
   CsvRow,
   CsvProcessingResult,
 } from '../common/abstractions/CsvImportProcessor';
-import { SysUniversities } from '@entity/entities/SysUniversities.entity';
-import { SysProgrammes } from '@entity/entities/SysProgrammes.entity';
-import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
 import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
 import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
-import { COURSE_DEGREE_LEVEL_ORDER } from './course-degree-level-order';
-import { CourseImportSchema } from './CourseImportSchema';
 import type { CourseImportConfig } from './CourseImportConfig';
 import {
   CourseImportConfig as CourseImportConfigToken,
 } from '@shared/tokens/injection.tokens';
-import { CourseRowValidator, type ErrorCourseRow } from './validators/CourseRowValidator';
+import {
+  CourseRowValidator,
+  type ErrorCourseRow,
+} from './validators/CourseRowValidator';
+import { CourseUniversityResolverService } from './resolvers/CourseUniversityResolverService';
+import { ProgrammeDegreeResolverService } from './resolvers/ProgrammeDegreeResolverService';
+import { CourseRowResultBuilder } from './builders/CourseRowResultBuilder';
 import { parseIntakeInfo } from './parsers/courseIntakeInfoParser';
 import {
   parseCourseDurationMonths,
@@ -33,14 +34,13 @@ import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
 const LOG_CONTEXT = '[BulkImport:Course:Processor]';
 
-function normalizeDegreeKey(name: string): string {
-  return name.trim().toUpperCase().replace(/\s+/g, ' ');
-}
-
 @Injectable()
 export class CourseImportProcessorService implements CsvImportProcessor {
   constructor(
     private readonly validator: CourseRowValidator,
+    private readonly universityResolver: CourseUniversityResolverService,
+    private readonly programmeDegreeResolver: ProgrammeDegreeResolverService,
+    private readonly resultBuilder: CourseRowResultBuilder,
     @Inject(CourseImportConfigToken) private readonly importConfig: CourseImportConfig,
     @Inject(ILoggerToken) private readonly logger: ILogger,
   ) {}
@@ -102,34 +102,51 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     reviewed?: Record<string, string>;
     error?: ErrorCourseRow;
   }> {
-    const base = this.flattenRowToStrings(row);
+    const base = this.resultBuilder.flattenInputRow(row);
 
-    const uniResult = await this.resolveUniversity(tm, row.uniName);
+    const uniResult = await this.universityResolver.resolveUniversity(
+      tm,
+      row.uniName,
+    );
     if ('error' in uniResult) {
-      return { error: { ...base, errorReason: uniResult.error } };
+      return {
+        error: this.resultBuilder.resolutionError(base, uniResult.error),
+      };
     }
     const uniId = uniResult.uniId;
 
-    const progResult = await this.findOrCreateProgramme(tm, row.programmeName);
-    if ('error' in progResult) {
-      return { error: { ...base, errorReason: progResult.error } };
+    const progResult = await this.programmeDegreeResolver.findOrCreateProgramme(
+      tm,
+      row.programmeName,
+    );
+
+    const award = await this.programmeDegreeResolver.findOrCreateDegree(
+      tm,
+      row.degreeName,
+    );
+    if ('error' in award) {
+      return { error: this.resultBuilder.resolutionError(base, award.error) };
     }
 
-    const award = await this.findOrCreateDegree(tm, row.degreeName);
-    if ('error' in award) {
-      return { error: { ...base, errorReason: award.error } };
-    }
-    const minDeg = await this.findOrCreateDegree(tm, row.minDegreeName);
+    const minDeg = await this.programmeDegreeResolver.findOrCreateDegree(
+      tm,
+      row.minDegreeName,
+    );
     if ('error' in minDeg) {
-      return { error: { ...base, errorReason: minDeg.error } };
+      return {
+        error: this.resultBuilder.resolutionError(base, minDeg.error),
+      };
     }
 
     let higherSysDegreeId: string | undefined;
     const hName = (row.higherDegreeName ?? '').trim();
     if (hName) {
-      const hd = await this.findOrCreateDegree(tm, hName);
+      const hd = await this.programmeDegreeResolver.findOrCreateDegree(
+        tm,
+        hName,
+      );
       if ('error' in hd) {
-        return { error: { ...base, errorReason: hd.error } };
+        return { error: this.resultBuilder.resolutionError(base, hd.error) };
       }
       higherSysDegreeId = hd.id;
     }
@@ -203,13 +220,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     intakeEntity.currency = (row.currency ?? '').trim() || undefined;
     intakeEntity.initialDeposit = parseOptionalDecimal(row.initialDeposit ?? '');
     intakeEntity.applicationFee = parseOptionalDecimal(row.applicationFee ?? '');
-    const im = (row.intakeMetaData ?? '').trim();
-    if (im) {
-      const o = parseJsonValue(im);
-      if (o !== null && typeof o === 'object' && !Array.isArray(o)) {
-        intakeEntity.intakeMetaData = o as Record<string, unknown>;
-      }
-    }
+    /** Bulk upload does not persist `intakeMetaData` (column ignored; set elsewhere if needed). */
     const fm = (row.feesMetaData ?? '').trim();
     if (fm) {
       const o = parseJsonValue(fm);
@@ -322,8 +333,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     }
 
     return {
-      reviewed: {
-        ...base,
+      reviewed: this.resultBuilder.reviewed(base, {
         uniId,
         sysProgrammeId: progResult.id,
         sysDegreeId: award.id,
@@ -338,83 +348,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
         sysEngTestIdPte,
         courseEngReqIdPte,
         scholarshipId,
-      },
+      }),
     };
-  }
-
-  private flattenRowToStrings(row: CsvRow): Record<string, string> {
-    const out: Record<string, string> = {};
-    for (const h of CourseImportSchema.inputHeaders) {
-      out[h] = row[h] ?? '';
-    }
-    return out;
-  }
-
-  private async resolveUniversity(
-    tm: EntityManager,
-    uniNameRaw: string,
-  ): Promise<{ uniId: string } | { error: string }> {
-    const name = uniNameRaw.trim();
-    const list = await tm
-      .createQueryBuilder(SysUniversities, 'u')
-      .where('TRIM(u.uniName) = TRIM(:name)', { name })
-      .getMany();
-
-    if (list.length === 0) {
-      return { error: `University not found for uniName: "${name}"` };
-    }
-    if (list.length > 1) {
-      return {
-        error: `Ambiguous uniName: multiple universities match "${name}"`,
-      };
-    }
-    return { uniId: list[0].id };
-  }
-
-  private async findOrCreateProgramme(
-    tm: EntityManager,
-    nameRaw: string,
-  ): Promise<{ id: string } | { error: string }> {
-    const name = nameRaw.trim();
-    const repo = tm.getRepository(SysProgrammes);
-    const existing = await repo
-      .createQueryBuilder('p')
-      .where('LOWER(TRIM(p.name)) = LOWER(TRIM(:n))', { n: name })
-      .getOne();
-    if (existing) return { id: existing.id };
-    const created = repo.create({ name });
-    await repo.save(created);
-    return { id: created.id };
-  }
-
-  private async findOrCreateDegree(
-    tm: EntityManager,
-    nameRaw: string,
-  ): Promise<{ id: string } | { error: string }> {
-    const name = nameRaw.trim();
-    if (!name) {
-      return { error: 'degree name is empty' };
-    }
-    const repo = tm.getRepository(SysAcademicDegrees);
-    const existing = await repo
-      .createQueryBuilder('d')
-      .where('LOWER(TRIM(d.degreeName)) = LOWER(TRIM(:n))', { n: name })
-      .getOne();
-    if (existing) return { id: existing.id };
-
-    const key = normalizeDegreeKey(name);
-    const levelOrder = COURSE_DEGREE_LEVEL_ORDER[key];
-    if (levelOrder === undefined) {
-      return {
-        error: `Unknown degree "${name}" for insert — add "${key}" to course-degree-level-order.ts`,
-      };
-    }
-
-    const created = repo.create({
-      degreeName: name,
-      levelOrder,
-    });
-    await repo.save(created);
-    return { id: created.id };
   }
 }

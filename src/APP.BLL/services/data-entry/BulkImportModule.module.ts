@@ -19,6 +19,9 @@ import { defaultUniversityImportConfig } from './university/UniversityImportConf
 import { CourseImportProcessorService } from './course/CourseImportProcessorService';
 import { CourseImportService } from './course/CourseImportService';
 import { CourseRowValidator } from './course/validators/CourseRowValidator';
+import { CourseUniversityResolverService } from './course/resolvers/CourseUniversityResolverService';
+import { ProgrammeDegreeResolverService } from './course/resolvers/ProgrammeDegreeResolverService';
+import { CourseRowResultBuilder } from './course/builders/CourseRowResultBuilder';
 import { defaultCourseImportConfig } from './course/CourseImportConfig';
 
 const defaultBasePath = path.join(process.cwd(), 'BulkImport', 'University');
@@ -51,6 +54,9 @@ const defaultCourseBasePath = path.join(process.cwd(), 'BulkImport', 'Course');
       useValue: defaultCourseImportConfig,
     },
     CourseRowValidator,
+    CourseUniversityResolverService,
+    ProgrammeDegreeResolverService,
+    CourseRowResultBuilder,
     CourseImportProcessorService,
     CourseImportService,
     UniversityRowValidator,

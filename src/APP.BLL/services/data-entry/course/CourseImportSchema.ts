@@ -12,7 +12,6 @@ const INPUT_HEADERS = [
   'higherGpa',
   'AcademicRequirementsMetaData',
   'intakeInfo',
-  'intakeMetaData',
   'courseDuration',
   'tuitionFee',
   'currency',

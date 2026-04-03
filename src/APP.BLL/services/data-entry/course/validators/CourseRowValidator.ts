@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { CsvRow } from '../../common/abstractions/CsvImportProcessor';
+import type { CourseCsvRow, ErrorCourseRow } from '../dto/CourseImportRowTypes';
 import { parseIntakeInfo } from '../parsers/courseIntakeInfoParser';
 import {
   parseCourseDurationMonths,
@@ -7,9 +8,7 @@ import {
   parseRequiredDecimal,
 } from '../parsers/courseCsvFieldParsers';
 
-export type CourseCsvRow = CsvRow;
-
-export type ErrorCourseRow = CourseCsvRow & { errorReason: string };
+export type { CourseCsvRow, ErrorCourseRow };
 
 const REQUIRED = [
   'uniName',
@@ -77,10 +76,6 @@ export class CourseRowValidator {
     const ar = (row.AcademicRequirementsMetaData ?? '').trim();
     if (ar && parseJsonValue(ar) === null) {
       return 'AcademicRequirementsMetaData: invalid JSON';
-    }
-    const im = (row.intakeMetaData ?? '').trim();
-    if (im && parseJsonValue(im) === null) {
-      return 'intakeMetaData: invalid JSON';
     }
     const fm = (row.feesMetaData ?? '').trim();
     if (fm && parseJsonValue(fm) === null) {
