@@ -1,19 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import type { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import type { SysUniversities } from '@entity/entities/SysUniversities.entity';
-import type { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
 import { CourseDetailsResponseDto } from '@shared/dtos/course-details/CourseDetailsResponseDto';
 import {
   CourseDetailsDto,
   AcademicRequirementsContentDto,
   FeesAndScholarshipsItemsDto,
+  TuitionFeesDto,
+  ScholarshipDetailsDto,
 } from '@shared/dtos/course-details/CourseDetailsDto';
 import {
   MetaItemDto,
   MetaInformationItemDto,
 } from '@shared/dtos/course-details/MetaItemDto';
 
-/** Full English month names for intake lines, e.g. `April - 2026`, `September - 2026`. */
+/** English month names only (no year) — used for `intakeDates.intakes`. */
 const MONTH_NAMES = [
   'January',
   'February',
@@ -44,19 +45,31 @@ export class CourseDetailsMapper {
     intake: UniCourseIntakes,
     allCourseIntakes: UniCourseIntakes[],
   ): CourseDetailsResponseDto {
+    const sections = this.buildCourseDetailSections(intake, allCourseIntakes);
     return {
-      courseDetails: this.toCourseDetailsDto(intake, allCourseIntakes),
-      meta: this.buildMeta(intake, allCourseIntakes),
+      courseDetails: this.toCourseDetailsDto(intake, sections),
+      meta: this.buildMeta(intake, sections),
+    };
+  }
+
+  /** Builds academic, fees, and intake sections once per request (shared by DTO + meta). */
+  private buildCourseDetailSections(
+    intake: UniCourseIntakes,
+    allCourseIntakes: UniCourseIntakes[],
+  ) {
+    return {
+      academic: this.buildAcademicRequirementsSection(intake),
+      fees: this.buildFeesAndScholarshipsSection(intake),
+      intakeDates: this.buildIntakeDatesSection(intake, allCourseIntakes),
     };
   }
 
   private toCourseDetailsDto(
     intake: UniCourseIntakes,
-    allCourseIntakes: UniCourseIntakes[],
+    sections: ReturnType<CourseDetailsMapper['buildCourseDetailSections']>,
   ): CourseDetailsDto {
     const course = intake.UniCourse;
     const uni = course?.SysUniversity;
-    const scholarships = intake.CourseIntakeScholarship ?? [];
 
     return {
       courseId: intake.id,
@@ -77,12 +90,9 @@ export class CourseDetailsMapper {
       aboutUs: this.buildAboutUs(uni),
       campusLife: this.buildCampusLife(uni),
       location: this.buildLocation(uni),
-      academicRequirements: this.buildAcademicRequirementsSection(intake),
-      feesAndScholarships: this.buildFeesAndScholarshipsSection(
-        intake,
-        scholarships,
-      ),
-      intakeDates: this.buildIntakeDatesSection(intake, allCourseIntakes),
+      academicRequirements: sections.academic,
+      feesAndScholarships: sections.fees,
+      intakeDates: sections.intakeDates,
     };
   }
 
@@ -103,46 +113,55 @@ export class CourseDetailsMapper {
 
   private buildMeta(
     intake: UniCourseIntakes,
-    allCourseIntakes: UniCourseIntakes[],
+    sections: ReturnType<CourseDetailsMapper['buildCourseDetailSections']>,
   ): MetaItemDto[] {
     const course = intake.UniCourse;
     const uni = course?.SysUniversity;
-    const scholarships = intake.CourseIntakeScholarship ?? [];
     const meta: MetaItemDto[] = [];
 
     if (this.rankingHasInfo(uni)) {
-      meta.push({
-        infoKey: 'rankingMetaData',
-        title: 'Ranking',
-        information: this.metaInformationForRanking(uni!),
-      });
+      const rankingInformation = this.metaInformationForRanking(uni!);
+      if (rankingInformation.length > 0) {
+        meta.push({
+          infoKey: 'rankingMetaData',
+          title: 'Ranking',
+          information: rankingInformation,
+        });
+      }
     }
 
-    const academic = this.buildAcademicRequirementsSection(intake);
+    const { academic, fees, intakeDates: intakes } = sections;
     if (academic.hasInfo) {
-      meta.push({
-        infoKey: 'academicRequirementsMetaData',
-        title: 'Academic Requirements',
-        information: this.metaInformationForAcademic(intake, academic),
-      });
+      const academicInformation = this.metaInformationForAcademic(intake, academic);
+      if (academicInformation.length > 0) {
+        meta.push({
+          infoKey: 'academicRequirementsMetaData',
+          title: 'Academic Requirements',
+          information: academicInformation,
+        });
+      }
     }
 
-    const fees = this.buildFeesAndScholarshipsSection(intake, scholarships);
     if (fees.hasInfo) {
-      meta.push({
-        infoKey: 'feesAndScholarshipsMetaData',
-        title: 'Fees & Scholarships',
-        information: this.metaInformationForFees(intake, scholarships, fees),
-      });
+      const feesInformation = this.metaInformationForFees(intake);
+      if (feesInformation.length > 0) {
+        meta.push({
+          infoKey: 'feesAndScholarshipsMetaData',
+          title: 'Fees & Scholarships',
+          information: feesInformation,
+        });
+      }
     }
 
-    const intakes = this.buildIntakeDatesSection(intake, allCourseIntakes);
     if (intakes.hasInfo) {
-      meta.push({
-        infoKey: 'intakeDatesMetaData',
-        title: 'Intake Dates',
-        information: this.metaInformationForIntakes(intakes),
-      });
+      const intakeInformation = this.metaInformationForIntakes(intake, intakes);
+      if (intakeInformation.length > 0) {
+        meta.push({
+          infoKey: 'intakeDatesMetaData',
+          title: 'Intake Dates',
+          information: intakeInformation,
+        });
+      }
     }
 
     return meta;
@@ -167,26 +186,314 @@ export class CourseDetailsMapper {
     return parsed;
   }
 
-  private metaInformationForFees(
-    intake: UniCourseIntakes,
-    _scholarships: CourseIntakeScholarships[],
-    _section: ReturnType<CourseDetailsMapper['buildFeesAndScholarshipsSection']>,
-  ): MetaInformationItemDto[] {
-    const meta = intake.feesMetaData as Record<string, unknown> | undefined;
-    if (meta && Array.isArray(meta.information)) {
-      return meta.information as MetaInformationItemDto[];
+  /**
+   * Merges fees + scholarships narrative from `feesMetaData` JSONB: inner `feesMetaData` and
+   * `scholarshipsMetaData` segments; legacy `information`; root fallbacks. Appends prose from
+   * **`CourseIntakeScholarships.scholarshipMetaData`** only (no synthetic lines from amount/name columns).
+   */
+  private metaInformationForFees(intake: UniCourseIntakes): MetaInformationItemDto[] {
+    const root = intake.feesMetaData as Record<string, unknown> | undefined;
+    let out: MetaInformationItemDto[] = [];
+
+    if (root) {
+      const innerFees = root.feesMetaData;
+      const innerSch = root.scholarshipsMetaData;
+
+      const feesParsed = this.tryParseMetaInformation(innerFees);
+      const schParsed = this.tryParseMetaInformation(innerSch);
+
+      const feesDesc = this.flattenMetaDescriptions(feesParsed);
+      const rootNarrative = this.feesMetaRootNarrativeLines(root);
+      const feesDescription =
+        feesDesc.length > 0 ? feesDesc : rootNarrative;
+      if (feesDescription.length > 0) {
+        out.push({
+          subtitle: 'feesMetaData',
+          description: feesDescription,
+        });
+      }
+
+      const schDesc = this.flattenMetaDescriptions(schParsed);
+      if (schDesc.length > 0) {
+        out.push({
+          subtitle: 'ScholarshipsMetaData',
+          description: schDesc,
+        });
+      }
+
+      if (out.length === 0) {
+        if (Array.isArray(root.information)) {
+          out = root.information as MetaInformationItemDto[];
+        } else {
+          const rootParsed = this.tryParseMetaInformation(root);
+          if (rootParsed.length > 0) {
+            out = rootParsed;
+          } else {
+            out = this.metaInformationForFeesFromRootFallback(root);
+          }
+        }
+      }
     }
-    const parsed = this.tryParseMetaInformation(meta);
-    return parsed;
+
+    return this.ensureFeesMetaDataFromIntake(
+      this.mergeRelationalScholarshipMeta(out, intake),
+      intake,
+    );
   }
 
-  /** Built from all active course intakes (month/year), not `intakeMetaData` JSONB. */
+  /**
+   * Root **`feesMetaData`** keys outside nested narrative blobs — e.g. **`notes`**, **`tuitionYear`**.
+   * Stops column-only tuition lines from masking DB copy when inner **`feesMetaData`** is absent.
+   */
+  private feesMetaRootNarrativeLines(root: Record<string, unknown>): string[] {
+    const lines: string[] = [];
+    const notes = root.notes;
+    if (typeof notes === 'string' && notes.trim()) {
+      lines.push(
+        ...notes
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0),
+      );
+    }
+    const tuitionYear = root.tuitionYear;
+    if (tuitionYear != null && tuitionYear !== '') {
+      lines.push(`Tuition year: ${String(tuitionYear)}`);
+    }
+    return lines;
+  }
+
+  /**
+   * When JSON narrative did not produce **`feesMetaData`** but **`UniCourseIntakes`** has tuition /
+   * deposit / application (same resolution as **`courseDetails.feesAndScholarships.items`**), add or
+   * fill **`subtitle: feesMetaData`** so **`meta`** lists fees alongside **`ScholarshipsMetaData`**.
+   * Skipped when **`feesMetaData`** JSON already supplied any **`feesMetaData`** block (including root **`notes`**).
+   */
+  private ensureFeesMetaDataFromIntake(
+    out: MetaInformationItemDto[],
+    intake: UniCourseIntakes,
+  ): MetaInformationItemDto[] {
+    const idx = out.findIndex((i) => i.subtitle === 'feesMetaData');
+    const existing = idx >= 0 ? (out[idx].description ?? []) : [];
+    if (existing.length > 0) {
+      return out;
+    }
+
+    const columnLines = this.linesFeesMetaFromIntakeColumns(intake);
+    if (columnLines.length === 0) {
+      return out;
+    }
+
+    const block: MetaInformationItemDto = {
+      subtitle: 'feesMetaData',
+      description: columnLines,
+    };
+
+    if (idx >= 0) {
+      const next = [...out];
+      next[idx] = block;
+      return next;
+    }
+
+    return [block, ...out];
+  }
+
+  /** Tuition / deposit / application lines aligned with **`buildFeesAndScholarshipsSection`** items. */
+  private linesFeesMetaFromIntakeColumns(intake: UniCourseIntakes): string[] {
+    const feesJson = intake.feesMetaData as Record<string, unknown> | undefined;
+    const tuitionFromJson = feesJson?.tuitionFees as
+      | Record<string, unknown>
+      | undefined;
+
+    const explicitFrequency =
+      (tuitionFromJson?.frequency as string | undefined) ??
+      (feesJson?.frequency as string | undefined) ??
+      null;
+
+    const rawAmount =
+      tuitionFromJson?.amount !== undefined && tuitionFromJson?.amount !== null
+        ? String(tuitionFromJson.amount)
+        : intake.tuitionFee ?? null;
+
+    const amount = this.formatCurrencyAmount(rawAmount);
+    const currency =
+      (tuitionFromJson?.currency as string | undefined)?.trim() ??
+      (intake.currency ?? '').trim() ??
+      '';
+    const freqLabel = (explicitFrequency ?? 'yearly').trim();
+
+    const lines: string[] = [];
+    const core = [amount, currency].filter(Boolean).join(' ');
+    if (core) {
+      lines.push(
+        freqLabel ? `Tuition: ${core} (${freqLabel})` : `Tuition: ${core}`,
+      );
+    } else if (currency) {
+      lines.push(`Currency: ${currency}`);
+    }
+
+    const dep = this.formatCurrencyAmount(intake.initialDeposit ?? undefined);
+    if (dep != null && dep !== '') {
+      lines.push(
+        currency ?
+          `Initial deposit: ${dep} ${currency}`
+        : `Initial deposit: ${dep}`,
+      );
+    }
+
+    const app = this.formatCurrencyAmount(intake.applicationFee ?? undefined);
+    if (app != null && app !== '') {
+      lines.push(
+        currency ? `Application fee: ${app} ${currency}` : `Application fee: ${app}`,
+      );
+    }
+
+    return lines;
+  }
+
+  /** Appends or creates **`ScholarshipsMetaData`** from parsed **`scholarshipMetaData`** JSONB on each row. */
+  private mergeRelationalScholarshipMeta(
+    out: MetaInformationItemDto[],
+    intake: UniCourseIntakes,
+  ): MetaInformationItemDto[] {
+    const relLines = this.linesFromRelationalScholarships(intake);
+    if (relLines.length === 0) {
+      return out;
+    }
+    const idx = out.findIndex((i) => i.subtitle === 'ScholarshipsMetaData');
+    if (idx >= 0) {
+      const existing = out[idx].description ?? [];
+      const next = [...out];
+      next[idx] = {
+        ...out[idx],
+        description: [...existing, ...relLines],
+      };
+      return next;
+    }
+    return [
+      ...out,
+      {
+        subtitle: 'ScholarshipsMetaData',
+        description: relLines,
+      },
+    ];
+  }
+
+  /** Prose lines from **`scholarshipMetaData`** JSONB per active row only (relational columns are not turned into meta lines). */
+  private linesFromRelationalScholarships(intake: UniCourseIntakes): string[] {
+    const rows = (intake.CourseIntakeScholarship ?? []).filter((s) => s.isActive);
+    const lines: string[] = [];
+    for (const s of rows) {
+      const fromMeta = this.tryParseMetaInformation(s.scholarshipMetaData);
+      if (fromMeta.length === 0) {
+        continue;
+      }
+      for (const item of fromMeta) {
+        const desc = item.description ?? [];
+        if (item.subtitle && desc.length > 0) {
+          lines.push(...desc.map((d) => `${item.subtitle}: ${d}`));
+        } else {
+          lines.push(...desc);
+        }
+      }
+    }
+    return lines;
+  }
+
+  /** True when any active row has parseable **`scholarshipMetaData`** (drives fees **`hasInfo`** for meta). */
+  private intakeHasRelationalScholarshipContent(intake: UniCourseIntakes): boolean {
+    for (const s of intake.CourseIntakeScholarship ?? []) {
+      if (!s.isActive) {
+        continue;
+      }
+      if (this.tryParseMetaInformation(s.scholarshipMetaData).length > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * When nested `feesMetaData` / `scholarshipsMetaData` blobs are absent but the column still has
+   * root `tuitionFees` and/or `scholarships` / `scholarshipsSummary` strings, expose them under the
+   * same subtitles as the narrative JSON path so `meta` includes Fees & Scholarships.
+   */
+  private metaInformationForFeesFromRootFallback(
+    root: Record<string, unknown>,
+  ): MetaInformationItemDto[] {
+    const out: MetaInformationItemDto[] = [];
+
+    const tuitionLines = this.linesFromRootTuitionFees(root);
+    if (tuitionLines.length > 0) {
+      out.push({
+        subtitle: 'feesMetaData',
+        description: tuitionLines,
+      });
+    }
+
+    const schRaw =
+      (typeof root.scholarships === 'string' ? root.scholarships : '') ||
+      (typeof root.scholarshipsSummary === 'string' ?
+        root.scholarshipsSummary
+      : '');
+    const schTrim = schRaw.trim();
+    if (schTrim) {
+      out.push({
+        subtitle: 'ScholarshipsMetaData',
+        description: [schTrim],
+      });
+    }
+
+    return out;
+  }
+
+  /** One line from root `tuitionFees` + optional root `frequency` (matches courseDetails fee copy). */
+  private linesFromRootTuitionFees(root: Record<string, unknown>): string[] {
+    const tf = root.tuitionFees;
+    if (tf == null || typeof tf !== 'object' || Array.isArray(tf)) {
+      return [];
+    }
+    const t = tf as Record<string, unknown>;
+    const amount = t.amount != null && t.amount !== '' ? String(t.amount) : '';
+    const currency = (t.currency as string | undefined)?.trim() ?? '';
+    const freqTf = (t.frequency as string | undefined)?.trim() ?? '';
+    const freqRoot =
+      (typeof root.frequency === 'string' ? root.frequency.trim() : '') || '';
+    const freq = freqTf || freqRoot;
+    if (!amount && !currency && !freq) {
+      return [];
+    }
+    const core = [amount, currency].filter(Boolean).join(' ');
+    if (core && freq) {
+      return [`Tuition: ${core} (${freq})`];
+    }
+    if (core) {
+      return [`Tuition: ${core}`];
+    }
+    if (freq) {
+      return [`Frequency: ${freq}`];
+    }
+    return [];
+  }
+
+  private flattenMetaDescriptions(items: MetaInformationItemDto[]): string[] {
+    const lines: string[] = [];
+    for (const item of items) {
+      lines.push(...(item.description ?? []));
+    }
+    return lines;
+  }
+
+  /** Intake dates meta: same month-only list as `courseDetails.intakeDates.intakes`. */
   private metaInformationForIntakes(
+    intake: UniCourseIntakes,
     section: ReturnType<CourseDetailsMapper['buildIntakeDatesSection']>,
   ): MetaInformationItemDto[] {
     const lines = section.intakes ?? [];
-    if (!lines.length) return [];
-    return [{ description: lines }];
+    if (lines.length > 0) {
+      return [{ description: lines }];
+    }
+    return this.tryParseMetaInformation(intake.intakeMetaData);
   }
 
   /**
@@ -218,6 +525,19 @@ export class CourseDetailsMapper {
       }
       if (Array.isArray(o.paragraphs)) {
         return [{ description: o.paragraphs as string[] }];
+      }
+      /** Single meta block: `{ "subtitle": "Scholarships", "description": ["…"] }` (no `information` wrapper). */
+      if (
+        Array.isArray(o.description) &&
+        o.description.length > 0 &&
+        o.description.every((x) => typeof x === 'string')
+      ) {
+        return [
+          {
+            subtitle: typeof o.subtitle === 'string' ? o.subtitle : undefined,
+            description: o.description as string[],
+          },
+        ];
       }
     }
     return [];
@@ -300,6 +620,31 @@ export class CourseDetailsMapper {
     };
   }
 
+  /**
+   * First `CourseIntakeScholarship` row with a usable `amount`. When multiple rows exist, only the first match is returned.
+   */
+  private mapRelationalScholarship(
+    intake: UniCourseIntakes,
+  ): ScholarshipDetailsDto | undefined {
+    const rows = intake.CourseIntakeScholarship ?? [];
+    const currency = intake.currency ?? null;
+    for (const s of rows) {
+      const scholarshipAmount = this.formatCurrencyAmount(s.amount ?? undefined);
+      if (scholarshipAmount == null || scholarshipAmount === '') {
+        continue;
+      }
+      const scholarshipName = (s.name ?? '').trim();
+      const scholarshipType = (s.amountType ?? '').trim() || undefined;
+      return {
+        scholarshipName: scholarshipName || undefined,
+        scholarshipAmount,
+        currency: currency ?? undefined,
+        scholarshipType,
+      };
+    }
+    return undefined;
+  }
+
   /** Strips redundant trailing zeros from numeric amount strings (e.g. "14000.00" → "14000"). */
   private formatCurrencyAmount(value: string | null | undefined): string | null {
     if (value == null || value === '') return null;
@@ -314,10 +659,12 @@ export class CourseDetailsMapper {
     return neg ? `-${intPart}.${decTrimmed}` : `${intPart}.${decTrimmed}`;
   }
 
-  private buildFeesAndScholarshipsSection(
-    intake: UniCourseIntakes,
-    _scholarships: CourseIntakeScholarships[],
-  ) {
+  /**
+   * **`hasInfo`** when **`feesMetaData`** JSON is non-empty (**`isMetadataPresent`**) **or** any active
+   * scholarship row has parseable **`scholarshipMetaData`** (relational name/amount columns do not set **`hasInfo`**).
+   * Column-only tuition/deposit/application without JSON uses **`items`** with **`hasInfo` false** unless fees JSON exists.
+   */
+  private buildFeesAndScholarshipsSection(intake: UniCourseIntakes) {
     const feesJson = intake.feesMetaData as
       | Record<string, unknown>
       | undefined;
@@ -349,7 +696,9 @@ export class CourseDetailsMapper {
       (feesJson?.scholarshipsSummary as string | undefined) ??
       null;
 
-    const hasInfo = this.isMetadataPresent(intake.feesMetaData);
+    const hasInfo =
+      this.isMetadataPresent(feesJson) ||
+      this.intakeHasRelationalScholarshipContent(intake);
 
     const hasTuitionDetails = !!(
       tuitionFees.amount ||
@@ -357,11 +706,26 @@ export class CourseDetailsMapper {
       explicitFrequency != null
     );
 
-    const items: FeesAndScholarshipsItemsDto | undefined =
-      hasInfo ?
+    const initialDeposit = this.formatCurrencyAmount(intake.initialDeposit ?? undefined);
+    const applicationFee = this.formatCurrencyAmount(intake.applicationFee ?? undefined);
+    const relationalScholarship = this.mapRelationalScholarship(intake);
+
+    const hasColumnFeeDetails =
+      hasTuitionDetails ||
+      (initialDeposit != null && initialDeposit !== '') ||
+      (applicationFee != null && applicationFee !== '') ||
+      relationalScholarship != null;
+
+    const shouldShowItems = hasInfo || hasColumnFeeDetails;
+
+    const items: FeesAndScholarshipsItemsDto | undefined = shouldShowItems ?
         {
           tuitionFees: hasTuitionDetails ? tuitionFees : undefined,
-          scholarships: scholarshipsSummary ?? undefined,
+          initialDeposit: initialDeposit ?? undefined,
+          applicationFee: applicationFee ?? undefined,
+          scholarships: relationalScholarship,
+          scholarshipsSummary:
+            hasInfo ? scholarshipsSummary ?? undefined : undefined,
         }
       : undefined;
 
@@ -373,44 +737,117 @@ export class CourseDetailsMapper {
   }
 
   /**
-   * Unique (month, year) across all active intakes for the course; labels like `April - 2026`.
-   * Duplicate rows / same period collapse to one line.
+   * `intakes` lists **month names only**, unique and calendar-sorted:
+   * - Every active intake row for the same `uniCourseId` contributes `intakeMonth`.
+   * - Plus optional overrides from this row’s `intakeMetaData` (`months`, strings, prose).
+   * `hasInfo` when there is at least one month to show or metadata implies the section.
    */
-  private buildIntakeDateLinesFromRows(rows: UniCourseIntakes[]): string[] {
-    const pairs = new Map<
-      string,
-      { month: number; year: number }
-    >();
-    for (const r of rows) {
-      const y = r.intakeYear;
-      const m = r.intakeMonth;
-      if (m < 1 || m > 12) continue;
-      const key = `${y}-${String(m).padStart(2, '0')}`;
-      if (!pairs.has(key)) pairs.set(key, { month: m, year: y });
-    }
-    const sorted = [...pairs.values()].sort((a, b) =>
-      a.year !== b.year ? a.year - b.year : a.month - b.month,
-    );
-    return sorted.map(({ month, year }) =>
-      this.formatIntakePeriodLabel(month, year),
-    );
-  }
-
-  private formatIntakePeriodLabel(month: number, year: number): string {
-    return `${MONTH_NAMES[month - 1]} - ${year}`;
-  }
-
   private buildIntakeDatesSection(
-    _intake: UniCourseIntakes,
+    intake: UniCourseIntakes,
     allCourseIntakes: UniCourseIntakes[],
   ) {
-    const intakes = this.buildIntakeDateLinesFromRows(allCourseIntakes);
-    const hasInfo = intakes.length > 0;
+    const intakes = this.intakeMonthsDisplayOnly(intake, allCourseIntakes);
+    const hasInfo =
+      intakes.length > 0 || this.isMetadataPresent(intake.intakeMetaData);
     return {
       hasInfo,
       infoKey: 'intakeDatesMetaData' as const,
-      intakes: hasInfo ? intakes : undefined,
+      intakes: intakes.length > 0 ? intakes : undefined,
     };
+  }
+
+  /** Union: DB months for all course intakes + optional metadata on the viewed intake row. */
+  private intakeMonthsDisplayOnly(
+    intake: UniCourseIntakes,
+    allCourseIntakes: UniCourseIntakes[],
+  ): string[] {
+    const combined: string[] = [];
+
+    combined.push(...this.monthLabelsFromAllCourseIntakes(allCourseIntakes));
+
+    const raw = intake.intakeMetaData;
+    if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) {
+      const o = raw as Record<string, unknown>;
+      if (
+        Array.isArray(o.months) &&
+        o.months.every((x) => typeof x === 'number')
+      ) {
+        const labels = (o.months as number[])
+          .filter((m) => m >= 1 && m <= 12)
+          .map((m) => MONTH_NAMES[m - 1]);
+        combined.push(...labels);
+      }
+    }
+
+    const fromStrings = this.linesFromIntakeMetaDataStrings(intake)
+      .map((s) => this.toMonthOnlyLabel(s))
+      .filter((s): s is string => s.length > 0);
+    combined.push(...fromStrings);
+
+    return this.uniqueSortedMonthLabels(combined);
+  }
+
+  private monthLabelsFromAllCourseIntakes(rows: UniCourseIntakes[]): string[] {
+    const labels: string[] = [];
+    for (const r of rows) {
+      const lb = this.monthLabelFromEntityIntakeMonth(r.intakeMonth);
+      if (lb) {
+        labels.push(lb);
+      }
+    }
+    return labels;
+  }
+
+  private linesFromIntakeMetaDataStrings(intake: UniCourseIntakes): string[] {
+    const raw = intake.intakeMetaData;
+    if (raw == null) {
+      return [];
+    }
+    if (Array.isArray(raw) && raw.every((x) => typeof x === 'string')) {
+      return raw as string[];
+    }
+    if (typeof raw === 'object' && !Array.isArray(raw)) {
+      const o = raw as Record<string, unknown>;
+      if (
+        Array.isArray(o.intakes) &&
+        o.intakes.every((x) => typeof x === 'string')
+      ) {
+        return o.intakes as string[];
+      }
+    }
+    return this.flattenMetaDescriptions(this.tryParseMetaInformation(raw));
+  }
+
+  private monthLabelFromEntityIntakeMonth(month: number): string | null {
+    if (month < 1 || month > 12) {
+      return null;
+    }
+    return MONTH_NAMES[month - 1];
+  }
+
+  /** "April - 2026" → "April"; known month names canonicalized. */
+  private toMonthOnlyLabel(s: string): string {
+    const t = s.trim();
+    const dashYear = /^([A-Za-z]+)\s*-\s*\d{4}$/.exec(t);
+    if (dashYear) {
+      return this.canonicalMonthName(dashYear[1]) ?? dashYear[1];
+    }
+    return this.canonicalMonthName(t) ?? t;
+  }
+
+  private canonicalMonthName(word: string): string | undefined {
+    const idx = MONTH_NAMES.findIndex(
+      (n) => n.toLowerCase() === word.trim().toLowerCase(),
+    );
+    return idx >= 0 ? MONTH_NAMES[idx] : undefined;
+  }
+
+  private uniqueSortedMonthLabels(labels: string[]): string[] {
+    const order = new Map<string, number>(
+      MONTH_NAMES.map((m, i) => [m, i]),
+    );
+    const unique = [...new Set(labels)];
+    return unique.sort((a, b) => (order.get(a) ?? 99) - (order.get(b) ?? 99));
   }
 
   private buildTags(uni:

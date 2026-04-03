@@ -19,7 +19,6 @@ const COURSE_DETAILS_RELATIONS = {
     SysAcademicDegree: true,
     minSysAcademicDegree: true,
     higherSysAcademicDegree: true,
-    UniCourseIntake: true,
   },
   CourseIntakeScholarship: true,
 };
@@ -55,7 +54,7 @@ export class CourseService {
       return null;
     }
 
-    /** All active intakes for this course (including current) — distinct month/years for intake UI/meta. */
+    /** All active intakes for this course — aggregate intake months on the details page. */
     const allCourseIntakes = await this.db.courseIntakes.find({
       where: {
         uniCourseId: intake.uniCourseId,

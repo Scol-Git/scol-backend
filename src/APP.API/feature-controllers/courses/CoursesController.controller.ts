@@ -13,9 +13,10 @@ import {
 } from '@nestjs/swagger';
 import { CourseService } from '@bll/services/CourseService/CourseService';
 import { CourseDetailsResponseDto } from '@shared/dtos/course-details/CourseDetailsResponseDto';
+import { ScholarshipDetailsDto } from '@shared/dtos/course-details/CourseDetailsDto';
 
 @ApiTags('courses')
-@ApiExtraModels(CourseDetailsResponseDto)
+@ApiExtraModels(CourseDetailsResponseDto, ScholarshipDetailsDto)
 @Controller('courses')
 export class CoursesController {
   constructor(private readonly courseService: CourseService) {}

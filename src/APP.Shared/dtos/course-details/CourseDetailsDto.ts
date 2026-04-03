@@ -75,14 +75,44 @@ export class TuitionFeesDto {
   @ApiPropertyOptional() frequency?: string | null;
 }
 
+/** First relational `CourseIntakeScholarship` row (single object on `items.scholarships`). */
+export class ScholarshipDetailsDto {
+  @ApiPropertyOptional({ example: 'International Merit Scholarship' })
+  scholarshipName?: string | null;
+
+  @ApiPropertyOptional({ example: '14000' })
+  scholarshipAmount?: string | null;
+
+  @ApiPropertyOptional({ example: 'GBP' })
+  currency?: string | null;
+
+  /** From `amountType` (e.g. PERCENTAGE, FIXED). */
+  @ApiPropertyOptional({ example: 'PERCENTAGE' })
+  scholarshipType?: string | null;
+}
+
 export class FeesAndScholarshipsItemsDto {
   @ApiPropertyOptional({ type: TuitionFeesDto })
   tuitionFees?: TuitionFeesDto;
 
+  /** From intake columns when set; shown even if `hasInfo` is false (no fees JSON metadata). */
+  @ApiPropertyOptional()
+  initialDeposit?: string | null;
+
+  @ApiPropertyOptional()
+  applicationFee?: string | null;
+
+  /**
+   * Single relational scholarship: first `CourseIntakeScholarship` row with a usable `amount`.
+   */
+  @ApiPropertyOptional({ type: ScholarshipDetailsDto })
+  scholarships?: ScholarshipDetailsDto;
+
   @ApiPropertyOptional({
-    description: 'Short summary e.g. scholarship availability',
+    description:
+      'Short summary from fees JSON `scholarships` / `scholarshipsSummary` when metadata-backed `hasInfo`',
   })
-  scholarships?: string | null;
+  scholarshipsSummary?: string | null;
 }
 
 export class FeesAndScholarshipsSectionDto {
@@ -95,7 +125,11 @@ export class FeesAndScholarshipsSectionDto {
 export class IntakeDatesSectionDto {
   @ApiProperty() hasInfo!: boolean;
   @ApiProperty() infoKey!: string;
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Month names only (e.g. April, September). From intakeMetaData.months [1–12], normalized strings, or this intake’s intakeMonth.',
+  })
   intakes?: string[];
 }
 
