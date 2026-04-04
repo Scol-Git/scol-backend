@@ -174,16 +174,50 @@ export class CourseDetailsMapper {
 
   private metaInformationForAcademic(
     intake: UniCourseIntakes,
-    _section: ReturnType<CourseDetailsMapper['buildAcademicRequirementsSection']>,
+    section: ReturnType<CourseDetailsMapper['buildAcademicRequirementsSection']>,
   ): MetaInformationItemDto[] {
     const meta = intake.UniCourse?.requirementMetaData as
       | Record<string, unknown>
       | undefined;
-    if (meta && Array.isArray(meta.information)) {
+    if (meta && Array.isArray(meta.information) && meta.information.length > 0) {
       return meta.information as MetaInformationItemDto[];
     }
     const parsed = this.tryParseMetaInformation(meta);
-    return parsed;
+    if (parsed.length > 0) {
+      return parsed;
+    }
+    const req = section.requirements;
+    if (!req) {
+      return [];
+    }
+    return this.metaInformationFromAcademicRequirements(req);
+  }
+
+  /** Prose blocks for `meta` when narrative JSON is empty but structured requirements exist on the course. */
+  private metaInformationFromAcademicRequirements(
+    req: AcademicRequirementsContentDto,
+  ): MetaInformationItemDto[] {
+    const out: MetaInformationItemDto[] = [];
+    const degreeLines = req.degreeRequirements.map(
+      (d) => `${d.degreeName} — ${d.label}: ${d.minValue}`,
+    );
+    if (degreeLines.length > 0) {
+      out.push({ subtitle: 'Degree requirements', description: degreeLines });
+    }
+    const englishLines = req.englishRequirements.map((e) => {
+      const parts: string[] = [e.testName];
+      if (e.minOverallValue) {
+        parts.push(`Overall: ${e.minOverallValue}`);
+      }
+      if (e.minSectionValue) {
+        parts.push(`Section: ${e.minSectionValue}`);
+      }
+      return parts.join(' — ');
+    });
+    if (englishLines.length > 0) {
+      out.push({ subtitle: 'English requirements', description: englishLines });
+    }
+    return out;
   }
 
   /**
@@ -747,8 +781,7 @@ export class CourseDetailsMapper {
     allCourseIntakes: UniCourseIntakes[],
   ) {
     const intakes = this.intakeMonthsDisplayOnly(intake, allCourseIntakes);
-    const hasInfo =
-      intakes.length > 0 || this.isMetadataPresent(intake.intakeMetaData);
+    const hasInfo = intakes.length > 0;
     return {
       hasInfo,
       infoKey: 'intakeDatesMetaData' as const,
@@ -888,11 +921,30 @@ export class CourseDetailsMapper {
   }
 
   private buildCampusLife(uni: { campusLifeLinks?: string[] } | undefined):
-    | { media: { videoUrl?: string[] } }
-    | undefined {
-    if (!uni?.campusLifeLinks?.length) return undefined;
-    return { media: { videoUrl: uni.campusLifeLinks } };
+  | { media: { videoUrl?: string[] } }
+  | undefined {
+  if (!uni?.campusLifeLinks?.length) return undefined;
+  const videoUrl = this.uniqueCampusVideoUrls(uni.campusLifeLinks);
+  if (videoUrl.length === 0) return undefined;
+  return { media: { videoUrl } };
+}
+
+private normalizeCampusVideoUrl(raw: string): string {
+  return raw.trim().replace(/^["'`\\]+|["'`\\]+$/g, '').trim();
+}
+
+private uniqueCampusVideoUrls(urls: string[]): string[] {
+  const out: string[] = [];
+  for (const raw of urls) {
+    const parts = raw.split(',');
+    for (const part of parts) {
+      const u = this.normalizeCampusVideoUrl(part);
+      if (!u) continue;
+      out.push(u);
+    }
   }
+  return out;
+}
 
   private buildLocation(uni:
     | {

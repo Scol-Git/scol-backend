@@ -65,6 +65,10 @@ export class AcademicRequirementsContentDto {
 export class AcademicRequirementsSectionDto {
   @ApiProperty() hasInfo!: boolean;
   @ApiProperty() infoKey!: string;
+  /**
+   * Degree/GPA and English rows; may be set when `hasInfo` is false if there is no
+   * `requirementMetaData` JSON but relational course data exists.
+   */
   @ApiPropertyOptional({ type: AcademicRequirementsContentDto })
   requirements?: AcademicRequirementsContentDto;
 }
