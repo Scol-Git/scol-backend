@@ -54,19 +54,21 @@ export class CourseService {
       return null;
     }
 
-    /** All active intakes for this course — aggregate intake months on the details page. */
-    const allCourseIntakes = await this.db.courseIntakes.find({
+    const currentYear = new Date().getFullYear();
+
+    const currentYearIntakes = await this.db.courseIntakes.find({
       where: {
         uniCourseId: intake.uniCourseId,
         isActive: true,
         deletedAt: IsNull(),
+        intakeYear: currentYear,
       },
-      order: { intakeYear: 'ASC', intakeMonth: 'ASC' },
+      order: { intakeMonth: 'ASC' },
     });
 
     return this.courseDetailsMapper.toCourseDetailsResponse(
       intake,
-      allCourseIntakes,
+      currentYearIntakes,
     );
   }
 }

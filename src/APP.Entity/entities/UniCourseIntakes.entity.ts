@@ -141,6 +141,10 @@ export class UniCourseIntakes extends BaseEntity {
 @AutoMap()
 feesMetaData?: MetaDataItem[];
 
+@Column({ name: 'scholarshipMetaData', type: 'jsonb', nullable: true })
+  @AutoMap()
+  scholarshipMetaData?: MetaDataItem[];
+  
   @Column({
     name: 'applicationFee',
     type: 'decimal',

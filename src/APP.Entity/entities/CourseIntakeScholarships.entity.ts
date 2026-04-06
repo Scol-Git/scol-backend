@@ -65,9 +65,7 @@ export class CourseIntakeScholarships extends BaseEntity {
   @AutoMap()
   frequency?: string;
 
-  @Column({ name: 'scholarshipMetaData', type: 'jsonb', nullable: true })
-  @AutoMap()
-  scholarshipMetaData?: MetaDataItem[];
+  
 
   @Column({
     name: 'isActive',

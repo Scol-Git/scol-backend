@@ -13,6 +13,7 @@ import { SysProgrammes } from './SysProgrammes.entity';
 import { SysAcademicDegrees } from './SysAcademicDegrees.entity';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
 import { CourseEngReq } from './CourseEngReq.entity';
+import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
 
 /**
  * @class UniCourses
@@ -103,7 +104,7 @@ export class UniCourses extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  requirementMetaData?: Record<string, unknown>;
+  requirementMetaData?: MetaDataItem[];
 
   @Column({
     name: 'externalUrl',

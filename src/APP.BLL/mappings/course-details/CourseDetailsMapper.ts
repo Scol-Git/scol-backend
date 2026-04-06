@@ -12,15 +12,10 @@ import {
   CourseTabDto,
   AcademicRequirementsContentDto,
   AcademicRequirementsSectionDto,
-  FeesAndScholarshipsItemsDto,
   FeesAndScholarshipsSectionDto,
   IntakeDatesSectionDto,
 } from '@shared/dtos/course-details/CourseDetailsDto';
 import { MetaItemDto } from '@shared/dtos/course-details/MetaItemDto';
-import {
-  MetaDataItem,
-  parseMetaDataItems,
-} from '@shared/dtos/course-details/MetaDataItem.type';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -40,32 +35,44 @@ const COURSE_DETAIL_TABS: CourseTabDto[] = [
   { key: 'intakeDates',          label: 'Intake Dates' },
 ];
 
+// ─── Section meta config ──────────────────────────────────────────────────────
+
+interface SectionMeta {
+  infoKey: string;
+  title:   string;
+}
+
+const SECTION_META = {
+  ranking:  { infoKey: 'rankingMetaData',              title: 'Ranking'               } as const,
+  academic: { infoKey: 'academicRequirementsMetaData', title: 'Academic Requirements' } as const,
+  fees:     { infoKey: 'feesAndScholarshipsMetaData',  title: 'Fees & Scholarships'   } as const,
+  intakes:  { infoKey: 'intakeDatesMetaData',          title: 'Intake Dates'          } as const,
+} satisfies Record<string, SectionMeta>;
+
 // ─── Local source types ───────────────────────────────────────────────────────
 
-type BaseUni = Pick<
-  SysUniversities,
-  'establishedYear' | 'universityType'
->;
+type BaseUni = Pick<SysUniversities, 'establishedYear' | 'universityType'>;
 
 type UniTagSource = BaseUni & {
-  SysCity?: { cityName?: string };
+  SysCity?:    { cityName?: string };
   SysCountry?: { countryName?: string };
 };
 
 type UniLocationSource = {
-  address?: string;
-  SysCity?: { cityName?: string };
-  SysCountry?: { countryName?: string };
-  SysState?: { stateName?: string };
+  address?:             string;
+  SysCity?:             { cityName?: string };
+  SysCountry?:          { countryName?: string };
+  SysState?:            { stateName?: string };
   locationMapMetaData?: string;
 };
 
-type UniAboutSource    = { aboutUs?: string };
-type UniCampusSource   = { campusLifeLinks?: string[] };
+type UniAboutSource  = { aboutUs?: string };
+type UniCampusSource = { campusLifeLinks?: string[] };
 
 // ─── Section interface ────────────────────────────────────────────────────────
 
 interface CourseDetailSections {
+  ranking:     RankingDto;
   academic:    AcademicRequirementsSectionDto;
   fees:        FeesAndScholarshipsSectionDto;
   intakeDates: IntakeDatesSectionDto;
@@ -76,10 +83,10 @@ interface CourseDetailSections {
 @Injectable()
 export class CourseDetailsMapper {
   toCourseDetailsResponse(
-    intake: UniCourseIntakes,
-    allCourseIntakes: UniCourseIntakes[],
+    intake:             UniCourseIntakes,
+    currentYearIntakes: UniCourseIntakes[],
   ): CourseDetailsResponseDto {
-    const sections = this.buildSections(intake, allCourseIntakes);
+    const sections = this.buildSections(intake, currentYearIntakes);
     return {
       meta:          this.buildMeta(intake, sections),
       courseDetails: this.buildCourseDetails(intake, sections),
@@ -89,18 +96,20 @@ export class CourseDetailsMapper {
   // ─── Top-level builders ───────────────────────────────────────────────────
 
   private buildSections(
-    intake: UniCourseIntakes,
-    allCourseIntakes: UniCourseIntakes[],
+    intake:             UniCourseIntakes,
+    currentYearIntakes: UniCourseIntakes[],
   ): CourseDetailSections {
+    const uni = intake.UniCourse?.SysUniversity;
     return {
+      ranking:     this.buildRanking(uni),       
       academic:    this.buildAcademicSection(intake),
       fees:        this.buildFeesSection(intake),
-      intakeDates: this.buildIntakeDatesSection(allCourseIntakes),
+      intakeDates: this.buildIntakeDatesSection(currentYearIntakes),
     };
   }
 
   private buildCourseDetails(
-    intake: UniCourseIntakes,
+    intake:   UniCourseIntakes,
     sections: CourseDetailSections,
   ): CourseDetailsDto {
     const uni = intake.UniCourse?.SysUniversity;
@@ -108,7 +117,7 @@ export class CourseDetailsMapper {
     return {
       courseId:             intake.id,
       courseName:           intake.UniCourse?.courseName ?? '',
-      ranking:              this.buildRanking(uni),
+      ranking:              sections.ranking,
       university:           this.buildUniversity(uni),
       tags:                 this.buildTags(uni),
       tabs:                 COURSE_DETAIL_TABS.map((t) => ({ ...t })),
@@ -123,112 +132,44 @@ export class CourseDetailsMapper {
 
   // ─── Meta ─────────────────────────────────────────────────────────────────
 
+  
   private buildMeta(
-    intake: UniCourseIntakes,
+    intake:   UniCourseIntakes,
     sections: CourseDetailSections,
   ): MetaItemDto[] {
     const uni  = intake.UniCourse?.SysUniversity;
     const meta: MetaItemDto[] = [];
 
-    this.pushMetaItem(meta, 'rankingMetaData', 'Ranking',
-      parseMetaDataItems(uni?.rankingMetaData),
-    );
+    if (uni?.rankingMetaData)
+      meta.push({ ...SECTION_META.ranking,  information: uni.rankingMetaData });
 
-    if (sections.academic.hasInfo) {
-      this.pushMetaItem(meta, 'academicRequirementsMetaData', 'Academic Requirements',
-        this.academicMetaItems(intake, sections.academic),
-      );
-    }
+    if (intake.UniCourse?.requirementMetaData)
+      meta.push({ ...SECTION_META.academic, information: intake.UniCourse.requirementMetaData });
 
-    if (sections.fees.hasInfo) {
-      this.pushMetaItem(meta, 'feesAndScholarshipsMetaData', 'Fees & Scholarships',
-        this.feesMetaItems(intake),
-      );
-    }
+    if (intake.feesMetaData)
+      meta.push({ ...SECTION_META.fees,     information: intake.feesMetaData });
 
-    if (sections.intakeDates.hasInfo) {
-      this.pushMetaItem(meta, 'intakeDatesMetaData', 'Intake Dates',
-        this.intakeDatesMetaItems(intake, sections.intakeDates),
-      );
-    }
+    if (intake.intakeMetaData)
+      meta.push({ ...SECTION_META.intakes,  information: intake.intakeMetaData });
 
     return meta;
   }
 
-  private pushMetaItem(
-    meta: MetaItemDto[],
-    infoKey: string,
-    title: string,
-    information: MetaDataItem[],
-  ): void {
-    if (information.length > 0) {
-      meta.push({ infoKey, title, information });
-    }
-  }
-
-  // ─── Meta items ───────────────────────────────────────────────────────────
-
-  private academicMetaItems(
-    intake: UniCourseIntakes,
-    section: AcademicRequirementsSectionDto,
-  ): MetaDataItem[] {
-    const parsed = parseMetaDataItems(intake.UniCourse?.requirementMetaData);
-    if (parsed.length > 0) return parsed;
-    if (!section.requirements) return [];
-    return this.metaItemsFromAcademicContent(section.requirements);
-  }
-
-  private metaItemsFromAcademicContent(
-    req: AcademicRequirementsContentDto,
-  ): MetaDataItem[] {
-    const out: MetaDataItem[] = [];
-
-    const degreeLines = req.degreeRequirements.map(
-      (d) => `${d.degreeName} — ${d.label}: ${d.minValue}`,
-    );
-    if (degreeLines.length > 0) {
-      out.push({ subtitle: 'Degree requirements', description: degreeLines });
-    }
-
-    const englishLines = req.englishRequirements.map((e) => {
-      const parts = [e.testName];
-      if (e.minOverallValue) parts.push(`Overall: ${e.minOverallValue}`);
-      if (e.minSectionValue) parts.push(`Section: ${e.minSectionValue}`);
-      return parts.join(' — ');
-    });
-    if (englishLines.length > 0) {
-      out.push({ subtitle: 'English requirements', description: englishLines });
-    }
-
-    return out;
-  }
-
-  private feesMetaItems(intake: UniCourseIntakes): MetaDataItem[] {
-    return [
-      ...parseMetaDataItems(intake.feesMetaData),
-      ...(intake.CourseIntakeScholarship ?? [])
-        .filter((s) => s.isActive)
-        .flatMap((s) => parseMetaDataItems(s.scholarshipMetaData)),
-    ];
-  }
-
-  private intakeDatesMetaItems(
-    intake: UniCourseIntakes,
-    section: IntakeDatesSectionDto,
-  ): MetaDataItem[] {
-    const lines = section.intakes ?? [];
-    if (lines.length > 0) return [{ subtitle: 'intakeDates', description: lines }];
-    return parseMetaDataItems(intake.intakeMetaData);
-  }
-
   // ─── Section builders ─────────────────────────────────────────────────────
 
-  private buildAcademicSection(intake: UniCourseIntakes): AcademicRequirementsSectionDto {
-    const hasInfo = this.isMetadataPresent(intake.UniCourse?.requirementMetaData);
+  private buildRanking(uni: SysUniversities | undefined): RankingDto {
     return {
-      hasInfo,
-      infoKey:      'academicRequirementsMetaData',
-      requirements: hasInfo ? this.buildAcademicContent(intake) : undefined,
+      position: uni?.currRanking ?? null,
+      hasInfo:  uni?.rankingMetaData != null,   
+      infoKey:  SECTION_META.ranking.infoKey,
+    };
+  }
+
+  private buildAcademicSection(intake: UniCourseIntakes): AcademicRequirementsSectionDto {
+    return {
+      hasInfo:      intake.UniCourse?.requirementMetaData != null,  
+      infoKey:      SECTION_META.academic.infoKey,
+      requirements: this.buildAcademicContent(intake),              
     };
   }
 
@@ -264,45 +205,44 @@ export class CourseDetailsMapper {
   }
 
   private buildFeesSection(intake: UniCourseIntakes): FeesAndScholarshipsSectionDto {
-    const hasScholarship = (intake.CourseIntakeScholarship ?? []).some(
-      (s) => s.isActive && this.isMetadataPresent(s.scholarshipMetaData),
-    );
-    const hasInfo = this.isMetadataPresent(intake.feesMetaData) || hasScholarship;
+  
+    const hasScholarship = (intake.CourseIntakeScholarship?.length ?? 0) > 0;
+    const hasInfo        = intake.feesMetaData != null || hasScholarship;
 
     return {
       hasInfo,
-      infoKey: 'feesAndScholarshipsMetaData',
-      items:   hasInfo ? this.buildFeesItems(intake, hasScholarship) : undefined,
+      infoKey: SECTION_META.fees.infoKey,
+      items:   this.buildFeesItems(intake, hasScholarship),
     };
   }
 
   private buildFeesItems(
-    intake: UniCourseIntakes,
+    intake:         UniCourseIntakes,
     hasScholarship: boolean,
-  ): FeesAndScholarshipsItemsDto {
+  ): FeesAndScholarshipsSectionDto['items'] {
     return {
       tuitionFees: intake.tuitionFee
         ? { amount: intake.tuitionFee, currency: intake.currency ?? null, frequency: 'yearly' }
         : undefined,
-      initialDeposit: intake.initialDeposit ?? undefined,
-      applicationFee: intake.applicationFee ?? undefined,
+      initialDeposit: intake.initialDeposit ?? null,
+      applicationFee: intake.applicationFee ?? null,
       scholarships:   hasScholarship ? 'Available' : 'Not Available',
     };
   }
 
-  private buildIntakeDatesSection(allCourseIntakes: UniCourseIntakes[]): IntakeDatesSectionDto {
-    const intakes = this.resolveIntakeMonths(allCourseIntakes);
+  private buildIntakeDatesSection(currentYearIntakes: UniCourseIntakes[]): IntakeDatesSectionDto {
+    const intakes = this.resolveIntakeMonths(currentYearIntakes);
     return {
       hasInfo: intakes.length > 0,
-      infoKey: 'intakeDatesMetaData',
+      infoKey: SECTION_META.intakes.infoKey,
       intakes: intakes.length > 0 ? intakes : undefined,
     };
   }
 
-  private resolveIntakeMonths(allCourseIntakes: UniCourseIntakes[]): string[] {
+  private resolveIntakeMonths(intakes: UniCourseIntakes[]): string[] {
     const order = new Map<MonthName, number>(MONTH_NAMES.map((m, i) => [m, i]));
 
-    const months = allCourseIntakes
+    const months = intakes
       .map((r) => {
         const m = Number(r.intakeMonth);
         return m >= 1 && m <= 12 ? MONTH_NAMES[m - 1] : null;
@@ -313,14 +253,6 @@ export class CourseDetailsMapper {
   }
 
   // ─── DTO builders ─────────────────────────────────────────────────────────
-
-  private buildRanking(uni: SysUniversities | undefined): RankingDto {
-    return {
-      position: uni?.currRanking ?? null,
-      hasInfo:  this.isMetadataPresent(uni?.rankingMetaData),
-      infoKey:  'rankingMetaData',
-    };
-  }
 
   private buildUniversity(uni: SysUniversities | undefined): UniversityDetailsDto {
     return {
@@ -390,15 +322,5 @@ export class CourseDetailsMapper {
     } catch {
       return null;
     }
-  }
-
-  // ─── Shared helpers ───────────────────────────────────────────────────────
-
-  private isMetadataPresent(raw: unknown): boolean {
-    if (raw == null)             return false;
-    if (Array.isArray(raw))      return raw.length > 0;
-    if (typeof raw === 'object') return Object.keys(raw as object).length > 0;
-    if (typeof raw === 'string') return raw.trim().length > 0;
-    return true;
   }
 }
