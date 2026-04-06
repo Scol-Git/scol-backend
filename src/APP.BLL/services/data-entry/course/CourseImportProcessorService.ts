@@ -9,6 +9,7 @@ import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
+import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
 import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
 import type { CourseImportConfig } from './CourseImportConfig';
 import {
@@ -183,10 +184,9 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     courseEntity.higherSysDegreeId = higherSysDegreeId;
     courseEntity.higherGpa = higherGpaStr;
     if (arRaw) {
-      courseEntity.requirementMetaData =
-        reqMetaParsed === null
-          ? undefined
-          : (reqMetaParsed as unknown as Record<string, unknown>);
+      courseEntity.requirementMetaData = Array.isArray(reqMetaParsed)
+        ? (reqMetaParsed as MetaDataItem[])
+        : undefined;
     } else {
       courseEntity.requirementMetaData = undefined;
     }
@@ -223,9 +223,17 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     /** Bulk upload does not persist `intakeMetaData` (column ignored; set elsewhere if needed). */
     const fm = (row.feesMetaData ?? '').trim();
     if (fm) {
-      const o = parseJsonValue(fm);
-      if (o !== null && typeof o === 'object' && !Array.isArray(o)) {
-        intakeEntity.feesMetaData = o as Record<string, unknown>;
+      const parsed = parseJsonValue(fm);
+      if (Array.isArray(parsed)) {
+        intakeEntity.feesMetaData = parsed as MetaDataItem[];
+      }
+    }
+    
+    const sm = (row.scholarshipMetaData ?? '').trim();
+    if (sm) {
+      const parsed = parseJsonValue(sm);
+      if (Array.isArray(parsed)) {
+        intakeEntity.scholarshipMetaData = parsed as MetaDataItem[];
       }
     }
     intakeEntity.isActive = true;
@@ -318,16 +326,8 @@ export class CourseImportProcessorService implements CsvImportProcessor {
         name: schName,
         amount: parseOptionalDecimal(row.scholarshipAmount ?? ''),
         amountType: (row.scholarshipType ?? '').trim() || undefined,
-        scholarshipMetaData: undefined,
         isActive: true,
       });
-      const sm = (row.scholarshipMetaData ?? '').trim();
-      if (sm) {
-        const o = parseJsonValue(sm);
-        if (o !== null && typeof o === 'object' && !Array.isArray(o)) {
-          sch.scholarshipMetaData = o as Record<string, unknown>;
-        }
-      }
       const savedSch = await schRepo.save(sch);
       scholarshipId = savedSch.id;
     }

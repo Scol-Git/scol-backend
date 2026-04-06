@@ -1,16 +1,10 @@
+import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
 import type { CsvRow } from '../../common/abstractions/CsvImportProcessor';
 
 /** One item in rankingMetaData: subtitle optional, description array of strings. */
-export interface RankingMetaDataItem {
-  subtitle?: string;
-  description: string[];
-}
+export type RankingMetaDataItem = MetaDataItem;
 
-/** locationMapMetaData: href and text strings. */
-export interface LocationMapMetaData {
-  href: string;
-  text: string;
-}
+
 
 /**
  * One university CSV row (input columns). Matches schema input headers.
@@ -69,8 +63,8 @@ export interface ResolvedUniversityRow {
   address: string;
   coverImageUrl: string;
   campusLifeLinks: string;
-  rankingMetaData: RankingMetaDataItem[];
-  locationMapMetaData: LocationMapMetaData;
+  rankingMetaData:     MetaDataItem[];
+  locationMapMetaData: string;  
   establishedYear?: number;
   universityType?: string;
   currRanking?: number;

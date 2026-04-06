@@ -8,11 +8,10 @@ import type {
   UniversityCsvRow,
   ResolvedUniversityRow,
   RankingMetaDataItem,
-  LocationMapMetaData,
 } from '../dto/UniversityCsvRow';
 import type { LocationMaps } from './LocationMaps';
 import { stateKey, cityKey, universityKey } from './ImportKeys';
-
+import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
 const LOG_CONTEXT = '[BulkImport:University:UniversityResolver]';
 
 /**
@@ -73,9 +72,7 @@ export class UniversityResolverService {
       const rankingMetaData = JSON.parse(
         row.rankingMetaData.trim(),
       ) as RankingMetaDataItem[];
-      const locationMapMetaData = JSON.parse(
-        row.locationMapMetaData.trim(),
-      ) as LocationMapMetaData;
+      const locationMapMetaData = row.locationMapMetaData.trim();
       const establishedYearRaw = row.establishedYear?.trim();
       const establishedYear =
         establishedYearRaw !== undefined && establishedYearRaw !== ''
@@ -144,8 +141,8 @@ export class UniversityResolverService {
         coverImageUrl: row.coverImageUrl || undefined,
         campusLifeLinks:
           campusLifeLinksArr.length > 0 ? campusLifeLinksArr : undefined,
-        rankingMetaData: row.rankingMetaData as unknown as Record<string, unknown>,
-        locationMapMetaData: row.locationMapMetaData as unknown as Record<string, unknown>,
+          rankingMetaData:     row.rankingMetaData as unknown as MetaDataItem[],
+          locationMapMetaData: JSON.stringify(row.locationMapMetaData),
         establishedYear: row.establishedYear,
         universityType: row.universityType,
         currRanking: row.currRanking,
