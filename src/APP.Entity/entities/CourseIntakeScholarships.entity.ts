@@ -3,6 +3,8 @@ import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
 
+import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
+
 /**
  * @class CourseIntakeScholarships
  * @extends {BaseEntity}
@@ -63,13 +65,7 @@ export class CourseIntakeScholarships extends BaseEntity {
   @AutoMap()
   frequency?: string;
 
-  @Column({
-    name: 'scholarshipMetaData',
-    type: 'jsonb',
-    nullable: true,
-  })
-  @AutoMap()
-  scholarshipMetaData?: Record<string, unknown>;
+  
 
   @Column({
     name: 'isActive',
