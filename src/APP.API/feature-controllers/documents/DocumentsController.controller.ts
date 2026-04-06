@@ -11,13 +11,14 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { DocumentService } from '@bll/services/documents/DocumentService';
 import { CreateUploadUrlDto } from '@shared/dtos/documents/CreateUploadUrlDto';
 import { CreateUploadUrlResponseDto } from '@shared/dtos/documents/CreateUploadUrlResponseDto';
+import { ReuploadUrlDto } from '@shared/dtos/documents/ReuploadUrlDto';
 import { ConfirmUploadDto } from '@shared/dtos/documents/ConfirmUploadDto';
 import { DownloadUrlResponseDto } from '@shared/dtos/documents/DownloadUrlResponseDto';
 
 /**
  * Documents Controller
  *
- * Presigned URL flow: upload-url → client uploads to B2 → confirm-upload.
+ * Presigned URL flow: upload-url (or :documentId/upload-url for re-upload) → client uploads to storage → confirm-upload.
  * Download: GET download URL for current version.
  */
 @ApiTags('documents')
@@ -37,6 +38,19 @@ export class DocumentsController {
     return this.documentService.createUploadUrl(dto);
   }
 
+  @Post(':documentId/upload-url')
+  @ApiOperation({
+    summary: 'Request presigned URL for re-upload',
+    description:
+      'Creates a new version for an existing document. Returns presigned URL. Client uploads file, then calls confirm-upload. Document must already have at least one uploaded version.',
+  })
+  async createReuploadUrl(
+    @Param('documentId') documentId: string,
+    @Body() dto: ReuploadUrlDto,
+  ): Promise<CreateUploadUrlResponseDto> {
+    return this.documentService.createReuploadUrl(documentId, dto);
+  }
+
   @Post('confirm-upload')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -51,7 +65,8 @@ export class DocumentsController {
   @Get(':documentId/download')
   @ApiOperation({
     summary: 'Get presigned download URL',
-    description: 'Returns a temporary URL to download the current document version.',
+    description:
+      'Returns a temporary URL to download the current document version.',
   })
   async getDownloadUrl(
     @Param('documentId') documentId: string,
