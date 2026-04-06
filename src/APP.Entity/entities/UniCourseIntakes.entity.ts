@@ -6,6 +6,8 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
+
+import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { UniCourses } from './UniCourses.entity';
@@ -130,21 +132,14 @@ export class UniCourseIntakes extends BaseEntity {
   @AutoMap()
   initialDepositType?: string;
 
-  @Column({
-    name: 'intakeMetaData',
-    type: 'jsonb',
-    nullable: true,
-  })
+  @Column({ name: 'intakeMetaData', type: 'jsonb', nullable: true })
   @AutoMap()
-  intakeMetaData?: Record<string, unknown>;
+  intakeMetaData?: MetaDataItem[];
 
-  @Column({
-    name: 'feesMetaData',
-    type: 'jsonb',
-    nullable: true,
-  })
-  @AutoMap()
-  feesMetaData?: Record<string, unknown>;
+// AFTER
+@Column({ name: 'feesMetaData', type: 'jsonb', nullable: true })
+@AutoMap()
+feesMetaData?: MetaDataItem[];
 
   @Column({
     name: 'applicationFee',

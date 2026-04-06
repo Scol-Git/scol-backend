@@ -13,6 +13,10 @@ import {
   MetaItemDto,
   MetaInformationItemDto,
 } from '@shared/dtos/course-details/MetaItemDto';
+import {
+  MetaDataItem,
+  parseMetaDataItems,
+} from '@shared/dtos/course-details/MetaDataItem.type';
 
 /** English month names only (no year) — used for `intakeDates.intakes`. */
 const MONTH_NAMES = [
@@ -30,7 +34,6 @@ const MONTH_NAMES = [
   'December',
 ] as const;
 
-// Change 7: moved to top-level constant (move to a constants file when convenient)
 const COURSE_DETAIL_TABS: { key: string; label: string }[] = [
   { key: 'aboutUs', label: 'About Us' },
   { key: 'campusLife', label: 'Campus Life' },
@@ -40,7 +43,11 @@ const COURSE_DETAIL_TABS: { key: string; label: string }[] = [
   { key: 'intakeDates', label: 'Intake Dates' },
 ];
 
-// Change 1: explicit interfaces replacing inferred ReturnType<...> and inline structural types
+// Subtitle constants — single source of truth, eliminates casing bugs
+const MetaSubtitles = {
+  FEES: 'feesMetaData',
+  SCHOLARSHIPS: 'scholarshipsMetaData',
+} as const;
 
 interface AcademicSection {
   hasInfo: boolean;
@@ -66,7 +73,6 @@ interface CourseDetailSections {
   intakeDates: IntakeDatesSection;
 }
 
-// Change 4: named interface for buildTags parameter
 interface UniTagSource {
   establishedYear?: number;
   universityType?: string;
@@ -74,9 +80,7 @@ interface UniTagSource {
   SysCountry?: { countryName?: string };
 }
 
-// Resolved tuition data shared between buildFeesAndScholarshipsSection and linesFeesMetaFromIntakeColumns
 interface ResolvedTuitionData {
-  tuitionFromJson: Record<string, unknown> | undefined;
   explicitFrequency: string | null;
   rawAmount: string | null;
   currency: string;
@@ -95,7 +99,6 @@ export class CourseDetailsMapper {
     };
   }
 
-  // Change 2: explicit return type instead of inferred
   private buildCourseDetailSections(
     intake: UniCourseIntakes,
     allCourseIntakes: UniCourseIntakes[],
@@ -107,7 +110,6 @@ export class CourseDetailsMapper {
     };
   }
 
-  // Change 3: CourseDetailSections instead of ReturnType<...>
   private toCourseDetailsDto(
     intake: UniCourseIntakes,
     sections: CourseDetailSections,
@@ -142,10 +144,8 @@ export class CourseDetailsMapper {
 
   private isMetadataPresent(raw: unknown): boolean {
     if (raw == null) return false;
-    if (typeof raw === 'object') {
-      if (Array.isArray(raw)) return raw.length > 0;
-      return Object.keys(raw as Record<string, unknown>).length > 0;
-    }
+    if (Array.isArray(raw)) return raw.length > 0;
+    if (typeof raw === 'object') return Object.keys(raw as object).length > 0;
     if (typeof raw === 'string') return raw.trim().length > 0;
     return true;
   }
@@ -154,7 +154,6 @@ export class CourseDetailsMapper {
     return this.isMetadataPresent(uni?.rankingMetaData);
   }
 
-  // Change 3: CourseDetailSections instead of ReturnType<...>
   private buildMeta(
     intake: UniCourseIntakes,
     sections: CourseDetailSections,
@@ -164,13 +163,10 @@ export class CourseDetailsMapper {
     const meta: MetaItemDto[] = [];
 
     if (this.rankingHasInfo(uni)) {
-      const rankingInformation = this.metaInformationForRanking(uni!);
+      // rankingMetaData is MetaDataItem[] on the entity — no cast needed
+      const rankingInformation = parseMetaDataItems(uni!.rankingMetaData);
       if (rankingInformation.length > 0) {
-        meta.push({
-          infoKey: 'rankingMetaData',
-          title: 'Ranking',
-          information: rankingInformation,
-        });
+        meta.push({ infoKey: 'rankingMetaData', title: 'Ranking', information: rankingInformation });
       }
     }
 
@@ -201,53 +197,41 @@ export class CourseDetailsMapper {
     if (intakes.hasInfo) {
       const intakeInformation = this.metaInformationForIntakes(intake, intakes);
       if (intakeInformation.length > 0) {
-        meta.push({
-          infoKey: 'intakeDatesMetaData',
-          title: 'Intake Dates',
-          information: intakeInformation,
-        });
+        meta.push({ infoKey: 'intakeDatesMetaData', title: 'Intake Dates', information: intakeInformation });
       }
     }
 
     return meta;
   }
 
-  private metaInformationForRanking(uni: SysUniversities): MetaInformationItemDto[] {
-    return this.tryParseMetaInformation(uni.rankingMetaData);
-  }
+  // ─── Academic ────────────────────────────────────────────────────────────────
 
-  // Change 3: AcademicSection instead of ReturnType<...>
   private metaInformationForAcademic(
     intake: UniCourseIntakes,
     section: AcademicSection,
-  ): MetaInformationItemDto[] {
-    const meta = intake.UniCourse?.requirementMetaData as
-      | Record<string, unknown>
-      | undefined;
-    if (meta && Array.isArray(meta.information) && meta.information.length > 0) {
-      return meta.information as MetaInformationItemDto[];
-    }
-    const parsed = this.tryParseMetaInformation(meta);
-    if (parsed.length > 0) {
-      return parsed;
-    }
+  ): MetaDataItem[] {
+    // requirementMetaData is not in scope for MetaDataItem[] yet — kept as unknown read
+    const raw: unknown = intake.UniCourse?.requirementMetaData;
+    const parsed = parseMetaDataItems(raw);
+    if (parsed.length > 0) return parsed;
+
     const req = section.requirements;
-    if (!req) {
-      return [];
-    }
+    if (!req) return [];
     return this.metaInformationFromAcademicRequirements(req);
   }
 
   private metaInformationFromAcademicRequirements(
     req: AcademicRequirementsContentDto,
-  ): MetaInformationItemDto[] {
-    const out: MetaInformationItemDto[] = [];
+  ): MetaDataItem[] {
+    const out: MetaDataItem[] = [];
+
     const degreeLines = req.degreeRequirements.map(
       (d) => `${d.degreeName} — ${d.label}: ${d.minValue}`,
     );
     if (degreeLines.length > 0) {
       out.push({ subtitle: 'Degree requirements', description: degreeLines });
     }
+
     const englishLines = req.englishRequirements.map((e) => {
       const parts: string[] = [e.testName];
       if (e.minOverallValue) parts.push(`Overall: ${e.minOverallValue}`);
@@ -257,114 +241,33 @@ export class CourseDetailsMapper {
     if (englishLines.length > 0) {
       out.push({ subtitle: 'English requirements', description: englishLines });
     }
+
     return out;
   }
 
-  // Change 6: split metaInformationForFees into a clean orchestration + named helper
-  private metaInformationForFees(intake: UniCourseIntakes): MetaInformationItemDto[] {
-    const root = intake.feesMetaData as Record<string, unknown> | undefined;
-    const fromNarrative = root ? this.metaFromFeesNarrativeJson(root) : [];
-    const withRelational = this.mergeRelationalScholarshipMeta(fromNarrative, intake);
-    return this.ensureFeesMetaDataFromIntake(withRelational, intake);
+  // ─── Fees ────────────────────────────────────────────────────────────────────
+
+  private metaInformationForFees(intake: UniCourseIntakes): MetaDataItem[] {
+    // feesMetaData is MetaDataItem[] on the entity — parse at boundary, no cast
+    const fromSchema = parseMetaDataItems(intake.feesMetaData);
+    const fromNarrative = fromSchema.length > 0 ? fromSchema : this.feesMetaFromIntakeColumns(intake);
+    const withRelational = this.upsertMetaBlock(
+      fromNarrative,
+      MetaSubtitles.SCHOLARSHIPS,
+      this.linesFromRelationalScholarships(intake),
+      'last',
+    );
+    return withRelational;
   }
 
-  /**
-   * Parses the `feesMetaData` JSONB blob into meta blocks.
-   * Tries nested `feesMetaData` / `scholarshipsMetaData` segments first,
-   * then falls back to legacy `information` array, then root fallback helpers.
-   */
-  private metaFromFeesNarrativeJson(
-    root: Record<string, unknown>,
-  ): MetaInformationItemDto[] {
-    const innerFees = root.feesMetaData;
-    const innerSch = root.scholarshipsMetaData;
-
-    const feesParsed = this.tryParseMetaInformation(innerFees);
-    const schParsed = this.tryParseMetaInformation(innerSch);
-
-    const feesDesc = this.flattenMetaDescriptions(feesParsed);
-    const rootNarrative = this.feesMetaRootNarrativeLines(root);
-    const feesDescription = feesDesc.length > 0 ? feesDesc : rootNarrative;
-
-    const out: MetaInformationItemDto[] = [];
-
-    if (feesDescription.length > 0) {
-      out.push({ subtitle: 'feesMetaData', description: feesDescription });
-    }
-
-    const schDesc = this.flattenMetaDescriptions(schParsed);
-    if (schDesc.length > 0) {
-      out.push({ subtitle: 'ScholarshipsMetaData', description: schDesc });
-    }
-
-    if (out.length > 0) {
-      return out;
-    }
-
-    // Legacy / root fallback paths
-    if (Array.isArray(root.information)) {
-      return root.information as MetaInformationItemDto[];
-    }
-
-    const rootParsed = this.tryParseMetaInformation(root);
-    if (rootParsed.length > 0) {
-      return rootParsed;
-    }
-
-    return this.metaInformationForFeesFromRootFallback(root);
+  private feesMetaFromIntakeColumns(intake: UniCourseIntakes): MetaDataItem[] {
+    const lines = this.linesFeesMetaFromIntakeColumns(intake);
+    if (lines.length === 0) return [];
+    return [{ subtitle: MetaSubtitles.FEES, description: lines }];
   }
 
-  private feesMetaRootNarrativeLines(root: Record<string, unknown>): string[] {
-    const lines: string[] = [];
-    const notes = root.notes;
-    if (typeof notes === 'string' && notes.trim()) {
-      lines.push(
-        ...notes
-          .split(/\r?\n/)
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0),
-      );
-    }
-    const tuitionYear = root.tuitionYear;
-    if (tuitionYear != null && tuitionYear !== '') {
-      lines.push(`Tuition year: ${String(tuitionYear)}`);
-    }
-    return lines;
-  }
-
-  private ensureFeesMetaDataFromIntake(
-    out: MetaInformationItemDto[],
-    intake: UniCourseIntakes,
-  ): MetaInformationItemDto[] {
-    const idx = out.findIndex((i) => i.subtitle === 'feesMetaData');
-    const existing = idx >= 0 ? (out[idx].description ?? []) : [];
-    if (existing.length > 0) {
-      return out;
-    }
-
-    const columnLines = this.linesFeesMetaFromIntakeColumns(intake);
-    if (columnLines.length === 0) {
-      return out;
-    }
-
-    const block: MetaInformationItemDto = {
-      subtitle: 'feesMetaData',
-      description: columnLines,
-    };
-
-    if (idx >= 0) {
-      const next = [...out];
-      next[idx] = block;
-      return next;
-    }
-
-    return [block, ...out];
-  }
-
-  // Change 5: uses resolveTuitionData() — no more duplicated resolution logic
   private linesFeesMetaFromIntakeColumns(intake: UniCourseIntakes): string[] {
     const { explicitFrequency, rawAmount, currency } = this.resolveTuitionData(intake);
-
     const amount = this.formatCurrencyAmount(rawAmount);
     const freqLabel = (explicitFrequency ?? 'yearly').trim();
 
@@ -377,159 +280,77 @@ export class CourseDetailsMapper {
     }
 
     const dep = this.formatCurrencyAmount(intake.initialDeposit ?? undefined);
-    if (dep != null && dep !== '') {
-      lines.push(currency ? `Initial deposit: ${dep} ${currency}` : `Initial deposit: ${dep}`);
-    }
+    if (dep) lines.push(currency ? `Initial deposit: ${dep} ${currency}` : `Initial deposit: ${dep}`);
 
     const app = this.formatCurrencyAmount(intake.applicationFee ?? undefined);
-    if (app != null && app !== '') {
-      lines.push(currency ? `Application fee: ${app} ${currency}` : `Application fee: ${app}`);
-    }
+    if (app) lines.push(currency ? `Application fee: ${app} ${currency}` : `Application fee: ${app}`);
 
     return lines;
-  }
-
-  private mergeRelationalScholarshipMeta(
-    out: MetaInformationItemDto[],
-    intake: UniCourseIntakes,
-  ): MetaInformationItemDto[] {
-    const relLines = this.linesFromRelationalScholarships(intake);
-    if (relLines.length === 0) {
-      return out;
-    }
-    const idx = out.findIndex((i) => i.subtitle === 'ScholarshipsMetaData');
-    if (idx >= 0) {
-      const existing = out[idx].description ?? [];
-      const next = [...out];
-      next[idx] = { ...out[idx], description: [...existing, ...relLines] };
-      return next;
-    }
-    return [...out, { subtitle: 'ScholarshipsMetaData', description: relLines }];
   }
 
   private linesFromRelationalScholarships(intake: UniCourseIntakes): string[] {
     const rows = (intake.CourseIntakeScholarship ?? []).filter((s) => s.isActive);
     const lines: string[] = [];
     for (const s of rows) {
-      const fromMeta = this.tryParseMetaInformation(s.scholarshipMetaData);
-      if (fromMeta.length === 0) continue;
+      // scholarshipMetaData is MetaDataItem[] on entity — no cast needed
+      const fromMeta = parseMetaDataItems(s.scholarshipMetaData);
       for (const item of fromMeta) {
-        const desc = item.description ?? [];
-        if (item.subtitle && desc.length > 0) {
-          lines.push(...desc.map((d) => `${item.subtitle}: ${d}`));
-        } else {
-          lines.push(...desc);
-        }
+        lines.push(...item.description.map((d) => this.formatScholarshipLine(item.subtitle, d)));
       }
     }
     return lines;
+  }
+
+  private formatScholarshipLine(subtitle: string, detail: string): string {
+    return `${subtitle}: ${detail}`;
   }
 
   private intakeHasRelationalScholarshipContent(intake: UniCourseIntakes): boolean {
-    for (const s of intake.CourseIntakeScholarship ?? []) {
-      if (!s.isActive) continue;
-      if (this.tryParseMetaInformation(s.scholarshipMetaData).length > 0) return true;
-    }
-    return false;
+    return (intake.CourseIntakeScholarship ?? []).some(
+      (s) => s.isActive && parseMetaDataItems(s.scholarshipMetaData).length > 0,
+    );
   }
 
-  private metaInformationForFeesFromRootFallback(
-    root: Record<string, unknown>,
-  ): MetaInformationItemDto[] {
-    const out: MetaInformationItemDto[] = [];
+  // ─── Generic upsert helper (replaces two duplicated merge patterns) ──────────
 
-    const tuitionLines = this.linesFromRootTuitionFees(root);
-    if (tuitionLines.length > 0) {
-      out.push({ subtitle: 'feesMetaData', description: tuitionLines });
+  private upsertMetaBlock(
+    items: MetaDataItem[],
+    subtitle: string,
+    lines: string[],
+    position: 'first' | 'last' = 'last',
+  ): MetaDataItem[] {
+    if (lines.length === 0) return items;
+    const idx = items.findIndex((i) => i.subtitle === subtitle);
+    if (idx >= 0) {
+      const next = [...items];
+      next[idx] = { ...items[idx], description: [...items[idx].description, ...lines] };
+      return next;
     }
-
-    const schRaw =
-      (typeof root.scholarships === 'string' ? root.scholarships : '') ||
-      (typeof root.scholarshipsSummary === 'string' ? root.scholarshipsSummary : '');
-    const schTrim = schRaw.trim();
-    if (schTrim) {
-      out.push({ subtitle: 'ScholarshipsMetaData', description: [schTrim] });
-    }
-
-    return out;
+    const block: MetaDataItem = { subtitle, description: lines };
+    return position === 'first' ? [block, ...items] : [...items, block];
   }
 
-  private linesFromRootTuitionFees(root: Record<string, unknown>): string[] {
-    const tf = root.tuitionFees;
-    if (tf == null || typeof tf !== 'object' || Array.isArray(tf)) return [];
-    const t = tf as Record<string, unknown>;
-    const amount = t.amount != null && t.amount !== '' ? String(t.amount) : '';
-    const currency = (t.currency as string | undefined)?.trim() ?? '';
-    const freqTf = (t.frequency as string | undefined)?.trim() ?? '';
-    const freqRoot = (typeof root.frequency === 'string' ? root.frequency.trim() : '') || '';
-    const freq = freqTf || freqRoot;
-    if (!amount && !currency && !freq) return [];
-    const core = [amount, currency].filter(Boolean).join(' ');
-    if (core && freq) return [`Tuition: ${core} (${freq})`];
-    if (core) return [`Tuition: ${core}`];
-    if (freq) return [`Frequency: ${freq}`];
-    return [];
-  }
+  // ─── Intake dates ─────────────────────────────────────────────────────────────
 
-  private flattenMetaDescriptions(items: MetaInformationItemDto[]): string[] {
-    const lines: string[] = [];
-    for (const item of items) {
-      lines.push(...(item.description ?? []));
-    }
-    return lines;
-  }
-
-  // Change 3: IntakeDatesSection instead of ReturnType<...>
   private metaInformationForIntakes(
     intake: UniCourseIntakes,
     section: IntakeDatesSection,
-  ): MetaInformationItemDto[] {
+  ): MetaDataItem[] {
     const lines = section.intakes ?? [];
-    if (lines.length > 0) {
-      return [{ description: lines }];
-    }
-    return this.tryParseMetaInformation(intake.intakeMetaData);
+    if (lines.length > 0) return [{ subtitle: 'intakeDates', description: lines }];
+    // intakeMetaData kept as unknown — its shape is not MetaDataItem[]
+    return parseMetaDataItems(intake.intakeMetaData);
   }
 
-  private tryParseMetaInformation(raw: unknown): MetaInformationItemDto[] {
-    if (raw == null) return [];
-    if (Array.isArray(raw)) {
-      if (raw.length === 0) return [];
-      if (typeof raw[0] === 'string') return [{ description: raw as string[] }];
-      if (
-        typeof raw[0] === 'object' &&
-        raw[0] !== null &&
-        'description' in (raw[0] as object)
-      ) {
-        return raw as MetaInformationItemDto[];
-      }
-    }
-    if (typeof raw === 'object' && raw !== null) {
-      const o = raw as Record<string, unknown>;
-      if (Array.isArray(o.information)) return o.information as MetaInformationItemDto[];
-      if (Array.isArray(o.paragraphs)) return [{ description: o.paragraphs as string[] }];
-      if (
-        Array.isArray(o.description) &&
-        o.description.length > 0 &&
-        o.description.every((x) => typeof x === 'string')
-      ) {
-        return [
-          {
-            subtitle: typeof o.subtitle === 'string' ? o.subtitle : undefined,
-            description: o.description as string[],
-          },
-        ];
-      }
-    }
-    return [];
-  }
+  // ─── Academic section builder ─────────────────────────────────────────────────
 
   private buildAcademicRequirementsContent(
     intake: UniCourseIntakes,
   ): AcademicRequirementsContentDto {
     const course = intake.UniCourse;
-    const degreeRequirements: AcademicRequirementsContentDto['degreeRequirements'] = [];
     if (!course) return { degreeRequirements: [], englishRequirements: [] };
+
+    const degreeRequirements: AcademicRequirementsContentDto['degreeRequirements'] = [];
 
     if (course.minSysAcademicDegree?.degreeName && course.minGpa != null) {
       degreeRequirements.push({
@@ -545,11 +366,13 @@ export class CourseDetailsMapper {
         minValue: String(course.higherGpa),
       });
     }
+
     const englishRequirements = (course.CourseEngReq ?? []).map((r) => ({
       testName: r.SysEnglishTest?.testName ?? 'English test',
       minOverallValue: r.minOverallReq != null ? String(r.minOverallReq) : '',
       minSectionValue: r.minSectionReq != null ? String(r.minSectionReq) : '',
     }));
+
     return { degreeRequirements, englishRequirements };
   }
 
@@ -557,21 +380,19 @@ export class CourseDetailsMapper {
     intake: UniCourseIntakes,
     entityReq: AcademicRequirementsContentDto,
   ): AcademicRequirementsContentDto {
-    const raw = intake.UniCourse?.requirementMetaData as
-      | Record<string, unknown>
-      | undefined;
-    const nested = raw?.requirements as
+    // requirementMetaData not yet typed as MetaDataItem[] — read as unknown
+    const raw: unknown = intake.UniCourse?.requirementMetaData;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return entityReq;
+    const nested = (raw as Record<string, unknown>).requirements as
       | Partial<AcademicRequirementsContentDto>
       | undefined;
     if (!nested) return entityReq;
     return {
-      degreeRequirements:
-        nested.degreeRequirements?.length ?
-          (nested.degreeRequirements as AcademicRequirementsContentDto['degreeRequirements'])
+      degreeRequirements: nested.degreeRequirements?.length
+        ? (nested.degreeRequirements as AcademicRequirementsContentDto['degreeRequirements'])
         : entityReq.degreeRequirements,
-      englishRequirements:
-        nested.englishRequirements?.length ?
-          (nested.englishRequirements as AcademicRequirementsContentDto['englishRequirements'])
+      englishRequirements: nested.englishRequirements?.length
+        ? (nested.englishRequirements as AcademicRequirementsContentDto['englishRequirements'])
         : entityReq.englishRequirements,
     };
   }
@@ -587,67 +408,19 @@ export class CourseDetailsMapper {
     return { hasInfo: true, infoKey: 'academicRequirementsMetaData', requirements };
   }
 
-  private mapRelationalScholarship(
-    intake: UniCourseIntakes,
-  ): ScholarshipDetailsDto | undefined {
-    const rows = intake.CourseIntakeScholarship ?? [];
-    const currency = intake.currency ?? null;
-    for (const s of rows) {
-      const scholarshipAmount = this.formatCurrencyAmount(s.amount ?? undefined);
-      if (scholarshipAmount == null || scholarshipAmount === '') continue;
-      const scholarshipName = (s.name ?? '').trim();
-      const scholarshipType = (s.amountType ?? '').trim() || undefined;
-      return {
-        scholarshipName: scholarshipName || undefined,
-        scholarshipAmount,
-        currency: currency ?? undefined,
-        scholarshipType,
-      };
-    }
-    return undefined;
-  }
+  // ─── Fees section builder ─────────────────────────────────────────────────────
 
-  private formatCurrencyAmount(value: string | null | undefined): string | null {
-    if (value == null || value === '') return null;
-    const s = String(value).trim();
-    if (!/^-?\d+(\.\d+)?$/.test(s)) return s;
-    const neg = s.startsWith('-');
-    const abs = neg ? s.slice(1) : s;
-    const [intPart, decPart = ''] = abs.split('.');
-    if (!decPart) return neg ? `-${intPart}` : intPart;
-    const decTrimmed = decPart.replace(/0+$/, '');
-    if (!decTrimmed.length) return neg ? `-${intPart}` : intPart;
-    return neg ? `-${intPart}.${decTrimmed}` : `${intPart}.${decTrimmed}`;
-  }
-
-  // Change 5: single source of truth for tuition data resolution
   private resolveTuitionData(intake: UniCourseIntakes): ResolvedTuitionData {
-    const feesJson = intake.feesMetaData as Record<string, unknown> | undefined;
-    const tuitionFromJson = feesJson?.tuitionFees as Record<string, unknown> | undefined;
-
-    const explicitFrequency =
-      (tuitionFromJson?.frequency as string | undefined) ??
-      (feesJson?.frequency as string | undefined) ??
-      null;
-
-    const rawAmount =
-      tuitionFromJson?.amount !== undefined && tuitionFromJson?.amount !== null
-        ? String(tuitionFromJson.amount)
-        : intake.tuitionFee ?? null;
-
-    const currency =
-      (tuitionFromJson?.currency as string | undefined)?.trim() ??
-      (intake.currency ?? '').trim();
-
-    return { tuitionFromJson, explicitFrequency, rawAmount, currency };
+    // feesMetaData is now MetaDataItem[] — tuitionFees lives in scalar columns only
+    // legacy tuitionFees nested object no longer expected in new schema rows
+    const explicitFrequency: string | null = null;
+    const rawAmount = intake.tuitionFee ?? null;
+    const currency = (intake.currency ?? '').trim();
+    return { explicitFrequency, rawAmount, currency };
   }
 
-  // Change 5: uses resolveTuitionData() — no more duplicated resolution logic
   private buildFeesAndScholarshipsSection(intake: UniCourseIntakes): FeesSection {
-    const { tuitionFromJson, explicitFrequency, rawAmount, currency } =
-      this.resolveTuitionData(intake);
-
-    const feesJson = intake.feesMetaData as Record<string, unknown> | undefined;
+    const { explicitFrequency, rawAmount, currency } = this.resolveTuitionData(intake);
 
     const tuitionFees: FeesAndScholarshipsItemsDto['tuitionFees'] = {
       amount: this.formatCurrencyAmount(rawAmount),
@@ -655,30 +428,18 @@ export class CourseDetailsMapper {
       frequency: explicitFrequency ?? 'yearly',
     };
 
-    const scholarshipsSummary: string | null =
-      (feesJson?.scholarships as string | undefined) ??
-      (feesJson?.scholarshipsSummary as string | undefined) ??
-      null;
-
     const hasInfo =
-      this.isMetadataPresent(feesJson) ||
+      this.isMetadataPresent(intake.feesMetaData) ||
       this.intakeHasRelationalScholarshipContent(intake);
 
-    const hasTuitionDetails = !!(
-      tuitionFees.amount ||
-      tuitionFees.currency ||
-      explicitFrequency != null
-    );
+    const hasTuitionDetails = !!(tuitionFees.amount || tuitionFees.currency || explicitFrequency);
 
     const initialDeposit = this.formatCurrencyAmount(intake.initialDeposit ?? undefined);
     const applicationFee = this.formatCurrencyAmount(intake.applicationFee ?? undefined);
     const relationalScholarship = this.mapRelationalScholarship(intake);
 
     const hasColumnFeeDetails =
-      hasTuitionDetails ||
-      (initialDeposit != null && initialDeposit !== '') ||
-      (applicationFee != null && applicationFee !== '') ||
-      relationalScholarship != null;
+      hasTuitionDetails || !!initialDeposit || !!applicationFee || relationalScholarship != null;
 
     const shouldShowItems = hasInfo || hasColumnFeeDetails;
 
@@ -688,21 +449,38 @@ export class CourseDetailsMapper {
           initialDeposit: initialDeposit ?? undefined,
           applicationFee: applicationFee ?? undefined,
           scholarships: relationalScholarship,
-          scholarshipsSummary: hasInfo ? scholarshipsSummary ?? undefined : undefined,
+          scholarshipsSummary: undefined,
         }
       : undefined;
 
     return { hasInfo, infoKey: 'feesAndScholarshipsMetaData', items };
   }
 
+  private mapRelationalScholarship(intake: UniCourseIntakes): ScholarshipDetailsDto | undefined {
+    const rows = intake.CourseIntakeScholarship ?? [];
+    const currency = intake.currency ?? null;
+    for (const s of rows) {
+      const scholarshipAmount = this.formatCurrencyAmount(s.amount ?? undefined);
+      if (!scholarshipAmount) continue;
+      return {
+        scholarshipName: (s.name ?? '').trim() || undefined,
+        scholarshipAmount,
+        currency: currency ?? undefined,
+        scholarshipType: (s.amountType ?? '').trim() || undefined,
+      };
+    }
+    return undefined;
+  }
+
+  // ─── Intake dates section builder ─────────────────────────────────────────────
+
   private buildIntakeDatesSection(
     intake: UniCourseIntakes,
     allCourseIntakes: UniCourseIntakes[],
   ): IntakeDatesSection {
     const intakes = this.intakeMonthsDisplayOnly(intake, allCourseIntakes);
-    const hasInfo = intakes.length > 0;
     return {
-      hasInfo,
+      hasInfo: intakes.length > 0,
       infoKey: 'intakeDatesMetaData',
       intakes: intakes.length > 0 ? intakes : undefined,
     };
@@ -713,39 +491,37 @@ export class CourseDetailsMapper {
     allCourseIntakes: UniCourseIntakes[],
   ): string[] {
     const combined: string[] = [];
-
     combined.push(...this.monthLabelsFromAllCourseIntakes(allCourseIntakes));
 
-    const raw = intake.intakeMetaData;
+    const raw: unknown = intake.intakeMetaData;
     if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) {
       const o = raw as Record<string, unknown>;
       if (Array.isArray(o.months) && o.months.every((x) => typeof x === 'number')) {
-        const labels = (o.months as number[])
-          .filter((m) => m >= 1 && m <= 12)
-          .map((m) => MONTH_NAMES[m - 1]);
-        combined.push(...labels);
+        combined.push(
+          ...(o.months as number[])
+            .filter((m) => m >= 1 && m <= 12)
+            .map((m) => MONTH_NAMES[m - 1]),
+        );
       }
     }
 
-    const fromStrings = this.linesFromIntakeMetaDataStrings(intake)
-      .map((s) => this.toMonthOnlyLabel(s))
-      .filter((s): s is string => s.length > 0);
-    combined.push(...fromStrings);
+    combined.push(
+      ...this.linesFromIntakeMetaDataStrings(intake)
+        .map((s) => this.toMonthOnlyLabel(s))
+        .filter((s) => s.length > 0),
+    );
 
     return this.uniqueSortedMonthLabels(combined);
   }
 
   private monthLabelsFromAllCourseIntakes(rows: UniCourseIntakes[]): string[] {
-    const labels: string[] = [];
-    for (const r of rows) {
-      const lb = this.monthLabelFromEntityIntakeMonth(r.intakeMonth);
-      if (lb) labels.push(lb);
-    }
-    return labels;
+    return rows
+      .map((r) => this.monthLabelFromEntityIntakeMonth(r.intakeMonth))
+      .filter((l): l is string => l !== null);
   }
 
   private linesFromIntakeMetaDataStrings(intake: UniCourseIntakes): string[] {
-    const raw = intake.intakeMetaData;
+    const raw: unknown = intake.intakeMetaData;
     if (raw == null) return [];
     if (Array.isArray(raw) && raw.every((x) => typeof x === 'string')) return raw as string[];
     if (typeof raw === 'object' && !Array.isArray(raw)) {
@@ -754,7 +530,7 @@ export class CourseDetailsMapper {
         return o.intakes as string[];
       }
     }
-    return this.flattenMetaDescriptions(this.tryParseMetaInformation(raw));
+    return parseMetaDataItems(raw).flatMap((i) => i.description);
   }
 
   private monthLabelFromEntityIntakeMonth(month: number): string | null {
@@ -770,19 +546,30 @@ export class CourseDetailsMapper {
   }
 
   private canonicalMonthName(word: string): string | undefined {
-    const idx = MONTH_NAMES.findIndex(
-      (n) => n.toLowerCase() === word.trim().toLowerCase(),
-    );
+    const idx = MONTH_NAMES.findIndex((n) => n.toLowerCase() === word.trim().toLowerCase());
     return idx >= 0 ? MONTH_NAMES[idx] : undefined;
   }
 
   private uniqueSortedMonthLabels(labels: string[]): string[] {
     const order = new Map<string, number>(MONTH_NAMES.map((m, i) => [m, i]));
-    const unique = [...new Set(labels)];
-    return unique.sort((a, b) => (order.get(a) ?? 99) - (order.get(b) ?? 99));
+    return [...new Set(labels)].sort((a, b) => (order.get(a) ?? 99) - (order.get(b) ?? 99));
   }
 
-  // Change 4: UniTagSource instead of inline structural type
+  // ─── Shared helpers ───────────────────────────────────────────────────────────
+
+  private formatCurrencyAmount(value: string | null | undefined): string | null {
+    if (value == null || value === '') return null;
+    const s = String(value).trim();
+    if (!/^-?\d+(\.\d+)?$/.test(s)) return s;
+    const neg = s.startsWith('-');
+    const abs = neg ? s.slice(1) : s;
+    const [intPart, decPart = ''] = abs.split('.');
+    if (!decPart) return neg ? `-${intPart}` : intPart;
+    const decTrimmed = decPart.replace(/0+$/, '');
+    if (!decTrimmed.length) return neg ? `-${intPart}` : intPart;
+    return neg ? `-${intPart}.${decTrimmed}` : `${intPart}.${decTrimmed}`;
+  }
+
   private buildTags(uni: UniTagSource | undefined): { label: string; type: string }[] {
     const tags: { label: string; type: string }[] = [];
     if (uni?.establishedYear != null) {
@@ -794,26 +581,22 @@ export class CourseDetailsMapper {
     const city = uni?.SysCity?.cityName;
     const country = uni?.SysCountry?.countryName;
     if (city || country) {
-      const label = [city, country].filter(Boolean).join(', ');
-      tags.push({ label, type: 'location' });
+      tags.push({ label: [city, country].filter(Boolean).join(', '), type: 'location' });
     }
     return tags;
   }
 
-  private buildAboutUs(uni: { aboutUs?: string } | undefined):
-    | { description: string[] }
-    | undefined {
+  private buildAboutUs(uni: { aboutUs?: string } | undefined): { description: string[] } | undefined {
     if (!uni?.aboutUs) return undefined;
     return { description: uni.aboutUs.split(/\n\n+/).filter(Boolean) };
   }
 
-  private buildCampusLife(uni: { campusLifeLinks?: string[] } | undefined):
-    | { media: { videoUrl?: string[] } }
-    | undefined {
+  private buildCampusLife(
+    uni: { campusLifeLinks?: string[] } | undefined,
+  ): { media: { videoUrl?: string[] } } | undefined {
     if (!uni?.campusLifeLinks?.length) return undefined;
     const videoUrl = this.uniqueCampusVideoUrls(uni.campusLifeLinks);
-    if (videoUrl.length === 0) return undefined;
-    return { media: { videoUrl } };
+    return videoUrl.length > 0 ? { media: { videoUrl } } : undefined;
   }
 
   private normalizeCampusVideoUrl(raw: string): string {
@@ -823,45 +606,35 @@ export class CourseDetailsMapper {
   private uniqueCampusVideoUrls(urls: string[]): string[] {
     const out: string[] = [];
     for (const raw of urls) {
-      const parts = raw.split(',');
-      for (const part of parts) {
+      for (const part of raw.split(',')) {
         const u = this.normalizeCampusVideoUrl(part);
-        if (!u) continue;
-        out.push(u);
+        if (u) out.push(u);
       }
     }
     return out;
   }
 
-  private buildLocation(uni:
-    | {
-        address?: string;
-        SysCity?: { cityName?: string };
-        SysCountry?: { countryName?: string };
-        SysState?: { stateName?: string };
-        locationMapMetaData?: Record<string, unknown>;
-      }
-    | undefined) {
+  private buildLocation(
+    uni:
+      | {
+          address?: string;
+          SysCity?: { cityName?: string };
+          SysCountry?: { countryName?: string };
+          SysState?: { stateName?: string };
+          locationMapMetaData?: Record<string, unknown>;
+        }
+      | undefined,
+  ) {
     const raw = uni?.locationMapMetaData;
-    let coordinates: {
-      latitude?: number;
-      longitude?: number;
-      link?: string | null;
-    } | null = null;
+    let coordinates: { latitude?: number; longitude?: number; link?: string | null } | null = null;
 
     if (raw && typeof raw === 'object') {
-      const lat =
-        typeof raw.latitude === 'number' ? raw.latitude
-        : typeof raw.lat === 'number' ? raw.lat
-        : undefined;
-      const lng =
-        typeof raw.longitude === 'number' ? raw.longitude
-        : typeof raw.lng === 'number' ? raw.lng
-        : undefined;
-      const link =
-        typeof raw.href === 'string' ? raw.href
-        : typeof raw.link === 'string' ? raw.link
-        : null;
+      const lat = typeof raw.latitude === 'number' ? raw.latitude
+        : typeof raw.lat === 'number' ? raw.lat : undefined;
+      const lng = typeof raw.longitude === 'number' ? raw.longitude
+        : typeof raw.lng === 'number' ? raw.lng : undefined;
+      const link = typeof raw.href === 'string' ? raw.href
+        : typeof raw.link === 'string' ? raw.link : null;
 
       if (lat != null || lng != null || link != null) {
         coordinates = {

@@ -1,8 +1,10 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
+import { MetaDataItem } from './MetaDataItem.type';
 
-export class MetaInformationItemDto {
-  @ApiPropertyOptional({ description: 'Subtitle for this block' })
-  subtitle?: string;
+// subtitle is now @ApiProperty (required), not @ApiPropertyOptional
+export class MetaInformationItemDto implements MetaDataItem {
+  @ApiProperty({ description: 'Subtitle for this block' })
+  subtitle!: string;
 
   @ApiProperty({ description: 'Description paragraphs', type: [String] })
   description!: string[];
@@ -10,8 +12,7 @@ export class MetaInformationItemDto {
 
 export class MetaItemDto {
   @ApiProperty({
-    description:
-      'Key used to link from courseDetails (e.g. rankingMetaData)',
+    description: 'Key used to link from courseDetails (e.g. rankingMetaData)',
   })
   infoKey!: string;
 

@@ -6,6 +6,8 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
+
+import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysCountries } from './SysCountries.entity';
@@ -171,13 +173,9 @@ export class SysUniversities extends BaseEntity {
   @AutoMap()
   currRanking?: number;
 
-  @Column({
-    name: 'rankingMetaData',
-    type: 'jsonb',
-    nullable: true,
-  })
+  @Column({ name: 'rankingMetaData', type: 'jsonb', nullable: true })
   @AutoMap()
-  rankingMetaData?: Record<string, unknown>;
+  rankingMetaData?: MetaDataItem[];
 
   // ========================================
   // Navigation Properties (EF Core style)
