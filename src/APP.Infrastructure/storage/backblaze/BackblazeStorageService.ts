@@ -10,9 +10,8 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
 
-
-const UPLOAD_URL_EXPIRES_IN = 
-const DOWNLOAD_URL_EXPIRES_IN = 3600; // 1 hour
+const UPLOAD_URL_EXPIRES_IN = 24 * 3600; // 24 hours
+const DOWNLOAD_URL_EXPIRES_IN = 24 * 3600; // 24 hours
 
 @Injectable()
 export class BackblazeStorageService implements IStorageService {
