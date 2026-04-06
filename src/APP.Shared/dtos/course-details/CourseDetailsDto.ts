@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class RankingDto {
   @ApiPropertyOptional() position?: number | null;
   @ApiProperty() hasInfo!: boolean;
-  @ApiProperty() infoKey!: string;
+  @ApiProperty() infoKey!: 'rankingMetaData';
 }
 
 export class UniversityDetailsDto {
@@ -99,24 +99,14 @@ export class FeesAndScholarshipsItemsDto {
   @ApiPropertyOptional({ type: TuitionFeesDto })
   tuitionFees?: TuitionFeesDto;
 
-  /** From intake columns when set; shown even if `hasInfo` is false (no fees JSON metadata). */
   @ApiPropertyOptional()
   initialDeposit?: string | null;
 
   @ApiPropertyOptional()
   applicationFee?: string | null;
 
-  /**
-   * Single relational scholarship: first `CourseIntakeScholarship` row with a usable `amount`.
-   */
-  @ApiPropertyOptional({ type: ScholarshipDetailsDto })
-  scholarships?: ScholarshipDetailsDto;
-
-  @ApiPropertyOptional({
-    description:
-      'Short summary from fees JSON `scholarships` / `scholarshipsSummary` when metadata-backed `hasInfo`',
-  })
-  scholarshipsSummary?: string | null;
+  @ApiProperty({ enum: ['Available', 'Not Available'] })
+  scholarships!: 'Available' | 'Not Available';
 }
 
 export class FeesAndScholarshipsSectionDto {

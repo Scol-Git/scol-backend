@@ -159,11 +159,11 @@ export class SysUniversities extends BaseEntity {
 
   @Column({
     name: 'locationMapMetaData',
-    type: 'jsonb',
+    type: 'varchar',
     nullable: true,
   })
   @AutoMap()
-  locationMapMetaData?: Record<string, unknown>;
+  locationMapMetaData?: string;
 
   @Column({
     name: 'currRanking',
