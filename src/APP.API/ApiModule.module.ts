@@ -11,6 +11,7 @@ import { LeadsModule } from './feature-controllers/leads/LeadsModule.module';
 import { HomeModule } from './feature-controllers/home/HomeModule.module';
 import { SearchModule } from './feature-controllers/search/SearchModule.module';
 import { CategoriesModule } from './feature-controllers/categories/CategoriesModule.module';
+import { CoursesModule } from './feature-controllers/courses/CoursesModule.module';
 
 // Standalone controllers
 import { HealthController } from './feature-controllers/health/HealthController.controller';
@@ -40,6 +41,7 @@ import { HealthCheckModule } from '@bll/services/health/HealthCheckModule.module
     HomeModule, // Home page endpoint
     SearchModule, // Search endpoints
     CategoriesModule, // Category endpoints (cities, etc.)
+    CoursesModule, // GET /courses/:id (course details by intake id)
 
     // BLL modules for standalone controllers
     AuthBllModule, // For InternalCronController
