@@ -13,7 +13,7 @@ import { SysProgrammes } from './SysProgrammes.entity';
 import { SysAcademicDegrees } from './SysAcademicDegrees.entity';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
 import { CourseEngReq } from './CourseEngReq.entity';
-import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
+import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 
 /**
  * @class UniCourses

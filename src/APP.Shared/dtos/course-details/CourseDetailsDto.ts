@@ -1,39 +1,34 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RankingDto {
-  @ApiPropertyOptional() position?: number | null;
+  @ApiPropertyOptional({ nullable: true }) position!: number | null;
   @ApiProperty() hasInfo!: boolean;
-  @ApiProperty() infoKey!: 'rankingMetaData';
+  @ApiProperty() infoKey!: string;
 }
 
 export class UniversityDetailsDto {
   @ApiProperty() uniId!: string;
   @ApiProperty() uniName!: string;
-  @ApiPropertyOptional() uniLogoUrl?: string | null;
-  @ApiPropertyOptional() uniCoverImageUrl?: string | null;
+  @ApiProperty({ nullable: true }) uniLogoUrl!: string | null;
+  @ApiProperty({ nullable: true }) uniCoverImageUrl!: string | null;
 }
 
 export class LocationCoordinatesDto {
-  @ApiPropertyOptional() latitude?: number;
-  @ApiPropertyOptional() longitude?: number;
-  /** Map URL from `locationMapMetaData.href` (or `link` when stored). */
-  @ApiPropertyOptional() link?: string | null;
+  @ApiProperty({ nullable: true }) link!: string | null;
 }
 
 export class LocationDto {
-  @ApiPropertyOptional() city?: string | null;
-  @ApiPropertyOptional() country?: string | null;
-  @ApiPropertyOptional() state?: string | null;
-  @ApiPropertyOptional() address?: string | null;
-  @ApiPropertyOptional({ type: LocationCoordinatesDto })
-  coordinates?: LocationCoordinatesDto | null;
+  @ApiProperty({ nullable: true }) city!: string | null;
+  @ApiProperty({ nullable: true }) country!: string | null;
+  @ApiProperty({ nullable: true }) state!: string | null;
+  @ApiProperty({ nullable: true }) address!: string | null;
+  @ApiProperty({ type: LocationCoordinatesDto, nullable: true })
+  coordinates!: LocationCoordinatesDto | null;
 }
 
 export class CourseTagDto {
   @ApiProperty() label!: string;
-  @ApiProperty({
-    description: 'Tag category: established | type | location',
-  })
+  @ApiProperty({ description: 'Tag category: established | type | location' })
   type!: string;
 }
 
@@ -65,45 +60,22 @@ export class AcademicRequirementsContentDto {
 export class AcademicRequirementsSectionDto {
   @ApiProperty() hasInfo!: boolean;
   @ApiProperty() infoKey!: string;
-  /**
-   * Degree/GPA and English rows; may be set when `hasInfo` is false if there is no
-   * `requirementMetaData` JSON but relational course data exists.
-   */
-  @ApiPropertyOptional({ type: AcademicRequirementsContentDto })
-  requirements?: AcademicRequirementsContentDto;
+  @ApiProperty({ type: AcademicRequirementsContentDto, nullable: true })
+  requirements!: AcademicRequirementsContentDto | null;
 }
 
 export class TuitionFeesDto {
-  @ApiPropertyOptional() amount?: string | null;
-  @ApiPropertyOptional() currency?: string | null;
-  @ApiPropertyOptional() frequency?: string | null;
-}
-
-/** First relational `CourseIntakeScholarship` row (single object on `items.scholarships`). */
-export class ScholarshipDetailsDto {
-  @ApiPropertyOptional({ example: 'International Merit Scholarship' })
-  scholarshipName?: string | null;
-
-  @ApiPropertyOptional({ example: '14000' })
-  scholarshipAmount?: string | null;
-
-  @ApiPropertyOptional({ example: 'GBP' })
-  currency?: string | null;
-
-  /** From `amountType` (e.g. PERCENTAGE, FIXED). */
-  @ApiPropertyOptional({ example: 'PERCENTAGE' })
-  scholarshipType?: string | null;
+  @ApiProperty({ nullable: true }) amount!: string | null;
+  @ApiProperty({ nullable: true }) currency!: string | null;
+  @ApiProperty({ nullable: true }) frequency!: string | null;
 }
 
 export class FeesAndScholarshipsItemsDto {
-  @ApiPropertyOptional({ type: TuitionFeesDto })
-  tuitionFees?: TuitionFeesDto;
+  @ApiProperty({ type: TuitionFeesDto, nullable: true })
+  tuitionFees!: TuitionFeesDto | null;
 
-  @ApiPropertyOptional()
-  initialDeposit?: string | null;
-
-  @ApiPropertyOptional()
-  applicationFee?: string | null;
+  @ApiProperty({ nullable: true }) initialDeposit!: string | null;
+  @ApiProperty({ nullable: true }) applicationFee!: string | null;
 
   @ApiProperty({ enum: ['Available', 'Not Available'] })
   scholarships!: 'Available' | 'Not Available';
@@ -112,35 +84,63 @@ export class FeesAndScholarshipsItemsDto {
 export class FeesAndScholarshipsSectionDto {
   @ApiProperty() hasInfo!: boolean;
   @ApiProperty() infoKey!: string;
-  @ApiPropertyOptional({ type: FeesAndScholarshipsItemsDto })
-  items?: FeesAndScholarshipsItemsDto;
+  @ApiProperty({ type: FeesAndScholarshipsItemsDto, nullable: true })
+  items!: FeesAndScholarshipsItemsDto | null;
 }
 
 export class IntakeDatesSectionDto {
   @ApiProperty() hasInfo!: boolean;
   @ApiProperty() infoKey!: string;
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: [String],
+    nullable: true,
     description:
-      'Month names only (e.g. April, September). From intakeMetaData.months [1–12], normalized strings, or this intake’s intakeMonth.',
+      'Month names only (e.g. April, September). Null when no intakes exist for the current year.',
   })
-  intakes?: string[];
+  intakes!: string[] | null;
+}
+
+export class AboutUsDto {
+  @ApiProperty({ type: [String] }) description!: string[];
+}
+
+export class CampusLifeDto {
+  @ApiProperty({ type: [String], nullable: true }) videoUrl!: string[] | null;
+}
+
+export class CampusLifeMediaDto {
+  @ApiProperty({ type: CampusLifeDto, nullable: true })
+  media!: CampusLifeDto | null;
 }
 
 export class CourseDetailsDto {
   @ApiProperty() courseId!: string;
   @ApiProperty() courseName!: string;
-  @ApiProperty() ranking!: RankingDto;
-  @ApiProperty() university!: UniversityDetailsDto;
+
+  @ApiProperty({ type: RankingDto })
+  ranking!: RankingDto;
+
+  @ApiProperty({ type: UniversityDetailsDto })
+  university!: UniversityDetailsDto;
+
   @ApiProperty({ type: [CourseTagDto] }) tags!: CourseTagDto[];
   @ApiProperty({ type: [CourseTabDto] }) tabs!: CourseTabDto[];
-  @ApiPropertyOptional() aboutUs?: { description: string[] };
-  @ApiPropertyOptional() campusLife?: { media: { videoUrl?: string[] } };
-  @ApiProperty() location!: LocationDto;
+
+  @ApiProperty({ type: AboutUsDto, nullable: true })
+  aboutUs!: AboutUsDto | null;
+
+  @ApiProperty({ type: CampusLifeMediaDto, nullable: true })
+  campusLife!: CampusLifeMediaDto | null;
+
+  @ApiProperty({ type: LocationDto })
+  location!: LocationDto;
+
   @ApiProperty({ type: AcademicRequirementsSectionDto })
   academicRequirements!: AcademicRequirementsSectionDto;
+
   @ApiProperty({ type: FeesAndScholarshipsSectionDto })
   feesAndScholarships!: FeesAndScholarshipsSectionDto;
+
   @ApiProperty({ type: IntakeDatesSectionDto })
   intakeDates!: IntakeDatesSectionDto;
 }

@@ -14,6 +14,7 @@ import {
   AcademicRequirementsSectionDto,
   FeesAndScholarshipsSectionDto,
   IntakeDatesSectionDto,
+  CampusLifeMediaDto,
 } from '@shared/dtos/course-details/CourseDetailsDto';
 import { MetaItemDto } from '@shared/dtos/course-details/MetaItemDto';
 
@@ -146,8 +147,12 @@ export class CourseDetailsMapper {
     if (intake.UniCourse?.requirementMetaData)
       meta.push({ ...SECTION_META.academic, information: intake.UniCourse.requirementMetaData });
 
-    if (intake.feesMetaData)
-      meta.push({ ...SECTION_META.fees,     information: intake.feesMetaData });
+    const feesInformation = [
+      ...(intake.feesMetaData        ?? []),
+      ...(intake.scholarshipMetaData ?? []),
+    ];
+    if (feesInformation.length > 0)
+      meta.push({ ...SECTION_META.fees, information: feesInformation });
 
     if (intake.intakeMetaData)
       meta.push({ ...SECTION_META.intakes,  information: intake.intakeMetaData });
@@ -183,7 +188,7 @@ export class CourseDetailsMapper {
       degreeRequirements.push({
         degreeName: course.minSysAcademicDegree.degreeName,
         label:      (course.minSysAcademicDegree.levelOrder ?? 0) > 1 ? 'CGPA' : 'GPA',
-        minValue:   String(course.minGpa),
+        minValue: course.minGpa,
       });
     }
 
@@ -191,14 +196,14 @@ export class CourseDetailsMapper {
       degreeRequirements.push({
         degreeName: course.higherSysAcademicDegree.degreeName,
         label:      (course.higherSysAcademicDegree.levelOrder ?? 0) > 1 ? 'CGPA' : 'GPA',
-        minValue:   String(course.higherGpa),
+        minValue:   course.higherGpa,
       });
     }
 
     const englishRequirements = (course.CourseEngReq ?? []).map((r) => ({
       testName:        r.SysEnglishTest?.testName ?? 'English test',
-      minOverallValue: r.minOverallReq != null ? String(r.minOverallReq) : '',
-      minSectionValue: r.minSectionReq != null ? String(r.minSectionReq) : '',
+      minOverallValue: r.minOverallReq ?? '',
+      minSectionValue: r.minSectionReq ?? '',
     }));
 
     return { degreeRequirements, englishRequirements };
@@ -223,7 +228,7 @@ export class CourseDetailsMapper {
     return {
       tuitionFees: intake.tuitionFee
         ? { amount: intake.tuitionFee, currency: intake.currency ?? null, frequency: 'yearly' }
-        : undefined,
+        : null,
       initialDeposit: intake.initialDeposit ?? null,
       applicationFee: intake.applicationFee ?? null,
       scholarships:   hasScholarship ? 'Available' : 'Not Available',
@@ -235,7 +240,7 @@ export class CourseDetailsMapper {
     return {
       hasInfo: intakes.length > 0,
       infoKey: SECTION_META.intakes.infoKey,
-      intakes: intakes.length > 0 ? intakes : undefined,
+      intakes: intakes.length > 0 ? intakes : null,
     };
   }
 
@@ -282,17 +287,17 @@ export class CourseDetailsMapper {
     return tags;
   }
 
-  private buildAboutUs(uni: UniAboutSource | undefined): { description: string[] } | undefined {
-    if (!uni?.aboutUs) return undefined;
+  private buildAboutUs(uni: UniAboutSource | undefined): { description: string[] } | null {
+    if (!uni?.aboutUs) return null;
     return { description: uni.aboutUs.split(/\n\n+/).filter(Boolean) };
   }
 
-  private buildCampusLife(
-    uni: UniCampusSource | undefined,
-  ): { media: { videoUrl?: string[] } } | undefined {
-    if (!uni?.campusLifeLinks?.length) return undefined;
+  private buildCampusLife(uni: UniCampusSource | undefined): CampusLifeMediaDto | null {
+    if (!uni?.campusLifeLinks?.length) return null;
     const videoUrl = this.parseCampusVideoUrls(uni.campusLifeLinks);
-    return videoUrl.length > 0 ? { media: { videoUrl } } : undefined;
+    return videoUrl.length > 0
+      ? { media: { videoUrl } }
+      : { media: { videoUrl: null } };
   }
 
   private parseCampusVideoUrls(urls: string[]): string[] {
@@ -315,10 +320,10 @@ export class CourseDetailsMapper {
   }
 
   private parseCoordinates(raw: string | undefined): LocationCoordinatesDto | null {
-    if (!raw) return null;
+    if (!raw?.trim()) return null;
     try {
-      new URL(raw);
-      return { link: raw };
+      const url = new URL(raw.trim());
+      return { link: url.href };   // normalized href — strips trailing spaces, ensures valid form
     } catch {
       return null;
     }

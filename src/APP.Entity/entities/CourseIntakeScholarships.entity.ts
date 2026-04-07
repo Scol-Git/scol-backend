@@ -3,7 +3,7 @@ import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
 
-import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
+import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 
 /**
  * @class CourseIntakeScholarships
