@@ -29,7 +29,7 @@ export class OtpJwtGuard implements CanActivate {
     const token = this._extractToken(request);
 
     if (!token) {
-      throw new UnauthorizedException('Missing OTP verification token');
+      throw new UnauthorizedException('OTP verification token missing');
     }
 
     try {
@@ -47,7 +47,7 @@ export class OtpJwtGuard implements CanActivate {
       return true;
     } catch (error) {
       throw new UnauthorizedException(
-        'Invalid or expired OTP verification token',
+        'Invalid OTP verification token',
       );
     }
   }

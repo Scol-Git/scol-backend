@@ -145,7 +145,7 @@ export class OtpService {
           if (elapsedSeconds < this.resendCooldown) {
             const retryAfter = this.resendCooldown - elapsedSeconds;
             throw new OtpResendRateLimitException(
-              `Please wait ${retryAfter} seconds before requesting a new OTP.`,
+              `Retry after ${retryAfter} seconds`,
               retryAfter,
             );
           }
@@ -207,7 +207,7 @@ export class OtpService {
       });
 
       throw new BusinessException(
-        'Failed to save OTP session',
+        'OTP session save failed',
         'OTP_SESSION_SAVE_FAILED',
       );
     }
@@ -276,8 +276,8 @@ export class OtpService {
     if (!session) {
       const errorMessage =
         purpose === OtpPurpose.Registration
-          ? 'Registration session expired. Please register again.'
-          : 'Password reset session expired. Please request a new OTP.';
+          ? 'Registration session has expired'
+          : 'Password reset session expired';
       throw new BusinessException(errorMessage, 'OTP_SESSION_EXPIRED');
     }
 
@@ -286,8 +286,8 @@ export class OtpService {
       await this.deleteOtpSession(phone, purpose, purposeId);
       const errorMessage =
         purpose === OtpPurpose.Registration
-          ? 'Registration session expired. Please register again.'
-          : 'Password reset session expired. Please request a new OTP.';
+          ? 'Registration session has expired'
+          : 'Password reset session expired';
       throw new BusinessException(errorMessage, 'OTP_SESSION_EXPIRED');
     }
 
@@ -295,7 +295,7 @@ export class OtpService {
     const currentCount = session.resendCount ?? 0;
     if (currentCount >= this.maxTotalOtps) {
       throw new OtpResendRateLimitException(
-        'You have reached the maximum number of OTPs for this session.',
+        'Maximum session OTPs reached',
         0,
       );
     }
@@ -309,7 +309,7 @@ export class OtpService {
       if (elapsedSeconds < this.resendCooldown) {
         const retryAfter = this.resendCooldown - elapsedSeconds;
         throw new OtpResendRateLimitException(
-          `Please wait ${retryAfter} seconds before requesting a new OTP.`,
+          `Retry after ${retryAfter} seconds`,
           retryAfter,
         );
       }

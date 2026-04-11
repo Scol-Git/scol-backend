@@ -65,4 +65,10 @@ dist/migrations/*
 # uploadUniCourse - ignore entire folder
 uploadUniCourse/
 
+# Bulk import staging/archive/reviewed/errors
+BulkImport/
+
+# Project docs (local)
+docs/
+
 # Note: package-lock.json is NOT ignored - it ensures reproducible builds

@@ -29,7 +29,7 @@ export class JwtAuthGuard implements CanActivate {
     const token = this._extractToken(request);
 
     if (!token) {
-      throw new UnauthorizedException('Missing authentication token');
+      throw new UnauthorizedException('Authentication token is missing');
     }
 
     try {
@@ -38,7 +38,7 @@ export class JwtAuthGuard implements CanActivate {
       // Reject OTP tokens - they should only be used with OtpJwtGuard
       if ((payload as any).aud === 'otp') {
         throw new UnauthorizedException(
-          'Invalid token type. OTP tokens cannot be used for authentication.',
+          'Invalid authentication token type',
         );
       }
 
@@ -50,7 +50,7 @@ export class JwtAuthGuard implements CanActivate {
 
       return true;
     } catch (error) {
-      throw new UnauthorizedException('Invalid or expired token');
+      throw new UnauthorizedException('Token is invalid or expired');
     }
   }
 

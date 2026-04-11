@@ -27,11 +27,11 @@ export class AuthValidationService {
    */
   validateLoginRequest(dto: LoginRequestDto): void {
     if (!dto.email && !dto.phone) {
-      throw new ValidationException('Either email or phone is required');
+      throw new ValidationException('Email or phone required');
     }
 
     if (dto.email && dto.phone) {
-      throw new ValidationException('Provide either email or phone, not both');
+      throw new ValidationException('Provide either email or phone');
     }
 
     // Validate phone format if provided
@@ -58,7 +58,7 @@ export class AuthValidationService {
         );
         return {
           allowed: false,
-          reason: `Account locked due to multiple failed login attempts. Try again in ${minutesRemaining} minute(s).`,
+          reason: `Locked: retry in ${minutesRemaining} minutes`,
           lockedUntil: user.lockedUntil,
         };
       }

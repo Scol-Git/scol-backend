@@ -20,8 +20,8 @@ export class AccountLockedException extends UnauthorizedException {
    */
   constructor(lockedUntil?: Date) {
     const message = lockedUntil
-      ? `Account is locked until ${lockedUntil.toISOString()}`
-      : 'Account is locked due to too many failed login attempts';
+      ? `Account locked until ${lockedUntil.toISOString().substring(0, 10)}`
+      : 'Account locked: too many attempts';
     super(message);
   }
 }

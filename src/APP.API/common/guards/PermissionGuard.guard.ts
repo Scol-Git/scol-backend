@@ -39,7 +39,7 @@ export class PermissionGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      throw new ForbiddenException('User not authenticated');
+      throw new ForbiddenException('User is not authenticated');
     }
 
     // Check if user has any of the required permissions
@@ -56,7 +56,7 @@ export class PermissionGuard implements CanActivate {
 
     if (!hasPermission) {
       throw new ForbiddenException(
-        `Missing required permission. Required: ${requiredPermissions.join(', ')}`,
+        'Required user permission missing',
       );
     }
 

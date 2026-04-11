@@ -14,6 +14,7 @@ import { SysAcademicDegrees } from './SysAcademicDegrees.entity';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
 import { CourseEngReq } from './CourseEngReq.entity';
 import { CourseRequiredDocuments } from './CourseRequiredDocuments.entity';
+import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 
 /**
  * @class UniCourses
@@ -97,6 +98,23 @@ export class UniCourses extends BaseEntity {
   })
   @AutoMap()
   higherGpa?: string;
+
+  @Column({
+    name: 'requirementMetaData',
+    type: 'jsonb',
+    nullable: true,
+  })
+  @AutoMap()
+  requirementMetaData?: MetaDataItem[];
+
+  @Column({
+    name: 'externalUrl',
+    type: 'varchar',
+    length: 2048,
+    nullable: true,
+  })
+  @AutoMap()
+  externalUrl?: string;
 
   // ========================================
   // Navigation Properties (EF Core style)

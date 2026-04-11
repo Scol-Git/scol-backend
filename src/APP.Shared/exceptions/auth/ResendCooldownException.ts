@@ -8,7 +8,7 @@ import { BusinessException } from '../BusinessException';
 export class ResendCooldownException extends BusinessException {
   constructor(remainingSeconds: number) {
     super(
-      `Please wait ${remainingSeconds} seconds before requesting a new OTP.`,
+      `Retry after ${remainingSeconds} seconds`,
       'RESEND_COOLDOWN_ACTIVE',
     );
   }

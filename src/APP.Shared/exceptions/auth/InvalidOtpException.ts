@@ -10,7 +10,7 @@ export class InvalidOtpException extends HttpException {
   constructor() {
     super(
       {
-        message: 'The OTP you entered is incorrect. Please check and try again.',
+        message: 'Incorrect OTP. Try again',
         error: { code: 'INVALID_OTP' },
       },
       HttpStatus.BAD_REQUEST,

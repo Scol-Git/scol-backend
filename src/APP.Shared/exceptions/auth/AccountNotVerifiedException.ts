@@ -8,7 +8,7 @@ import { BusinessException } from '../BusinessException';
 export class AccountNotVerifiedException extends BusinessException {
   constructor() {
     super(
-      'Your account is not verified. Please verify your phone number first.',
+      'Account verification is required',
       'ACCOUNT_NOT_VERIFIED',
     );
   }

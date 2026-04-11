@@ -10,7 +10,7 @@ export class OtpExpiredException extends HttpException {
   constructor() {
     super(
       {
-        message: 'Your OTP has expired. Please request a new OTP.',
+        message: 'Your OTP has expired',
         error: { code: 'OTP_EXPIRED' },
       },
       HttpStatus.BAD_REQUEST,

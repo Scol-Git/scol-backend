@@ -6,6 +6,8 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
+
+import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysCountries } from './SysCountries.entity';
@@ -137,6 +139,43 @@ export class SysUniversities extends BaseEntity {
   })
   @AutoMap()
   commissionType?: CommissionType;
+
+  @Column({
+    name: 'establishedYear',
+    type: 'int',
+    nullable: true,
+  })
+  @AutoMap()
+  establishedYear?: number;
+
+  @Column({
+    name: 'universityType',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  @AutoMap()
+  universityType?: string;
+
+  @Column({
+    name: 'locationMapMetaData',
+    type: 'varchar',
+    nullable: true,
+  })
+  @AutoMap()
+  locationMapMetaData?: string;
+
+  @Column({
+    name: 'currRanking',
+    type: 'int',
+    nullable: true,
+  })
+  @AutoMap()
+  currRanking?: number;
+
+  @Column({ name: 'rankingMetaData', type: 'jsonb', nullable: true })
+  @AutoMap()
+  rankingMetaData?: MetaDataItem[];
 
   // ========================================
   // Navigation Properties (EF Core style)
