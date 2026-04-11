@@ -1,7 +1,7 @@
 /**
- * Upload Status Enum
+ * Upload state of a document file version (persisted as varchar).
  *
- * Represents the upload state of a document version.
+ * Aligns with application/lead document version entities; values are stable for API and storage.
  */
 export enum UploadStatus {
   PENDING = 'PENDING',

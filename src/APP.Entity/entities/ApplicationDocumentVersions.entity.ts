@@ -1,22 +1,31 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
-import { BaseEntity } from './BaseEntity.template';
-import { Document } from './Document.entity';
+import { StorageProvider } from '@shared/enums/StorageProvider.enum';
 import { UploadStatus } from '@shared/enums/UploadStatus.enum';
 import { VerificationStatus } from '@shared/enums/VerificationStatus.enum';
+import { BaseEntity } from './BaseEntity.template';
+import { ApplicationDocuments } from './ApplicationDocuments.entity';
 
 /**
- * A single version of a document (file) in storage.
+ * Versioned file blob for an application document.
  */
-@Entity('DocumentVersions')
-export class DocumentVersion extends BaseEntity {
+@Index(
+  'UQ_ApplicationDocumentVersions_doc_version',
+  ['applicationDocumentId', 'versionNumber'],
+  { unique: true },
+)
+@Index('IX_ApplicationDocumentVersions_applicationDocumentId', [
+  'applicationDocumentId',
+])
+@Entity('ApplicationDocumentVersions')
+export class ApplicationDocumentVersions extends BaseEntity {
   @Column({
-    name: 'documentId',
+    name: 'applicationDocumentId',
     type: 'uuid',
     nullable: false,
   })
   @AutoMap()
-  documentId!: string;
+  applicationDocumentId!: string;
 
   @Column({
     name: 'versionNumber',
@@ -33,7 +42,7 @@ export class DocumentVersion extends BaseEntity {
     nullable: false,
   })
   @AutoMap()
-  storageProvider!: string;
+  storageProvider!: StorageProvider;
 
   @Column({
     name: 'storageKey',
@@ -83,19 +92,10 @@ export class DocumentVersion extends BaseEntity {
     name: 'uploadStatus',
     type: 'varchar',
     length: 50,
-    nullable: false,
-  })
-  @AutoMap()
-  uploadStatus!: UploadStatus;
-
-  @Column({
-    name: 'verificationStatus',
-    type: 'varchar',
-    length: 50,
     nullable: true,
   })
   @AutoMap()
-  verificationStatus?: VerificationStatus;
+  uploadStatus?: UploadStatus;
 
   @Column({
     name: 'uploadedByUserId',
@@ -106,6 +106,15 @@ export class DocumentVersion extends BaseEntity {
   uploadedByUserId?: string;
 
   @Column({
+    name: 'verificationStatus',
+    type: 'varchar',
+    length: 50,
+    nullable: false,
+  })
+  @AutoMap()
+  verificationStatus!: VerificationStatus;
+
+  @Column({
     name: 'verifiedByUserId',
     type: 'uuid',
     nullable: true,
@@ -113,7 +122,14 @@ export class DocumentVersion extends BaseEntity {
   @AutoMap()
   verifiedByUserId?: string;
 
-  @ManyToOne(() => Document, (doc) => doc.versions)
-  @JoinColumn({ name: 'documentId' })
-  document!: Document;
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+
+  @ManyToOne(
+    () => ApplicationDocuments,
+    (doc) => doc.ApplicationDocumentVersions,
+  )
+  @JoinColumn({ name: 'applicationDocumentId' })
+  ApplicationDocument!: ApplicationDocuments;
 }

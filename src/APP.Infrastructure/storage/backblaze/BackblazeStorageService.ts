@@ -11,7 +11,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
 
 
-const UPLOAD_URL_EXPIRES_IN = 
+const UPLOAD_URL_EXPIRES_IN = 3600; // 1 hour
 const DOWNLOAD_URL_EXPIRES_IN = 3600; // 1 hour
 
 @Injectable()

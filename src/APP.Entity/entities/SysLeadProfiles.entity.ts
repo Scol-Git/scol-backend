@@ -14,6 +14,8 @@ import { LeadTestResults } from './LeadTestResults.entity';
 import { LeadEnglishTestResults } from './LeadEnglishTestResults.entity';
 import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
 import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
+import { Applications } from './Applications.entity';
+import { LeadDocuments } from './LeadDocuments.entity';
 
 /**
  * @class SysLeadProfiles
@@ -108,7 +110,9 @@ export class SysLeadProfiles extends BaseEntity {
    * One-to-Many: English test results (legacy)
    * A lead can have multiple test results (IELTS, TOEFL, etc.)
    */
-  @OneToMany(() => LeadTestResults, (result) => result.SysLeadProfile, { cascade: true })
+  @OneToMany(() => LeadTestResults, (result) => result.SysLeadProfile, {
+    cascade: true,
+  })
   LeadTestResult!: LeadTestResults[];
 
   /**
@@ -137,4 +141,16 @@ export class SysLeadProfiles extends BaseEntity {
     cascade: true,
   })
   LeadPreferredProgram!: LeadPreferredPrograms[];
+
+  /**
+   * One-to-Many: Applications submitted by this lead
+   */
+  @OneToMany(() => Applications, (app) => app.SysLeadProfile)
+  Applications!: Applications[];
+
+  /**
+   * One-to-Many: Lead-scoped documents
+   */
+  @OneToMany(() => LeadDocuments, (doc) => doc.SysLeadProfile)
+  LeadDocuments!: LeadDocuments[];
 }

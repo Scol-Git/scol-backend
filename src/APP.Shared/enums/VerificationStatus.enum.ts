@@ -1,7 +1,5 @@
 /**
- * Verification Status Enum
- *
- * Represents the verification state of a document version.
+ * Verification outcome for a document version or lead document header (persisted as varchar).
  */
 export enum VerificationStatus {
   PENDING = 'PENDING',

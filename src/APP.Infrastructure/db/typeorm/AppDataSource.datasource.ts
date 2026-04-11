@@ -83,8 +83,18 @@ import { UniAcademicReq } from '@entity/entities/UniAcademicReq.entity';
 import { UniEngReq } from '@entity/entities/UniEngReq.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
 import { SysDocumentTypes } from '@entity/entities/SysDocumentTypes.entity';
-import { Document } from '@entity/entities/Document.entity';
-import { DocumentVersion } from '@entity/entities/DocumentVersion.entity';
+import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
+import { SysApplicationStatus } from '@entity/entities/SysApplicationStatus.entity';
+import { SysApplicationStage2Status } from '@entity/entities/SysApplicationStage2Status.entity';
+import { Applications } from '@entity/entities/Applications.entity';
+import { CourseRequiredDocuments } from '@entity/entities/CourseRequiredDocuments.entity';
+import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
+import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
+import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
+import { ApplicationStatusHistory } from '@entity/entities/ApplicationStatusHistory.entity';
+import { ApplicationStageHistory } from '@entity/entities/ApplicationStageHistory.entity';
+import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
+import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 
 /**
  * AppDataSource - TypeORM DataSource for migrations and CLI operations
@@ -132,8 +142,18 @@ const AppDataSource = new DataSource({
     UniEngReq,
     CourseEngReq,
     SysDocumentTypes,
-    Document,
-    DocumentVersion,
+    SysApplicationStage,
+    SysApplicationStatus,
+    SysApplicationStage2Status,
+    Applications,
+    CourseRequiredDocuments,
+    ApplicationRequiredDocuments,
+    ApplicationDocuments,
+    ApplicationDocumentVersions,
+    ApplicationStatusHistory,
+    ApplicationStageHistory,
+    LeadDocuments,
+    LeadDocumentVersions,
   ],
 
   migrations: [migrationPath],

@@ -1,21 +1,54 @@
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
+import { DocumentScope } from '@shared/enums/DocumentScope.enum';
 import { BaseEntity } from './BaseEntity.template';
-import { Document } from './Document.entity';
+import { CourseRequiredDocuments } from './CourseRequiredDocuments.entity';
+import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.entity';
+import { ApplicationDocuments } from './ApplicationDocuments.entity';
+import { LeadDocuments } from './LeadDocuments.entity';
 
 /**
- * Master list of document types (e.g. Passport, Transcript, CV).
+ * Master list of document types (passport, transcript, etc.) with scope and validation rules.
  */
+@Index('UQ_sys_DocumentTypes_documentTypeCode', ['documentTypeCode'], {
+  unique: true,
+})
 @Entity('sys_DocumentTypes')
 export class SysDocumentTypes extends BaseEntity {
   @Column({
-    name: 'name',
+    name: 'documentTypeCode',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  @AutoMap()
+  documentTypeCode!: string;
+
+  @Column({
+    name: 'documentTypeName',
     type: 'varchar',
     length: 255,
     nullable: false,
   })
   @AutoMap()
-  name!: string;
+  documentTypeName!: string;
+
+  @Column({
+    name: 'documentScope',
+    type: 'varchar',
+    length: 50,
+    nullable: false,
+  })
+  @AutoMap()
+  documentScope!: DocumentScope;
+
+  @Column({
+    name: 'isMultipleAllowed',
+    type: 'boolean',
+    nullable: true,
+  })
+  @AutoMap()
+  isMultipleAllowed?: boolean;
 
   @Column({
     name: 'description',
@@ -52,6 +85,19 @@ export class SysDocumentTypes extends BaseEntity {
   @AutoMap()
   isActive!: boolean;
 
-  @OneToMany(() => Document, (doc) => doc.documentType)
-  documents!: Document[];
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+
+  @OneToMany(() => CourseRequiredDocuments, (row) => row.SysDocumentType)
+  CourseRequiredDocuments!: CourseRequiredDocuments[];
+
+  @OneToMany(() => ApplicationRequiredDocuments, (row) => row.SysDocumentType)
+  ApplicationRequiredDocuments!: ApplicationRequiredDocuments[];
+
+  @OneToMany(() => ApplicationDocuments, (row) => row.SysDocumentType)
+  ApplicationDocuments!: ApplicationDocuments[];
+
+  @OneToMany(() => LeadDocuments, (row) => row.SysDocumentType)
+  LeadDocuments!: LeadDocuments[];
 }
