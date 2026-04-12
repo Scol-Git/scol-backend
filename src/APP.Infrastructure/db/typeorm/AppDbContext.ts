@@ -49,8 +49,8 @@ import { CourseRequiredDocuments } from '@entity/entities/CourseRequiredDocument
 import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
 import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
 import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
-import { ApplicationStatusHistory } from '@entity/entities/ApplicationStatusHistory.entity';
-import { ApplicationStageHistory } from '@entity/entities/ApplicationStageHistory.entity';
+import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocuments.entity';
+import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 
@@ -191,11 +191,11 @@ export class AppDbContext {
     @InjectRepository(ApplicationDocumentVersions)
     public readonly applicationDocumentVersions: Repository<ApplicationDocumentVersions>,
 
-    @InjectRepository(ApplicationStatusHistory)
-    public readonly applicationStatusHistories: Repository<ApplicationStatusHistory>,
+    @InjectRepository(SysStageRequiredDocuments)
+    public readonly sysStageRequiredDocuments: Repository<SysStageRequiredDocuments>,
 
-    @InjectRepository(ApplicationStageHistory)
-    public readonly applicationStageHistories: Repository<ApplicationStageHistory>,
+    @InjectRepository(ApplicationActivities)
+    public readonly applicationActivities: Repository<ApplicationActivities>,
 
     @InjectRepository(LeadDocuments)
     public readonly leadDocuments: Repository<LeadDocuments>,

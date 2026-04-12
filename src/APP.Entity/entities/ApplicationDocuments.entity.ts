@@ -16,6 +16,7 @@ import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.ent
 import { LeadDocuments } from './LeadDocuments.entity';
 import { LeadDocumentVersions } from './LeadDocumentVersions.entity';
 import { ApplicationDocumentVersions } from './ApplicationDocumentVersions.entity';
+import { ApplicationActivities } from './ApplicationActivities.entity';
 
 /**
  * Application-scoped document (may link to lead document or application-only uploads).
@@ -51,6 +52,15 @@ export class ApplicationDocuments extends BaseEntity {
   })
   @AutoMap()
   applicationRequirementId!: string;
+
+  @Column({
+    name: 'latestFileName',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  @AutoMap()
+  latestFileName?: string;
 
   @Column({
     name: 'sourceScope',
@@ -153,4 +163,7 @@ export class ApplicationDocuments extends BaseEntity {
 
   @OneToMany(() => ApplicationDocumentVersions, (v) => v.ApplicationDocument)
   ApplicationDocumentVersions!: ApplicationDocumentVersions[];
+
+  @OneToMany(() => ApplicationActivities, (a) => a.ApplicationDocument)
+  ApplicationActivities!: ApplicationActivities[];
 }

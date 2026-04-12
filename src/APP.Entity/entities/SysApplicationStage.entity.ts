@@ -10,8 +10,9 @@ import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.entity';
 import { Applications } from './Applications.entity';
-import { ApplicationStageHistory } from './ApplicationStageHistory.entity';
 import { SysApplicationStage2Status } from './SysApplicationStage2Status.entity';
+import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
+import { ApplicationActivities } from './ApplicationActivities.entity';
 
 /**
  * Lookup: application workflow stage (e.g. draft, submitted).
@@ -53,6 +54,15 @@ export class SysApplicationStage extends BaseEntity {
   @AutoMap()
   isTerminal?: boolean;
 
+  @Column({
+    name: 'stageInformation',
+    type: 'varchar',
+    length: 2000,
+    nullable: true,
+  })
+  @AutoMap()
+  stageInformation?: string;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================
@@ -68,12 +78,9 @@ export class SysApplicationStage extends BaseEntity {
   @OneToMany(() => SysApplicationStage2Status, (row) => row.SysApplicationStage)
   ApplicationStageToStatuses!: SysApplicationStage2Status[];
 
-  @OneToMany(
-    () => ApplicationStageHistory,
-    (row) => row.FromSysApplicationStage,
-  )
-  ApplicationStageHistoryFrom!: ApplicationStageHistory[];
+  @OneToMany(() => SysStageRequiredDocuments, (row) => row.SysApplicationStage)
+  SysStageRequiredDocuments!: SysStageRequiredDocuments[];
 
-  @OneToMany(() => ApplicationStageHistory, (row) => row.ToSysApplicationStage)
-  ApplicationStageHistoryTo!: ApplicationStageHistory[];
+  @OneToMany(() => ApplicationActivities, (a) => a.SysApplicationStage)
+  ApplicationActivities!: ApplicationActivities[];
 }

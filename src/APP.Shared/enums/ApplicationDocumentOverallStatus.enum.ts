@@ -1,5 +1,7 @@
 /**
- * High-level status of an application document requirement / file slot (varchar in DB).
+ * High-level status of an ApplicationDocuments row (file slot / document instance).
+ * For checklist rows use ApplicationRequirementOverallStatus on ApplicationRequiredDocuments.
+ * Stored as varchar in DB.
  */
 export enum ApplicationDocumentOverallStatus {
   Missing = 'MISSING',

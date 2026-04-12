@@ -2,8 +2,8 @@ import { Entity, Column, OneToMany, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { Applications } from './Applications.entity';
-import { ApplicationStatusHistory } from './ApplicationStatusHistory.entity';
 import { SysApplicationStage2Status } from './SysApplicationStage2Status.entity';
+import { ApplicationActivities } from './ApplicationActivities.entity';
 
 /**
  * Lookup: application status (e.g. pending, approved).
@@ -57,15 +57,6 @@ export class SysApplicationStatus extends BaseEntity {
   )
   ApplicationStageToStatuses!: SysApplicationStage2Status[];
 
-  @OneToMany(
-    () => ApplicationStatusHistory,
-    (row) => row.FromSysApplicationStatus,
-  )
-  ApplicationStatusHistoryFrom!: ApplicationStatusHistory[];
-
-  @OneToMany(
-    () => ApplicationStatusHistory,
-    (row) => row.ToSysApplicationStatus,
-  )
-  ApplicationStatusHistoryTo!: ApplicationStatusHistory[];
+  @OneToMany(() => ApplicationActivities, (a) => a.SysApplicationStatus)
+  ApplicationActivities!: ApplicationActivities[];
 }

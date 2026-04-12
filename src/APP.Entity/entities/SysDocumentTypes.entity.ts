@@ -6,6 +6,7 @@ import { CourseRequiredDocuments } from './CourseRequiredDocuments.entity';
 import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.entity';
 import { ApplicationDocuments } from './ApplicationDocuments.entity';
 import { LeadDocuments } from './LeadDocuments.entity';
+import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
 
 /**
  * Master list of document types (passport, transcript, etc.) with scope and validation rules.
@@ -100,4 +101,7 @@ export class SysDocumentTypes extends BaseEntity {
 
   @OneToMany(() => LeadDocuments, (row) => row.SysDocumentType)
   LeadDocuments!: LeadDocuments[];
+
+  @OneToMany(() => SysStageRequiredDocuments, (row) => row.SysDocumentType)
+  SysStageRequiredDocuments!: SysStageRequiredDocuments[];
 }

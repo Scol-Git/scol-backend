@@ -15,8 +15,7 @@ import { SysApplicationStage } from './SysApplicationStage.entity';
 import { SysUsers } from './SysUsers.entity';
 import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.entity';
 import { ApplicationDocuments } from './ApplicationDocuments.entity';
-import { ApplicationStatusHistory } from './ApplicationStatusHistory.entity';
-import { ApplicationStageHistory } from './ApplicationStageHistory.entity';
+import { ApplicationActivities } from './ApplicationActivities.entity';
 
 /**
  * Application for a lead against a course intake (enrollment pipeline).
@@ -29,6 +28,7 @@ import { ApplicationStageHistory } from './ApplicationStageHistory.entity';
 @Index('IX_Applications_currentSysApplicationStageId', [
   'currentSysApplicationStageId',
 ])
+@Index('UQ_Applications_serialNumber', ['serialNumber'], { unique: true })
 @Entity('Applications')
 export class Applications extends BaseEntity {
   @Column({
@@ -79,6 +79,15 @@ export class Applications extends BaseEntity {
   @AutoMap()
   submittedAt?: Date;
 
+  @Column({
+    name: 'serialNumber',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  @AutoMap()
+  serialNumber?: string;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================
@@ -121,9 +130,6 @@ export class Applications extends BaseEntity {
   @OneToMany(() => ApplicationDocuments, (doc) => doc.Application)
   ApplicationDocuments!: ApplicationDocuments[];
 
-  @OneToMany(() => ApplicationStatusHistory, (h) => h.Application)
-  ApplicationStatusHistories!: ApplicationStatusHistory[];
-
-  @OneToMany(() => ApplicationStageHistory, (h) => h.Application)
-  ApplicationStageHistories!: ApplicationStageHistory[];
+  @OneToMany(() => ApplicationActivities, (a) => a.Application)
+  ApplicationActivities!: ApplicationActivities[];
 }

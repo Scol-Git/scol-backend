@@ -14,6 +14,7 @@ import { SysPermissions } from './SysPermissions.entity';
 import { UserSessions } from './UserSessions.entity';
 import { SysLeadProfiles } from './SysLeadProfiles.entity';
 import { Applications } from './Applications.entity';
+import { ApplicationActivities } from './ApplicationActivities.entity';
 import { AccountStatus } from '@shared/enums/AccountStatus.enum';
 import { UserType } from '@shared/enums/UserType.enum';
 
@@ -164,4 +165,7 @@ export class SysUsers extends BaseEntity {
    */
   @OneToMany(() => Applications, (app) => app.AssignedToUser)
   AssignedApplications!: Applications[];
+
+  @OneToMany(() => ApplicationActivities, (a) => a.ActedByUser)
+  ActedApplicationActivities!: ApplicationActivities[];
 }

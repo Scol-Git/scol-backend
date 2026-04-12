@@ -1,10 +1,18 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { StorageProvider } from '@shared/enums/StorageProvider.enum';
 import { UploadStatus } from '@shared/enums/UploadStatus.enum';
 import { VerificationStatus } from '@shared/enums/VerificationStatus.enum';
 import { BaseEntity } from './BaseEntity.template';
 import { ApplicationDocuments } from './ApplicationDocuments.entity';
+import { ApplicationActivities } from './ApplicationActivities.entity';
 
 /**
  * Versioned file blob for an application document.
@@ -132,4 +140,7 @@ export class ApplicationDocumentVersions extends BaseEntity {
   )
   @JoinColumn({ name: 'applicationDocumentId' })
   ApplicationDocument!: ApplicationDocuments;
+
+  @OneToMany(() => ApplicationActivities, (a) => a.ApplicationDocumentVersion)
+  ApplicationActivities!: ApplicationActivities[];
 }

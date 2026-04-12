@@ -8,11 +8,14 @@ import {
 } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocumentSourceType.enum';
+import { ApplicationRequirementOverallStatus } from '@shared/enums/ApplicationRequirementOverallStatus.enum';
 import { BaseEntity } from './BaseEntity.template';
 import { Applications } from './Applications.entity';
 import { SysApplicationStage } from './SysApplicationStage.entity';
 import { SysDocumentTypes } from './SysDocumentTypes.entity';
+import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
 import { ApplicationDocuments } from './ApplicationDocuments.entity';
+import { ApplicationActivities } from './ApplicationActivities.entity';
 
 /**
  * Resolved document requirements for a specific application (course + stage + overrides).
@@ -23,6 +26,9 @@ import { ApplicationDocuments } from './ApplicationDocuments.entity';
 ])
 @Index('IX_ApplicationRequiredDocuments_sysApplicationStageId', [
   'sysApplicationStageId',
+])
+@Index('IX_ApplicationRequiredDocuments_sysStageRequiredDocumentId', [
+  'sysStageRequiredDocumentId',
 ])
 @Entity('ApplicationRequiredDocuments')
 export class ApplicationRequiredDocuments extends BaseEntity {
@@ -51,12 +57,38 @@ export class ApplicationRequiredDocuments extends BaseEntity {
   sysDocumentTypeId!: string;
 
   @Column({
+    name: 'sysStageRequiredDocumentId',
+    type: 'uuid',
+    nullable: true,
+  })
+  @AutoMap()
+  sysStageRequiredDocumentId?: string;
+
+  @Column({
     name: 'isRequired',
     type: 'boolean',
     nullable: true,
   })
   @AutoMap()
   isRequired?: boolean;
+
+  @Column({
+    name: 'isMultipleAllowed',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  @AutoMap()
+  isMultipleAllowed!: boolean;
+
+  @Column({
+    name: 'overallStatus',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  @AutoMap()
+  overallStatus?: ApplicationRequirementOverallStatus;
 
   @Column({
     name: 'allowedMimeTypes',
@@ -103,6 +135,14 @@ export class ApplicationRequiredDocuments extends BaseEntity {
   sourceType!: ApplicationDocumentSourceType;
 
   @Column({
+    name: 'displayOrder',
+    type: 'int',
+    nullable: true,
+  })
+  @AutoMap()
+  displayOrder?: number;
+
+  @Column({
     name: 'remarks',
     type: 'varchar',
     length: 500,
@@ -135,9 +175,20 @@ export class ApplicationRequiredDocuments extends BaseEntity {
   @JoinColumn({ name: 'sysDocumentTypeId' })
   SysDocumentType!: SysDocumentTypes;
 
+  @ManyToOne(
+    () => SysStageRequiredDocuments,
+    (row) => row.ApplicationRequiredDocuments,
+    { nullable: true },
+  )
+  @JoinColumn({ name: 'sysStageRequiredDocumentId' })
+  SysStageRequiredDocument?: SysStageRequiredDocuments;
+
   @OneToMany(
     () => ApplicationDocuments,
     (doc) => doc.ApplicationRequiredDocument,
   )
   ApplicationDocuments!: ApplicationDocuments[];
+
+  @OneToMany(() => ApplicationActivities, (a) => a.ApplicationRequiredDocument)
+  ApplicationActivities!: ApplicationActivities[];
 }

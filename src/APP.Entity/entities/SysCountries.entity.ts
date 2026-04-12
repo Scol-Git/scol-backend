@@ -3,6 +3,7 @@ import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
 import { SysStates } from './SysStates.entity';
+import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
 
 /**
  * @class SysCountries
@@ -40,4 +41,7 @@ export class SysCountries extends BaseEntity {
    */
   @OneToMany(() => SysStates, (state) => state.SysCountry)
   SysState!: SysStates[];
+
+  @OneToMany(() => SysStageRequiredDocuments, (row) => row.SysCountry)
+  SysStageRequiredDocuments!: SysStageRequiredDocuments[];
 }

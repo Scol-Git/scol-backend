@@ -48,8 +48,8 @@ import { CourseRequiredDocuments } from '@entity/entities/CourseRequiredDocument
 import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
 import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
 import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
-import { ApplicationStatusHistory } from '@entity/entities/ApplicationStatusHistory.entity';
-import { ApplicationStageHistory } from '@entity/entities/ApplicationStageHistory.entity';
+import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocuments.entity';
+import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { AppDbContext } from './AppDbContext';
@@ -107,8 +107,8 @@ import { AppDbContext } from './AppDbContext';
             ApplicationRequiredDocuments,
             ApplicationDocuments,
             ApplicationDocumentVersions,
-            ApplicationStatusHistory,
-            ApplicationStageHistory,
+            SysStageRequiredDocuments,
+            ApplicationActivities,
             LeadDocuments,
             LeadDocumentVersions,
           ],
@@ -164,8 +164,8 @@ import { AppDbContext } from './AppDbContext';
       ApplicationRequiredDocuments,
       ApplicationDocuments,
       ApplicationDocumentVersions,
-      ApplicationStatusHistory,
-      ApplicationStageHistory,
+      SysStageRequiredDocuments,
+      ApplicationActivities,
       LeadDocuments,
       LeadDocumentVersions,
     ]),
