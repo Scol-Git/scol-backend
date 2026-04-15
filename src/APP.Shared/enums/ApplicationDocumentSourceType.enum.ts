@@ -2,7 +2,7 @@
  * Origin of an application-level document requirement (varchar in DB).
  */
 export enum ApplicationDocumentSourceType {
-  Course = 'COURSE',
+  Lead = 'LEAD',
   Application = 'APPLICATION',
   Manual = 'MANUAL',
 }

@@ -24,6 +24,15 @@ export class SysCountries extends BaseEntity {
   @AutoMap()
   countryName!: string;
 
+  @Column({
+    name: 'countryCode',
+    type: 'varchar',
+    length: 10, // you can adjust (e.g., 2 or 3 if ISO codes)
+    nullable: true,
+  })
+  @AutoMap()
+  countryCode?: string;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================

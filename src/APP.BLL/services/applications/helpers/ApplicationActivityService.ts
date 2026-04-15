@@ -1,0 +1,74 @@
+import { Injectable } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
+import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
+import { ApplicationActivityType } from '@shared/enums/ApplicationActivityType.enum';
+import { ApplicationActivityEntityType } from '@shared/enums/ApplicationActivityEntityType.enum';
+
+export interface CreateApplicationActivityInput {
+  applicationId: string;
+  activityType: ApplicationActivityType;
+  entityType: ApplicationActivityEntityType;
+  entityId: string;
+  actedByUserId?: string;
+  stageId?: string;
+  statusId?: string;
+  documentRequirementId?: string;
+  applicationDocumentId?: string;
+  documentVersionId?: string;
+  fromValue?: string;
+  toValue?: string;
+  remarks?: string;
+  metaData?: Record<string, unknown>;
+}
+
+export interface LogApplicationCreatedInput {
+  applicationId: string;
+  actedByUserId?: string;
+  remarks?: string;
+  metaData?: Record<string, unknown>;
+}
+
+@Injectable()
+export class ApplicationActivityService {
+  async log(
+    manager: EntityManager,
+    input: CreateApplicationActivityInput,
+  ): Promise<ApplicationActivities> {
+    const repository = manager.getRepository(ApplicationActivities);
+
+    const entity = repository.create({
+      applicationId: input.applicationId,
+      activityType: input.activityType,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      actedByUserId: input.actedByUserId,
+      stageId: input.stageId,
+      statusId: input.statusId,
+      documentRequirementId: input.documentRequirementId,
+      applicationDocumentId: input.applicationDocumentId,
+      documentVersionId: input.documentVersionId,
+      fromValue: input.fromValue,
+      toValue: input.toValue,
+      remarks: input.remarks,
+      metaData: input.metaData,
+    });
+
+    return repository.save(entity);
+  }
+
+  async logApplicationCreated(
+    manager: EntityManager,
+    input: LogApplicationCreatedInput,
+  ): Promise<ApplicationActivities> {
+    return this.log(manager, {
+      applicationId: input.applicationId,
+      activityType: ApplicationActivityType.ApplicationCreated,
+      entityType: ApplicationActivityEntityType.Application,
+      entityId: input.applicationId,
+      actedByUserId: input.actedByUserId,
+      remarks: input.remarks,
+      metaData: input.metaData,
+    });
+  }
+}
+
