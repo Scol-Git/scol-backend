@@ -8,6 +8,7 @@ import { ISecurityConfig } from '@shared/interfaces/config/ISecurityConfig.inter
 import { ISecurityConfig as ISecurityConfigToken } from '@shared/tokens/injection.tokens';
 import { SysUsers } from '@entity/entities/SysUsers.entity';
 import { UserSessions } from '@entity/entities/UserSessions.entity';
+import { Role } from '@shared/enums/Role.enum';
 
 export interface TokenPair {
   accessToken: string;
@@ -42,7 +43,8 @@ export class TokenService {
     private readonly db: AppDbContext,
     @Inject(IJwtServiceToken) private readonly jwt: IJwtService,
     @Inject(IPasswordHasherToken) private readonly hasher: IPasswordHasher,
-    @Inject(ISecurityConfigToken) private readonly securityConfig: ISecurityConfig,
+    @Inject(ISecurityConfigToken)
+    private readonly securityConfig: ISecurityConfig,
   ) {}
 
   /**
@@ -76,7 +78,10 @@ export class TokenService {
       email: user.email || user.phone, // Fallback to phone if email not set
       roles: user.roles.map((role) => role.name),
       permissions: user.permissions.map((perm) => perm.name),
-      isSuperAdmin: false, // Set based on your logic
+      //if user has role SUPER_ADMIN, then isSuperAdmin is true
+      isSuperAdmin: user.roles.some(
+        (role) => role.name === Role.SUPER_ADMIN.toString(),
+      ),
     };
 
     // Generate tokens
@@ -137,4 +142,3 @@ export class TokenService {
     return new Date(Date.now() + ms);
   }
 }
-
