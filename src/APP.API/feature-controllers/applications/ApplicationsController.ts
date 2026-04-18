@@ -16,6 +16,8 @@ import { CreateApplicationRequestDto } from '@shared/dtos/applications/CreateApp
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
 import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
+import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
+import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@shared/enums/Role.enum';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
@@ -35,6 +37,34 @@ export class ApplicationsController {
     @CurrentUser() user: ICurrentUser,
   ): Promise<GetApplicationsResponseDto> {
     return this.applicationQueryService.getLeadApplications(user.userId);
+  }
+
+  @Get(':applicationId/stage-progress')
+  @UseGuards(JwtAuthGuard)
+  @RequireRole(Role.LEAD)
+  @ApiBearerAuth('JWT-auth')
+  async getApplicationStageProgress(
+    @CurrentUser() user: ICurrentUser,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+  ): Promise<GetApplicationStageProgressResponseDto> {
+    return await this.applicationQueryService.getApplicationStageProgress(
+      user.userId,
+      applicationId,
+    );
+  }
+
+  @Get(':applicationId/document-progress')
+  @UseGuards(JwtAuthGuard)
+  @RequireRole(Role.LEAD)
+  @ApiBearerAuth('JWT-auth')
+  async getApplicationDocumentProgress(
+    @CurrentUser() user: ICurrentUser,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+  ): Promise<GetApplicationDocumentProgressResponseDto> {
+    return await this.applicationQueryService.getApplicationDocumentProgress(
+      user.userId,
+      applicationId,
+    );
   }
 
   @Get(':applicationId')

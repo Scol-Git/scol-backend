@@ -19,9 +19,17 @@ import {
   ApplicationOverviewUniversityInfoDto,
 } from '@shared/dtos/applications/ApplicationOverviewDto';
 import { ApplicationUploadedDocumentDto } from '@shared/dtos/applications/ApplicationUploadedDocumentDto';
+import { ApplicationDocumentProgressItemDto } from '@shared/dtos/applications/ApplicationDocumentProgressItemDto';
+import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
 import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
-import { ApplicationRequirementWithDocuments } from './application-read-model.types';
+import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
+import { ApplicationDocumentChecklistDocumentTypeDto } from '@shared/dtos/applications/ApplicationDocumentChecklistItemDto';
+import {
+  ApplicationRequirementWithDocuments,
+  DocumentProgressViewModel,
+  StageProgressViewModel,
+} from './application-read-model.types';
 
 const MONTH_NAMES_EN = [
   'January',
@@ -91,6 +99,38 @@ export class ApplicationMapper {
     items: ApplicationListItemDto[],
   ): GetApplicationsResponseDto {
     return { applications: items };
+  }
+
+  toStageProgressResponse(
+    input: StageProgressViewModel,
+  ): GetApplicationStageProgressResponseDto {
+    const current = input.currentStage;
+    return {
+      totalStages: input.totalStages,
+      completedStages: input.completedStages,
+      currentStage: {
+        stageCode: current.stageCode,
+        stageName: current.stageName ?? current.stageCode,
+      },
+      progressBarItems: input.items.map((row) => ({
+        stageCode: row.stage.stageCode,
+        stageName: row.stage.stageName ?? row.stage.stageCode,
+        order: row.stage.stageOrder!,
+        state: row.state,
+      })),
+    };
+  }
+
+  toDocumentProgressResponse(
+    input: DocumentProgressViewModel,
+  ): GetApplicationDocumentProgressResponseDto {
+    return {
+      totalRequired: input.totalRequired,
+      uploadedCount: input.uploadedCount,
+      progressBarItems: input.items.map((row) =>
+        this.toApplicationDocumentProgressItem(row.requirement, row.order),
+      ),
+    };
   }
 
   toGetApplicationDetailsResponse(
@@ -193,6 +233,30 @@ export class ApplicationMapper {
     return {
       counsellorId: assigned.id,
       counsellorName: assigned.email ?? assigned.phone,
+    };
+  }
+
+  private toApplicationDocumentProgressItem(
+    requirement: ApplicationRequiredDocuments,
+    order: number,
+  ): ApplicationDocumentProgressItemDto {
+    const dt = requirement.SysDocumentType;
+    if (!dt) {
+      throw new Error(
+        'Application document progress mapping failed: SysDocumentType not loaded',
+      );
+    }
+
+    const documentType: ApplicationDocumentChecklistDocumentTypeDto = {
+      documentTypeId: requirement.id,
+      documentTypeCode: dt.documentTypeCode,
+      documentTypeName: dt.documentTypeName,
+    };
+
+    return {
+      documentType,
+      order,
+      overallStatus: requirement.overallStatus ?? null,
     };
   }
 
