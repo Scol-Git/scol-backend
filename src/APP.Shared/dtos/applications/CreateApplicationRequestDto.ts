@@ -11,7 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-class IntakeDto {
+class ApplicationIntakeDto {
   @ApiProperty({ description: 'Intake month (1-12)', example: 9 })
   @IsDefined()
   @IsInt()
@@ -48,12 +48,11 @@ export class CreateApplicationRequestDto {
 
   @ApiProperty({
     description: 'Selected intake information',
-    type: IntakeDto,
+    type: ApplicationIntakeDto,
   })
   @IsDefined()
   @IsObject()
   @ValidateNested()
-  @Type(() => IntakeDto)
-  intake!: IntakeDto;
+  @Type(() => ApplicationIntakeDto)
+  intake!: ApplicationIntakeDto;
 }
-

@@ -4,18 +4,16 @@ import { EntityManager } from 'typeorm';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import { Applications } from '@entity/entities/Applications.entity';
-import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
 import { SysApplicationStatus } from '@entity/entities/SysApplicationStatus.entity';
 import { CreateApplicationRequestDto } from '@shared/dtos/applications/CreateApplicationRequestDto';
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
 import { ApplicationMapper } from './helpers/ApplicationMapper';
 import { ApplicationValidator } from './helpers/ApplicationValidator';
-import { ApplicationAccessService } from './helpers/ApplicationAccessService';
+import { ApplicationCreationContextService } from './helpers/ApplicationCreationContextService';
 import { ApplicationSerialNumberService } from './helpers/ApplicationSerialNumberService';
 import { ApplicationRequirementResolver } from './helpers/ApplicationRequirementResolver';
 import { ApplicationActivityService } from './helpers/ApplicationActivityService';
-import { ValidationException } from '@shared/exceptions/ValidationException';
 import { ApplicationStage } from '@shared/enums/ApplicationStage.enum';
 import { ApplicationStatus } from '@shared/enums/ApplicationStatus.enum';
 
@@ -25,7 +23,7 @@ export class ApplicationCreationService {
     private readonly db: AppDbContext,
     private readonly mapper: ApplicationMapper,
     private readonly validator: ApplicationValidator,
-    private readonly accessService: ApplicationAccessService,
+    private readonly creationContextService: ApplicationCreationContextService,
     private readonly serialNumberService: ApplicationSerialNumberService,
     private readonly requirementResolver: ApplicationRequirementResolver,
     private readonly activityService: ApplicationActivityService,
@@ -38,16 +36,11 @@ export class ApplicationCreationService {
   ): Promise<CreateApplicationResponseDto> {
     await this.validator.validateCreateApplicationRequest(dto);
 
-    const leadProfile =
-      await this.accessService.ensureLeadProfileExistsOrThrow(currentUserId);
-
-    const courseIntake = await this.resolveCourseIntakeOrThrow(dto);
-    const countryId = courseIntake.UniCourse?.SysUniversity?.sysCountryId;
-    if (!countryId) {
-      throw new ValidationException(
-        'Unable to resolve country for selected intake',
+    const context =
+      await this.creationContextService.resolveCreateContextOrThrow(
+        currentUserId,
+        dto,
       );
-    }
 
     const initialStage = await this.resolveInitialStageOrThrow();
     const initialStatus = await this.resolveInitialStatusOrThrow();
@@ -56,15 +49,15 @@ export class ApplicationCreationService {
       await this.serialNumberService.generateNextSerialNumber(
         dto.intake.intakeMonth,
         dto.intake.intakeYear,
-        countryId,
+        context.countryId,
       );
 
     const application = await this.db.transaction((manager) =>
       this.createApplicationInTransaction(
         manager,
-        leadProfile.id,
-        courseIntake.id,
-        countryId,
+        context.leadId,
+        context.courseIntake.id,
+        context.countryId,
         initialStage.id,
         initialStatus.id,
         serialNumber,
@@ -76,40 +69,10 @@ export class ApplicationCreationService {
       context: 'ApplicationCreationService.createApplication',
       applicationId: application.id,
       userId: currentUserId,
-      courseIntakeId: courseIntake.id,
+      courseIntakeId: context.courseIntake.id,
     });
 
     return this.mapper.toCreateApplicationResponse(application.id);
-  }
-
-  private async resolveCourseIntakeOrThrow(
-    dto: CreateApplicationRequestDto,
-  ): Promise<UniCourseIntakes> {
-    const intake = await this.db.courseIntakes
-      .createQueryBuilder('intake')
-      .innerJoinAndSelect('intake.UniCourse', 'course')
-      .innerJoinAndSelect('course.SysUniversity', 'university')
-      .where('intake.uniCourseId = :courseId', { courseId: dto.courseId })
-      .andWhere('intake.intakeMonth = :intakeMonth', {
-        intakeMonth: dto.intake.intakeMonth,
-      })
-      .andWhere('intake.intakeYear = :intakeYear', {
-        intakeYear: dto.intake.intakeYear,
-      })
-      .andWhere('course.uniId = :universityId', {
-        universityId: dto.universityId,
-      })
-      .andWhere('intake.isActive = true')
-      .andWhere('intake.deletedAt IS NULL')
-      .getOneOrFail();
-
-    if (!intake) {
-      throw new NotFoundException(
-        'No course intake found for the provided university, course, and intake',
-      );
-    }
-
-    return intake;
   }
 
   private async resolveInitialStageOrThrow(): Promise<SysApplicationStage> {

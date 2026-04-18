@@ -5,6 +5,9 @@ import type { ICurrentUser } from '@shared/interfaces/domain';
 import { ApplicationCreationService } from '@bll/services/applications/ApplicationCreationService';
 import { CreateApplicationRequestDto } from '@shared/dtos/applications/CreateApplicationRequestDto';
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { Role } from '@shared/enums/Role.enum';
+import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 
 @Controller('applications')
 export class ApplicationsController {
@@ -14,6 +17,8 @@ export class ApplicationsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
+  @RequireRole(Role.LEAD)
+  @ApiBearerAuth('JWT-auth')
   async createApplication(
     @CurrentUser() user: ICurrentUser,
     @Body() dto: CreateApplicationRequestDto,
@@ -21,4 +26,3 @@ export class ApplicationsController {
     return this.applicationCreationService.createApplication(user.userId, dto);
   }
 }
-

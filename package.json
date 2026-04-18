@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
     "build": "nest build && tsc-alias -p tsconfig.build.json",
     "vercel-build": "npm run build",
     "start:prod": "npm run build && node dist/main.js",
