@@ -1,8 +1,27 @@
 import { Injectable } from '@nestjs/common';
+import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
+import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
 import { Applications } from '@entity/entities/Applications.entity';
+import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
+import { SysApplicationStatus } from '@entity/entities/SysApplicationStatus.entity';
+import { SysUniversities } from '@entity/entities/SysUniversities.entity';
+import { SysUsers } from '@entity/entities/SysUsers.entity';
+import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
+import { ApplicationDocumentChecklistItemDto } from '@shared/dtos/applications/ApplicationDocumentChecklistItemDto';
 import { ApplicationListItemDto } from '@shared/dtos/applications/ApplicationListItemDto';
+import {
+  ApplicationOverviewAssignedToDto,
+  ApplicationOverviewCourseInfoDto,
+  ApplicationOverviewCurrentStageDto,
+  ApplicationOverviewCurrentStatusDto,
+  ApplicationOverviewDto,
+  ApplicationOverviewUniversityInfoDto,
+} from '@shared/dtos/applications/ApplicationOverviewDto';
+import { ApplicationUploadedDocumentDto } from '@shared/dtos/applications/ApplicationUploadedDocumentDto';
+import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
+import { ApplicationRequirementWithDocuments } from './application-read-model.types';
 
 const MONTH_NAMES_EN = [
   'January',
@@ -46,16 +65,8 @@ export class ApplicationMapper {
     return {
       applicationId: application.id,
       applicationOverview: {
-        universityInfo: {
-          universityId: university.id,
-          universityName: university.uniName,
-          universityLogoUrl: university.logoUrl ?? null,
-          universityCoverImageUrl: university.coverImageUrl ?? null,
-        },
-        courseInfo: {
-          courseId: course.id,
-          courseName: course.courseName,
-        },
+        universityInfo: this.mapUniversityInfo(university),
+        courseInfo: this.mapCourseInfo(course),
         intakeInfo: {
           intakeId: intake.id,
           intakeName: this.formatIntakeName(
@@ -82,12 +93,156 @@ export class ApplicationMapper {
     return { applications: items };
   }
 
+  toGetApplicationDetailsResponse(
+    application: Applications,
+    requirementsWithDocuments: ApplicationRequirementWithDocuments[],
+  ): GetApplicationDetailsResponseDto {
+    const overview = this.toApplicationOverviewDto(application);
+
+    const documentCheckLists: ApplicationDocumentChecklistItemDto[] =
+      requirementsWithDocuments.map((row) =>
+        this.toApplicationDocumentChecklistItem(
+          row.requirement,
+          row.uploadedDocuments,
+        ),
+      );
+
+    return {
+      applicationId: application.id,
+      applicationSerialNumber: application.serialNumber ?? null,
+      applicationOverview: overview,
+      documentCheckLists,
+    };
+  }
+
+  private toApplicationOverviewDto(
+    application: Applications,
+  ): ApplicationOverviewDto {
+    const intake = application.UniCourseIntake;
+    const course = intake?.UniCourse;
+    const university = course?.SysUniversity;
+    const stage = application.CurrentSysApplicationStage;
+    const status = application.CurrentSysApplicationStatus;
+
+    if (!intake || !course || !university || !stage || !status) {
+      throw new Error(
+        'Application details mapping failed: required overview relations not loaded',
+      );
+    }
+
+    return {
+      universityInfo: this.mapUniversityInfo(university),
+      courseInfo: this.mapCourseInfo(course),
+      intakeInfo: {
+        intakeMonth: this.formatIntakeMonthOnly(intake.intakeMonth),
+        intakeYear: String(intake.intakeYear),
+      },
+      currentStage: this.mapDetailCurrentStage(stage),
+      currentStatus: this.mapDetailCurrentStatus(status),
+      appliedDate: application.submittedAt
+        ? application.submittedAt.toISOString()
+        : null,
+      lastUpdatedAt: application.updatedAt.toISOString(),
+      assignedTo: this.mapAssignedCounsellor(application.AssignedToUser),
+    };
+  }
+
+  private mapUniversityInfo(
+    university: SysUniversities,
+  ): ApplicationOverviewUniversityInfoDto {
+    return {
+      universityId: university.id,
+      universityName: university.uniName,
+      universityLogoUrl: university.logoUrl ?? null,
+      universityCoverImageUrl: university.coverImageUrl ?? null,
+    };
+  }
+
+  private mapCourseInfo(course: UniCourses): ApplicationOverviewCourseInfoDto {
+    return {
+      courseId: course.id,
+      courseName: course.courseName,
+    };
+  }
+
+  private mapDetailCurrentStage(
+    stage: SysApplicationStage,
+  ): ApplicationOverviewCurrentStageDto {
+    return {
+      stageCode: stage.stageCode,
+      stageName: stage.stageName ?? stage.stageCode,
+      stageInformation: stage.stageInformation ?? null,
+    };
+  }
+
+  private mapDetailCurrentStatus(
+    status: SysApplicationStatus,
+  ): ApplicationOverviewCurrentStatusDto {
+    return {
+      statusCode: status.statusCode,
+      statusName: status.statusName ?? status.statusCode,
+    };
+  }
+
+  private mapAssignedCounsellor(
+    assigned: SysUsers | undefined | null,
+  ): ApplicationOverviewAssignedToDto | null {
+    if (assigned == null) {
+      return null;
+    }
+    return {
+      counsellorId: assigned.id,
+      counsellorName: assigned.email ?? assigned.phone,
+    };
+  }
+
+  private toApplicationDocumentChecklistItem(
+    requirement: ApplicationRequiredDocuments,
+    uploadedDocuments: ApplicationDocuments[],
+  ): ApplicationDocumentChecklistItemDto {
+    const dt = requirement.SysDocumentType;
+    if (!dt) {
+      throw new Error(
+        'Application checklist mapping failed: SysDocumentType not loaded',
+      );
+    }
+
+    return {
+      documentType: {
+        documentTypeId: requirement.id,
+        documentTypeCode: dt.documentTypeCode,
+        documentTypeName: dt.documentTypeName,
+      },
+      isRequired: requirement.isRequired !== false,
+      isMultipleAllowed: requirement.isMultipleAllowed,
+      overallStatus: requirement.overallStatus ?? null,
+      allowedMimeTypes: requirement.allowedMimeTypes ?? null,
+      maxFileSizeBytes: requirement.maxFileSizeBytes ?? null,
+      uploadedDocuments: uploadedDocuments.map((d) =>
+        this.toApplicationUploadedDocumentDto(d),
+      ),
+    };
+  }
+
+  private toApplicationUploadedDocumentDto(
+    applicationDocument: ApplicationDocuments,
+  ): ApplicationUploadedDocumentDto {
+    return {
+      applicationDocumentId: applicationDocument.id,
+      fileName: applicationDocument.latestFileName ?? null,
+      overallStatus: applicationDocument.overallStatus ?? null,
+    };
+  }
+
   private formatIntakeName(intakeMonth: number, intakeYear: number): string {
+    return `${this.formatIntakeMonthOnly(intakeMonth)} ${intakeYear}`;
+  }
+
+  private formatIntakeMonthOnly(intakeMonth: number): string {
     const idx = intakeMonth - 1;
-    const monthName =
-      idx >= 0 && idx < MONTH_NAMES_EN.length
-        ? MONTH_NAMES_EN[idx]
-        : `Month ${intakeMonth}`;
-    return `${monthName} ${intakeYear}`;
+    if (idx >= 0 && idx < MONTH_NAMES_EN.length) {
+      return MONTH_NAMES_EN[idx];
+    }
+    return `Month ${intakeMonth}`;
   }
 }

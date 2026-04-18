@@ -113,6 +113,16 @@ export class ApplicationDocuments extends BaseEntity {
   @AutoMap()
   remarks?: string;
 
+  //isActive boolean : default true
+  @Column({
+    name: 'isActive',
+    type: 'boolean',
+    nullable: false,
+    default: true,
+  })
+  @AutoMap()
+  isActive!: boolean;
+
   @Column({
     name: 'createdByUserId',
     type: 'uuid',

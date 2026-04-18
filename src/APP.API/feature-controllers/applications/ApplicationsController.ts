@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { CurrentUser } from '@api/common/decorators/CurrentUser.decorator';
 import type { ICurrentUser } from '@shared/interfaces/domain';
@@ -7,6 +15,7 @@ import { ApplicationQueryService } from '@bll/services/applications/ApplicationQ
 import { CreateApplicationRequestDto } from '@shared/dtos/applications/CreateApplicationRequestDto';
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
+import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@shared/enums/Role.enum';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
@@ -26,6 +35,20 @@ export class ApplicationsController {
     @CurrentUser() user: ICurrentUser,
   ): Promise<GetApplicationsResponseDto> {
     return this.applicationQueryService.getLeadApplications(user.userId);
+  }
+
+  @Get(':applicationId')
+  @UseGuards(JwtAuthGuard)
+  @RequireRole(Role.LEAD)
+  @ApiBearerAuth('JWT-auth')
+  async getApplicationById(
+    @CurrentUser() user: ICurrentUser,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+  ): Promise<GetApplicationDetailsResponseDto> {
+    return await this.applicationQueryService.getApplicationDetails(
+      user.userId,
+      applicationId,
+    );
   }
 
   @Post()

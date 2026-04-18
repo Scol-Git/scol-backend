@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
+import { Applications } from '@entity/entities/Applications.entity';
 import { SysLeadProfiles } from '@entity/entities/SysLeadProfiles.entity';
 import { SysUsers } from '@entity/entities/SysUsers.entity';
 
@@ -19,6 +20,23 @@ export class ApplicationAccessService {
     }
 
     return leadProfile;
+  }
+
+  async ensureLeadCanAccessApplicationOrThrow(
+    currentUserId: string,
+    applicationId: string,
+  ): Promise<Applications> {
+    const lead = await this.ensureLeadProfileExistsOrThrow(currentUserId);
+
+    const application = await this.db.applications.findOne({
+      where: { id: applicationId },
+    });
+
+    if (!application || application.leadId !== lead.id) {
+      throw new NotFoundException('Application not found');
+    }
+
+    return application;
   }
 
   async ensureUserExistsOrThrow(userId: string): Promise<SysUsers> {
