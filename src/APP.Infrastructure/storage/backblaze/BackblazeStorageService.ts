@@ -11,7 +11,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
 
 
-const UPLOAD_URL_EXPIRES_IN = 3600; // 1 hour
+const DEFAULT_UPLOAD_URL_EXPIRES_IN = 3600; // 1 hour
 const DOWNLOAD_URL_EXPIRES_IN = 3600; // 1 hour
 
 @Injectable()
@@ -40,14 +40,18 @@ export class BackblazeStorageService implements IStorageService {
     this.bucket = storage?.bucketName ?? '';
   }
 
-  async generateUploadUrl(key: string, mimeType: string): Promise<string> {
+  async generateUploadUrl(
+    key: string,
+    mimeType: string,
+    expiresInSeconds: number = DEFAULT_UPLOAD_URL_EXPIRES_IN,
+  ): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
       ContentType: mimeType,
     });
     return getSignedUrl(this.client, command, {
-      expiresIn: UPLOAD_URL_EXPIRES_IN,
+      expiresIn: expiresInSeconds,
     });
   }
 

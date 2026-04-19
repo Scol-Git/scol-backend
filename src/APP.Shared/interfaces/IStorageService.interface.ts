@@ -5,7 +5,11 @@
  * Used for presigned upload/download URLs; files do not pass through the API.
  */
 export interface IStorageService {
-  generateUploadUrl(key: string, mimeType: string): Promise<string>;
+  generateUploadUrl(
+    key: string,
+    mimeType: string,
+    expiresInSeconds?: number,
+  ): Promise<string>;
   generateDownloadUrl(key: string): Promise<string>;
   objectExists(key: string): Promise<boolean>;
   deleteObject(key: string): Promise<void>;

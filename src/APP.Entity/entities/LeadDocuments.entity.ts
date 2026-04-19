@@ -7,12 +7,12 @@ import {
   Index,
 } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
-import { LeadDocumentOverallStatus } from '@shared/enums/LeadDocumentOverallStatus.enum';
 import { VerificationStatus } from '@shared/enums/VerificationStatus.enum';
 import { BaseEntity } from './BaseEntity.template';
 import { SysLeadProfiles } from './SysLeadProfiles.entity';
 import { SysDocumentTypes } from './SysDocumentTypes.entity';
 import { LeadDocumentVersions } from './LeadDocumentVersions.entity';
+import { LeadDocumentOverallStatus } from '@shared/enums/LeadDocumentOverallStatus.enum';
 
 /**
  * Lead-level document aggregate (files before/during application submission).
@@ -38,13 +38,13 @@ export class LeadDocuments extends BaseEntity {
   sysDocumentTypeId!: string;
 
   @Column({
-    name: 'title',
+    name: 'latestFileName',
     type: 'varchar',
     length: 255,
     nullable: true,
   })
   @AutoMap()
-  title?: string;
+  latestFileName?: string;
 
   @Column({
     name: 'currentLeadDocumentVersionId',

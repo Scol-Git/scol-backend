@@ -21,6 +21,7 @@ import {
 import { ApplicationUploadedDocumentDto } from '@shared/dtos/applications/ApplicationUploadedDocumentDto';
 import { ApplicationDocumentProgressItemDto } from '@shared/dtos/applications/ApplicationDocumentProgressItemDto';
 import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
+import { GenerateApplicationDocumentUploadUrlResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlResponseDto';
 import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
@@ -54,6 +55,24 @@ export class ApplicationMapper {
     return {
       success: true,
       applicationId,
+    };
+  }
+
+  toGenerateUploadUrlResponse(input: {
+    applicationDocumentId: string;
+    documentVersionId: string;
+    uploadUrl: string;
+    mimeType: string;
+    expiresInSeconds: number;
+  }): GenerateApplicationDocumentUploadUrlResponseDto {
+    return {
+      applicationDocumentId: input.applicationDocumentId,
+      documentVersionId: input.documentVersionId,
+      uploadUrl: input.uploadUrl,
+      headers: {
+        'Content-Type': input.mimeType,
+      },
+      expiresInSeconds: input.expiresInSeconds,
     };
   }
 
