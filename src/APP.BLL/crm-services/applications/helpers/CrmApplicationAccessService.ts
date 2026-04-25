@@ -1,0 +1,71 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { SysLeadProfiles } from '@entity/entities/SysLeadProfiles.entity';
+import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
+import { Role } from '@shared/enums/Role.enum';
+import { ValidationException } from '@shared/exceptions/ValidationException';
+import { SysUsers } from '@entity/entities/SysUsers.entity';
+
+@Injectable()
+export class CrmApplicationAccessService {
+  constructor(private readonly db: AppDbContext) {}
+
+  async ensureCrmCanAccessLeadOrThrow(
+    currentUserId: string,
+    leadId: string,
+  ): Promise<SysLeadProfiles> {
+    const crmUser = await this.loadCrmUserWithRolesOrThrow(currentUserId);
+
+    const leadProfile = await this.loadLeadProfileByIdOrThrow(leadId);
+
+    if (this.hasAnyRole(crmUser, [Role.SUPER_ADMIN, Role.ADMIN])) {
+      return leadProfile;
+    }
+
+    if (this.hasAnyRole(crmUser, [Role.COUNSELLOR])) {
+      if (leadProfile.assignedToUserId === crmUser.id) {
+        return leadProfile;
+      }
+    }
+
+    throw new ValidationException(
+      'You are not authorized to access this lead',
+      {
+        leadId: ['You are not authorized to access this lead'],
+      },
+    );
+  }
+
+  private async loadCrmUserWithRolesOrThrow(userId: string): Promise<SysUsers> {
+    const user = await this.db.users.findOne({
+      where: { id: userId },
+      relations: {
+        roles: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
+  private async loadLeadProfileByIdOrThrow(
+    leadId: string,
+  ): Promise<SysLeadProfiles> {
+    const leadProfile = await this.db.leadProfiles.findOne({
+      where: { id: leadId },
+    });
+    if (!leadProfile) {
+      throw new NotFoundException('Lead profile not found');
+    }
+
+    return leadProfile;
+  }
+
+  private hasAnyRole(user: SysUsers, allowedRoles: Role[]): boolean {
+    const roles = user.roles ?? [];
+
+    return roles.some((role) => allowedRoles.includes(role.name));
+  }
+}

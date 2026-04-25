@@ -5,6 +5,7 @@ import {
   JoinColumn,
   OneToMany,
   Index,
+  ManyToOne,
 } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
@@ -22,6 +23,7 @@ import { LeadDocuments } from './LeadDocuments.entity';
  * @extends {BaseEntity}
  */
 @Index('IX_SysLeadProfiles_user', ['userId'], { unique: true })
+@Index('IX_SysLeadProfiles_assignedToUserId', ['assignedToUserId'])
 @Entity('sys_LeadProfiles')
 export class SysLeadProfiles extends BaseEntity {
   @Column({
@@ -84,6 +86,19 @@ export class SysLeadProfiles extends BaseEntity {
   })
   @AutoMap()
   imgUrl?: string;
+
+  /**
+   * CRM user assigned to this lead.
+   *
+   * Usually ADMIN / COUNSELLOR.
+   */
+  @Column({
+    name: 'assignedToUserId',
+    type: 'uuid',
+    nullable: true,
+  })
+  @AutoMap()
+  assignedToUserId?: string | null;
 
   // ========================================
   // Navigation Properties (EF Core style)
@@ -153,4 +168,14 @@ export class SysLeadProfiles extends BaseEntity {
    */
   @OneToMany(() => LeadDocuments, (doc) => doc.SysLeadProfile)
   LeadDocuments!: LeadDocuments[];
+
+  /**
+   * Many-to-One: Assigned CRM user
+   * One CRM user can be assigned to many lead profiles.
+   */
+  @ManyToOne(() => SysUsers, (user) => user.AssignedLeadProfiles, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'assignedToUserId' })
+  AssignedToUser?: SysUsers | null;
 }

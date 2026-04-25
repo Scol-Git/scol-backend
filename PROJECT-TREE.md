@@ -61,15 +61,16 @@ src/
 │   │   ├── interceptors/   # ResponseInterceptor, UserContextInterceptor
 │   │   ├── middleware/     # RequestLoggingMiddleware
 │   │   └── swagger/        # Swagger docs registry
-│   └── feature-controllers/
-│       ├── auth/           # AuthController, auth swagger
-│       ├── categories/     # CategoriesController (cities, countries, etc.)
-│       ├── health/         # HealthController
-│       ├── home/           # HomeController (home search)
-│       ├── internal/       # InternalCronController
-│       ├── leads/          # LeadsProfileController (lead/academic form)
-│       ├── applications/   # ApplicationsController (application documents)
-│       └── search/         # SearchController (course search)
+│   ├── feature-controllers/
+│   │   ├── auth/           # AuthController, auth swagger
+│   │   ├── categories/     # CategoriesController (cities, countries, etc.)
+│   │   ├── health/         # HealthController
+│   │   ├── home/           # HomeController (home search)
+│   │   ├── internal/       # InternalCronController
+│   │   ├── leads/          # LeadsProfileController (lead/academic form)
+│   │   ├── applications/   # ApplicationsController (application documents)
+│   │   └── search/         # SearchController (course search)
+│   └── crm-controllers/
 │
 ├── APP.BLL/                # ─── Business Logic Layer ──────────────
 │   ├── core/
@@ -81,11 +82,12 @@ src/
 │   │   ├── mappers/        # Shared mappers
 │   │   └── search/         # CourseResponseMapper
 │   └── services/
-│       ├── auth/           # AuthService, TokenService
-│       ├── categories/     # CategoriesService
-│       ├── health/         # Health checks
-│       ├── leads/          # LeadProfileService, AcademicFormValidator, AcademicFormMapper
-│       └── search/         # CourseSearchService, HomeSearchService, pipeline, cache, filters
+│   │   ├── auth/           # AuthService, TokenService
+│   │   ├── categories/     # CategoriesService
+│   │   ├── health/         # Health checks
+│   │   ├── leads/          # LeadProfileService, AcademicFormValidator, AcademicFormMapper
+│   │   └── search/         # CourseSearchService, HomeSearchService, pipeline, cache, filters
+│   └── crm-services/
 │
 ├── APP.Entity/             # ─── Domain / Data Layer ───────────────
 │   ├── domain.events/      # (if any)

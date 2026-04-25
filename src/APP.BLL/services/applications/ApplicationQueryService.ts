@@ -39,8 +39,14 @@ export class ApplicationQueryService {
         currentUserId,
       );
 
+    return this.getApplicationsForAuthorizedLead(lead.id);
+  }
+
+  async getApplicationsForAuthorizedLead(
+    leadId: string,
+  ): Promise<GetApplicationsResponseDto> {
     const applications = await this.db.applications.find({
-      where: { leadId: lead.id },
+      where: { leadId },
       relations: [
         'UniCourseIntake',
         'UniCourseIntake.UniCourse',

@@ -3,6 +3,7 @@ import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysUsers } from './SysUsers.entity';
 import { SysPermissions } from './SysPermissions.entity';
+import { Role } from '@shared/enums/Role.enum';
 
 /**
  * @class SysRoles
@@ -18,7 +19,7 @@ export class SysRoles extends BaseEntity {
     nullable: false,
   })
   @AutoMap()
-  name!: string;
+  name!: Role;
 
   // ========================================
   // Navigation Properties (EF Core style)

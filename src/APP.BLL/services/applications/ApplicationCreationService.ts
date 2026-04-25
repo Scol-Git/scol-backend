@@ -16,6 +16,7 @@ import { ApplicationRequirementBootstrapService } from './helpers/ApplicationReq
 import { ApplicationActivityService } from './helpers/ApplicationActivityService';
 import { ApplicationStage } from '@shared/enums/ApplicationStage.enum';
 import { ApplicationStatus } from '@shared/enums/ApplicationStatus.enum';
+import { ApplicationAccessService } from './helpers/ApplicationAccessService';
 
 @Injectable()
 export class ApplicationCreationService {
@@ -23,6 +24,7 @@ export class ApplicationCreationService {
     private readonly db: AppDbContext,
     private readonly mapper: ApplicationMapper,
     private readonly validator: ApplicationValidator,
+    private readonly applicationAccessService: ApplicationAccessService,
     private readonly creationContextService: ApplicationCreationContextService,
     private readonly serialNumberService: ApplicationSerialNumberService,
     private readonly requirementBootstrap: ApplicationRequirementBootstrapService,
@@ -34,11 +36,24 @@ export class ApplicationCreationService {
     currentUserId: string,
     dto: CreateApplicationRequestDto,
   ): Promise<CreateApplicationResponseDto> {
+    const lead =
+      await this.applicationAccessService.ensureLeadProfileExistsOrThrow(
+        currentUserId,
+      );
+
+    return this.createApplicationForAuthorizedLead(lead.id, dto, currentUserId);
+  }
+
+  async createApplicationForAuthorizedLead(
+    leadId: string,
+    dto: CreateApplicationRequestDto,
+    actedByUserId: string,
+  ): Promise<CreateApplicationResponseDto> {
     await this.validator.validateCreateApplicationRequest(dto);
 
     const context =
-      await this.creationContextService.resolveCreateContextOrThrow(
-        currentUserId,
+      await this.creationContextService.resolveCreateContextForLeadOrThrow(
+        leadId,
         dto,
       );
 
@@ -61,14 +76,14 @@ export class ApplicationCreationService {
         initialStage.id,
         initialStatus.id,
         serialNumber,
-        currentUserId,
+        actedByUserId,
       ),
     );
 
     this.logger.info('Application created successfully', {
       context: 'ApplicationCreationService.createApplication',
       applicationId: application.id,
-      userId: currentUserId,
+      userId: actedByUserId,
       courseIntakeId: context.courseIntake.id,
     });
 

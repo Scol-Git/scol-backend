@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
+import { SysLeadProfiles } from '@entity/entities/SysLeadProfiles.entity';
 import { CreateApplicationRequestDto } from '@shared/dtos/applications/CreateApplicationRequestDto';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import type { NormalizedEligibilityProfile } from '@shared/eligibility/EligibilityTypes';
@@ -7,6 +8,7 @@ import { ApplicationAccessService } from './ApplicationAccessService';
 import { EligibilityLoader } from '@bll/services/shared/eligibility/EligibilityLoader';
 import { EligibilityProfileBuilder } from '@bll/services/shared/eligibility/EligibilityProfileBuilder';
 import { CourseEligibilityService } from '@bll/services/shared/eligibility/CourseEligibilityService';
+import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 
 export interface CreateApplicationContext {
   leadId: string;
@@ -17,6 +19,7 @@ export interface CreateApplicationContext {
 @Injectable()
 export class ApplicationCreationContextService {
   constructor(
+    private readonly db: AppDbContext,
     private readonly applicationAccessService: ApplicationAccessService,
     private readonly eligibilityLoader: EligibilityLoader,
     private readonly eligibilityProfileBuilder: EligibilityProfileBuilder,
@@ -31,6 +34,15 @@ export class ApplicationCreationContextService {
       await this.applicationAccessService.ensureLeadProfileExistsOrThrow(
         currentUserId,
       );
+
+    return this.resolveCreateContextForLeadOrThrow(lead.id, dto);
+  }
+
+  async resolveCreateContextForLeadOrThrow(
+    leadId: string,
+    dto: CreateApplicationRequestDto,
+  ): Promise<CreateApplicationContext> {
+    const lead = await this.loadLeadProfileByIdOrThrow(leadId);
 
     const courseIntake =
       await this.eligibilityLoader.loadCourseIntakeBySelectionOrThrow(
@@ -53,6 +65,20 @@ export class ApplicationCreationContextService {
       courseIntake,
       countryId,
     };
+  }
+
+  private async loadLeadProfileByIdOrThrow(
+    leadId: string,
+  ): Promise<SysLeadProfiles> {
+    const leadProfile = await this.db.leadProfiles.findOne({
+      where: { id: leadId },
+    });
+
+    if (!leadProfile) {
+      throw new NotFoundException('Lead profile not found');
+    }
+
+    return leadProfile;
   }
 
   private ensureEligibleForSelectedCourseOrThrow(
