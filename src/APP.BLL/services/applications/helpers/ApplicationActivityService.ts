@@ -3,6 +3,7 @@ import { EntityManager } from 'typeorm';
 import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
 import { ApplicationActivityType } from '@shared/enums/ApplicationActivityType.enum';
 import { ApplicationActivityEntityType } from '@shared/enums/ApplicationActivityEntityType.enum';
+import { UploadStatus } from '@shared/enums/UploadStatus.enum';
 
 export interface CreateApplicationActivityInput {
   applicationId: string;
@@ -26,6 +27,17 @@ export interface LogApplicationCreatedInput {
   actedByUserId?: string;
   remarks?: string;
   metaData?: Record<string, unknown>;
+}
+
+export interface LogDocumentUploadedInput {
+  applicationId: string;
+  actedByUserId?: string;
+  documentRequirementId: string;
+  documentId: string;
+  documentVersionId: string;
+  documentScope: 'APPLICATION' | 'LEAD';
+  fileName?: string | null;
+  remarks?: string;
 }
 
 @Injectable()
@@ -70,5 +82,33 @@ export class ApplicationActivityService {
       metaData: input.metaData,
     });
   }
-}
 
+  async logDocumentUploaded(
+    manager: EntityManager,
+    input: LogDocumentUploadedInput,
+  ): Promise<ApplicationActivities> {
+    return this.log(manager, {
+      applicationId: input.applicationId,
+      activityType: ApplicationActivityType.DocUploaded,
+      entityType: ApplicationActivityEntityType.ApplicationDocumentVersion,
+      entityId: input.documentVersionId,
+      actedByUserId: input.actedByUserId,
+      documentRequirementId: input.documentRequirementId,
+      applicationDocumentId:
+        input.documentScope === 'APPLICATION' ? input.documentId : undefined,
+      documentVersionId:
+        input.documentScope === 'APPLICATION'
+          ? input.documentVersionId
+          : undefined,
+      fromValue: UploadStatus.PENDING,
+      toValue: UploadStatus.UPLOADED,
+      remarks: input.remarks,
+      metaData: {
+        documentScope: input.documentScope,
+        documentId: input.documentId,
+        documentVersionId: input.documentVersionId,
+        fileName: input.fileName ?? null,
+      },
+    });
+  }
+}

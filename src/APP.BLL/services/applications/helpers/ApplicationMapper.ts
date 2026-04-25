@@ -19,13 +19,16 @@ import {
 } from '@shared/dtos/applications/ApplicationOverviewDto';
 import { ApplicationUploadedDocumentDto } from '@shared/dtos/applications/ApplicationUploadedDocumentDto';
 import { ApplicationDocumentProgressItemDto } from '@shared/dtos/applications/ApplicationDocumentProgressItemDto';
+import { ConfirmApplicationDocumentUploadResponseDto } from '@shared/dtos/applications/ConfirmApplicationDocumentUploadResponseDto';
 import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
+import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentDownloadResponseDto';
 import { GenerateApplicationDocumentUploadUrlResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlResponseDto';
 import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { ApplicationDocumentChecklistDocumentTypeDto } from '@shared/dtos/applications/ApplicationDocumentChecklistItemDto';
 import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
+import { UploadStatus } from '@shared/enums/UploadStatus.enum';
 import {
   ApplicationRequirementWithDocuments,
   DocumentProgressViewModel,
@@ -74,6 +77,27 @@ export class ApplicationMapper {
         'Content-Type': input.mimeType,
       },
       expiresInSeconds: input.expiresInSeconds,
+    };
+  }
+
+  toConfirmUploadResponse(
+    status: UploadStatus,
+  ): ConfirmApplicationDocumentUploadResponseDto {
+    return {
+      success: true,
+      status,
+    };
+  }
+
+  toDownloadResponse(input: {
+    url: string;
+    expiresInSeconds: number;
+    fileName: string;
+  }): GenerateApplicationDocumentDownloadResponseDto {
+    return {
+      url: input.url,
+      expiresInSeconds: input.expiresInSeconds,
+      fileName: input.fileName,
     };
   }
 

@@ -34,13 +34,13 @@ scol-backend/
 
 ## Source (`src/`) — Layer Overview
 
-| Layer | Folder | Role |
-|-------|--------|------|
-| **API** | `APP.API` | HTTP controllers, guards, filters, Swagger |
-| **BLL** | `APP.BLL` | Business logic, services, mappers |
-| **Entity** | `APP.Entity` | Domain entities (TypeORM) |
-| **Infrastructure** | `APP.Infrastructure` | DB, Redis, JWT, SMS, config, logging |
-| **Shared** | `APP.Shared` | DTOs, enums, interfaces, exceptions, utils |
+| Layer              | Folder               | Role                                       |
+| ------------------ | -------------------- | ------------------------------------------ |
+| **API**            | `APP.API`            | HTTP controllers, guards, filters, Swagger |
+| **BLL**            | `APP.BLL`            | Business logic, services, mappers          |
+| **Entity**         | `APP.Entity`         | Domain entities (TypeORM)                  |
+| **Infrastructure** | `APP.Infrastructure` | DB, Redis, JWT, SMS, config, logging       |
+| **Shared**         | `APP.Shared`         | DTOs, enums, interfaces, exceptions, utils |
 
 ---
 
@@ -68,6 +68,7 @@ src/
 │       ├── home/           # HomeController (home search)
 │       ├── internal/       # InternalCronController
 │       ├── leads/          # LeadsProfileController (lead/academic form)
+│       ├── applications/   # ApplicationsController (application documents)
 │       └── search/         # SearchController (course search)
 │
 ├── APP.BLL/                # ─── Business Logic Layer ──────────────
@@ -139,11 +140,11 @@ src/
 
 ## Feature areas
 
-| Feature | API Controller | BLL Service(s) | Main entities |
-|--------|----------------|----------------|----------------|
-| Auth | `auth` | AuthService, TokenService | SysUsers, UserSessions, OtpSession |
-| Categories | `categories` | CategoriesService | SysCountries, SysCities, SysStates, etc. |
-| Search | `search`, `home` | CourseSearchService, HomeSearchService | UniCourses, UniCourseIntakes, etc. |
-| Leads | `leads` | LeadProfileService, AcademicForm* | Lead*, SysLeadProfiles |
+| Feature    | API Controller   | BLL Service(s)                         | Main entities                            |
+| ---------- | ---------------- | -------------------------------------- | ---------------------------------------- |
+| Auth       | `auth`           | AuthService, TokenService              | SysUsers, UserSessions, OtpSession       |
+| Categories | `categories`     | CategoriesService                      | SysCountries, SysCities, SysStates, etc. |
+| Search     | `search`, `home` | CourseSearchService, HomeSearchService | UniCourses, UniCourseIntakes, etc.       |
+| Leads      | `leads`          | LeadProfileService, AcademicForm*      | Lead*, SysLeadProfiles                   |
 
 Use this file to navigate the codebase quickly.

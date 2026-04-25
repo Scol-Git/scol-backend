@@ -10,13 +10,13 @@ export class ApplicationDocumentUploadPolicy {
   validateUploadOrThrow(
     requirement: ApplicationRequiredDocuments,
     dto: GenerateApplicationDocumentUploadUrlRequestDto,
-    existingVerifiedDocumentCount: number,
+    existingActiveDocumentCount: number,
   ): void {
     this.validateRequirementSourceScopeOrThrow(requirement);
     this.validateRequirementStatusOrThrow(requirement);
     this.validateMimeOrThrow(requirement, dto);
     this.validateFileSizeOrThrow(requirement, dto);
-    this.validateSlotCountOrThrow(requirement, existingVerifiedDocumentCount);
+    this.validateSlotCountOrThrow(requirement, existingActiveDocumentCount);
   }
 
   private validateRequirementSourceScopeOrThrow(
@@ -103,19 +103,16 @@ export class ApplicationDocumentUploadPolicy {
 
   private validateSlotCountOrThrow(
     requirement: ApplicationRequiredDocuments,
-    existingVerifiedDocumentCount: number,
+    existingActiveDocumentCount: number,
   ): void {
-    if (!requirement.isMultipleAllowed) {
-      if (existingVerifiedDocumentCount > 1) {
-        throw new ValidationException(
-          'Invalid document state: multiple active documents for a single-upload requirement',
-          { requirement: ['Too many active documents for this requirement'] },
-        );
-      }
-      return;
+    if (!requirement.isMultipleAllowed && existingActiveDocumentCount >= 1) {
+      throw new ValidationException(
+        'Invalid document state: multiple active documents for a single-upload requirement',
+        { requirement: ['Too many active documents for this requirement'] },
+      );
     }
 
-    if (requirement.maxCount <= 0) {
+    if (requirement.isMultipleAllowed && requirement.maxCount <= 0) {
       throw new ValidationException(
         'Invalid requirement configuration: maxCount must be greater than 0',
         {
@@ -125,7 +122,11 @@ export class ApplicationDocumentUploadPolicy {
         },
       );
     }
-    if (existingVerifiedDocumentCount >= requirement.maxCount) {
+
+    if (
+      requirement.isMultipleAllowed &&
+      existingActiveDocumentCount >= requirement.maxCount
+    ) {
       throw new ValidationException(
         'Invalid document state: more active documents than configured for this requirement',
         {

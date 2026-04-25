@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   ParseUUIDPipe,
   Post,
@@ -13,6 +14,9 @@ import type { ICurrentUser } from '@shared/interfaces/domain';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 import { Role } from '@shared/enums/Role.enum';
 import { ApplicationDocumentService } from '@bll/services/applications/ApplicationDocumentService';
+import { ConfirmApplicationDocumentUploadRequestDto } from '@shared/dtos/applications/ConfirmApplicationDocumentUploadRequestDto';
+import { ConfirmApplicationDocumentUploadResponseDto } from '@shared/dtos/applications/ConfirmApplicationDocumentUploadResponseDto';
+import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentDownloadResponseDto';
 import { GenerateApplicationDocumentUploadUrlRequestDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlRequestDto';
 import { GenerateApplicationDocumentUploadUrlResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlResponseDto';
 
@@ -37,6 +41,40 @@ export class ApplicationDocumentsController {
       applicationId,
       documentTypeId,
       dto,
+    );
+  }
+
+  @Post(':applicationId/document-types/:documentTypeId/confirm-upload')
+  @UseGuards(JwtAuthGuard)
+  @RequireRole(Role.LEAD)
+  @ApiBearerAuth('JWT-auth')
+  async confirmUpload(
+    @CurrentUser() user: ICurrentUser,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('documentTypeId', ParseUUIDPipe) applicationRequirementId: string,
+    @Body() dto: ConfirmApplicationDocumentUploadRequestDto,
+  ): Promise<ConfirmApplicationDocumentUploadResponseDto> {
+    return await this.applicationDocumentService.confirmUpload(
+      user.userId,
+      applicationId,
+      applicationRequirementId,
+      dto,
+    );
+  }
+
+  @Get(':applicationId/documents/:documentId/download')
+  @UseGuards(JwtAuthGuard)
+  @RequireRole(Role.LEAD)
+  @ApiBearerAuth('JWT-auth')
+  async downloadDocument(
+    @CurrentUser() user: ICurrentUser,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ): Promise<GenerateApplicationDocumentDownloadResponseDto> {
+    return await this.applicationDocumentService.generateDownloadUrl(
+      user.userId,
+      applicationId,
+      documentId,
     );
   }
 }

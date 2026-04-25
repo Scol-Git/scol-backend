@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { CreateApplicationRequestDto } from '@shared/dtos/applications/CreateApplicationRequestDto';
 import { GenerateApplicationDocumentUploadUrlRequestDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlRequestDto';
+import { ConfirmApplicationDocumentUploadRequestDto } from '@shared/dtos/applications/ConfirmApplicationDocumentUploadRequestDto';
 
 @Injectable()
 export class ApplicationValidator {
@@ -61,6 +62,26 @@ export class ApplicationValidator {
     if (errors.length > 0) {
       throw new ValidationException('Generate upload URL request is invalid', {
         generateUploadUrl: errors,
+      });
+    }
+  }
+
+  async validateConfirmUploadRequest(
+    dto: ConfirmApplicationDocumentUploadRequestDto,
+  ): Promise<void> {
+    const errors: string[] = [];
+
+    if (!dto.documentId?.trim()) {
+      errors.push('documentId is required');
+    }
+
+    if (!dto.documentVersionId?.trim()) {
+      errors.push('documentVersionId is required');
+    }
+
+    if (errors.length > 0) {
+      throw new ValidationException('Confirm upload request is invalid', {
+        confirmUpload: errors,
       });
     }
   }
