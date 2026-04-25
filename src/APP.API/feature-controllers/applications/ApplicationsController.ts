@@ -21,7 +21,11 @@ import { GetApplicationStageProgressResponseDto } from '@shared/dtos/application
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@shared/enums/Role.enum';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
+import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
 
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard, RoleGuard)
+@RequireRole(Role.LEAD)
 @Controller('applications')
 export class ApplicationsController {
   constructor(
@@ -30,9 +34,6 @@ export class ApplicationsController {
   ) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
-  @RequireRole(Role.LEAD)
-  @ApiBearerAuth('JWT-auth')
   async getLeadApplications(
     @CurrentUser() user: ICurrentUser,
   ): Promise<GetApplicationsResponseDto> {
@@ -40,9 +41,6 @@ export class ApplicationsController {
   }
 
   @Get(':applicationId/stage-progress')
-  @UseGuards(JwtAuthGuard)
-  @RequireRole(Role.LEAD)
-  @ApiBearerAuth('JWT-auth')
   async getApplicationStageProgress(
     @CurrentUser() user: ICurrentUser,
     @Param('applicationId', ParseUUIDPipe) applicationId: string,
@@ -54,9 +52,6 @@ export class ApplicationsController {
   }
 
   @Get(':applicationId/document-progress')
-  @UseGuards(JwtAuthGuard)
-  @RequireRole(Role.LEAD)
-  @ApiBearerAuth('JWT-auth')
   async getApplicationDocumentProgress(
     @CurrentUser() user: ICurrentUser,
     @Param('applicationId', ParseUUIDPipe) applicationId: string,
@@ -68,9 +63,6 @@ export class ApplicationsController {
   }
 
   @Get(':applicationId')
-  @UseGuards(JwtAuthGuard)
-  @RequireRole(Role.LEAD)
-  @ApiBearerAuth('JWT-auth')
   async getApplicationById(
     @CurrentUser() user: ICurrentUser,
     @Param('applicationId', ParseUUIDPipe) applicationId: string,
@@ -82,9 +74,6 @@ export class ApplicationsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @RequireRole(Role.LEAD)
-  @ApiBearerAuth('JWT-auth')
   async createApplication(
     @CurrentUser() user: ICurrentUser,
     @Body() dto: CreateApplicationRequestDto,

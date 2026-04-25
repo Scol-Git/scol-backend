@@ -72,15 +72,42 @@ export class ApplicationDocumentService {
     applicationRequirementId: string,
     dto: GenerateApplicationDocumentUploadUrlRequestDto,
   ): Promise<GenerateApplicationDocumentUploadUrlResponseDto> {
-    await this.validator.validateGenerateUploadUrlRequest(dto);
+    return this.generateUploadUrlForLead(
+      currentUserId,
+      applicationId,
+      applicationRequirementId,
+      dto,
+    );
+  }
 
+  async generateUploadUrlForLead(
+    currentUserId: string,
+    applicationId: string,
+    applicationRequirementId: string,
+    dto: GenerateApplicationDocumentUploadUrlRequestDto,
+  ): Promise<GenerateApplicationDocumentUploadUrlResponseDto> {
     const application = await this.access.ensureLeadCanAccessApplicationOrThrow(
       currentUserId,
       applicationId,
     );
+    return this.generateUploadUrlForAuthorizedApplication(
+      application,
+      applicationRequirementId,
+      dto,
+      currentUserId,
+    );
+  }
+
+  async generateUploadUrlForAuthorizedApplication(
+    application: Applications,
+    applicationRequirementId: string,
+    dto: GenerateApplicationDocumentUploadUrlRequestDto,
+    actedByUserId: string,
+  ): Promise<GenerateApplicationDocumentUploadUrlResponseDto> {
+    await this.validator.validateGenerateUploadUrlRequest(dto);
 
     const requirement = await this.resolveUploadRequirementOrThrow(
-      applicationId,
+      application.id,
       applicationRequirementId,
     );
 
@@ -107,7 +134,7 @@ export class ApplicationDocumentService {
       ) {
         return this.createPendingApplicationScopedUpload(
           manager,
-          currentUserId,
+          actedByUserId,
           application,
           requirement,
           dto,
@@ -115,7 +142,7 @@ export class ApplicationDocumentService {
       }
       return this.createPendingLeadScopedUpload(
         manager,
-        currentUserId,
+        actedByUserId,
         application,
         requirement,
         dto,
@@ -143,15 +170,43 @@ export class ApplicationDocumentService {
     applicationRequirementId: string,
     dto: ConfirmApplicationDocumentUploadRequestDto,
   ): Promise<ConfirmApplicationDocumentUploadResponseDto> {
-    await this.validator.validateConfirmUploadRequest(dto);
+    return this.confirmUploadForLead(
+      currentUserId,
+      applicationId,
+      applicationRequirementId,
+      dto,
+    );
+  }
 
+  async confirmUploadForLead(
+    currentUserId: string,
+    applicationId: string,
+    applicationRequirementId: string,
+    dto: ConfirmApplicationDocumentUploadRequestDto,
+  ): Promise<ConfirmApplicationDocumentUploadResponseDto> {
     const application = await this.access.ensureLeadCanAccessApplicationOrThrow(
       currentUserId,
       applicationId,
     );
 
+    return this.confirmUploadForAuthorizedApplication(
+      application,
+      applicationRequirementId,
+      dto,
+      currentUserId,
+    );
+  }
+
+  async confirmUploadForAuthorizedApplication(
+    application: Applications,
+    applicationRequirementId: string,
+    dto: ConfirmApplicationDocumentUploadRequestDto,
+    actedByUserId: string,
+  ): Promise<ConfirmApplicationDocumentUploadResponseDto> {
+    await this.validator.validateConfirmUploadRequest(dto);
+
     const requirement = await this.resolveUploadRequirementOrThrow(
-      applicationId,
+      application.id,
       applicationRequirementId,
     );
 
@@ -166,6 +221,10 @@ export class ApplicationDocumentService {
       dto,
     );
 
+    if (pending.uploadStatus === UploadStatus.UPLOADED) {
+      return this.mapper.toConfirmUploadResponse(UploadStatus.UPLOADED);
+    }
+
     const objectExists = await this.storage.objectExists(pending.storageKey);
     if (!objectExists) {
       throw new ValidationException(
@@ -178,16 +237,18 @@ export class ApplicationDocumentService {
       if (pending.documentScope === 'APPLICATION') {
         await this.confirmApplicationScopedUpload(
           manager,
-          currentUserId,
+          actedByUserId,
           pending,
         );
       } else {
-        await this.confirmLeadScopedUpload(manager, currentUserId, pending);
+        await this.confirmLeadScopedUpload(manager, actedByUserId, pending);
       }
+
+      await this.markRequirementInProgressIfNeeded(manager, requirement.id);
 
       await this.activity.logDocumentUploaded(manager, {
         applicationId: application.id,
-        actedByUserId: currentUserId,
+        actedByUserId,
         documentRequirementId: requirement.id,
         documentId: pending.documentId,
         documentVersionId: pending.documentVersionId,
@@ -206,11 +267,32 @@ export class ApplicationDocumentService {
     applicationId: string,
     documentId: string,
   ): Promise<GenerateApplicationDocumentDownloadResponseDto> {
+    return this.generateDownloadUrlForLead(
+      currentUserId,
+      applicationId,
+      documentId,
+    );
+  }
+
+  async generateDownloadUrlForLead(
+    currentUserId: string,
+    applicationId: string,
+    documentId: string,
+  ): Promise<GenerateApplicationDocumentDownloadResponseDto> {
     const application = await this.access.ensureLeadCanAccessApplicationOrThrow(
       currentUserId,
       applicationId,
     );
+    return this.generateDownloadUrlForAuthorizedApplication(
+      application,
+      documentId,
+    );
+  }
 
+  async generateDownloadUrlForAuthorizedApplication(
+    application: Applications,
+    documentId: string,
+  ): Promise<GenerateApplicationDocumentDownloadResponseDto> {
     const downloadable =
       (await this.resolveApplicationScopedDownloadOrNull(
         application.id,
@@ -271,19 +353,23 @@ export class ApplicationDocumentService {
     dto: ConfirmApplicationDocumentUploadRequestDto,
   ): Promise<PendingUploadForConfirmation> {
     if (requirement.sourceType === ApplicationDocumentSourceType.Application) {
-      return this.resolvePendingApplicationScopedUploadOrThrow(
+      const pending = await this.resolvePendingApplicationScopedUploadOrThrow(
         application,
         requirement,
         dto,
       );
+      this.ensureUploadCanBeConfirmedOrThrow(pending.uploadStatus);
+      return pending;
     }
 
     if (requirement.sourceType === ApplicationDocumentSourceType.Lead) {
-      return this.resolvePendingLeadScopedUploadOrThrow(
+      const pending = await this.resolvePendingLeadScopedUploadOrThrow(
         application,
         requirement,
         dto,
       );
+      this.ensureUploadCanBeConfirmedOrThrow(pending.uploadStatus);
+      return pending;
     }
 
     throw new ValidationException(
@@ -302,7 +388,6 @@ export class ApplicationDocumentService {
         id: dto.documentId,
         applicationId: application.id,
         applicationRequirementId: requirement.id,
-        overallStatus: ApplicationDocumentStatus.Pending,
       },
     });
 
@@ -317,7 +402,6 @@ export class ApplicationDocumentService {
       where: {
         id: dto.documentVersionId,
         applicationDocumentId: document.id,
-        uploadStatus: In([UploadStatus.PENDING, UploadStatus.FAILED]),
       },
     });
 
@@ -354,7 +438,6 @@ export class ApplicationDocumentService {
         id: dto.documentId,
         leadId: application.leadId,
         sysDocumentTypeId: requirement.sysDocumentTypeId,
-        overallStatus: ApplicationDocumentStatus.Pending,
       },
     });
 
@@ -369,7 +452,6 @@ export class ApplicationDocumentService {
       where: {
         id: dto.documentVersionId,
         leadDocumentId: document.id,
-        uploadStatus: In([UploadStatus.PENDING, UploadStatus.FAILED]),
       },
     });
 
@@ -388,6 +470,39 @@ export class ApplicationDocumentService {
       originalFileName: version.originalFileName,
       uploadStatus: version.uploadStatus,
     };
+  }
+
+  private ensureUploadCanBeConfirmedOrThrow(
+    uploadStatus: UploadStatus | null | undefined,
+  ): void {
+    if (uploadStatus === UploadStatus.PENDING) return;
+    if (uploadStatus === UploadStatus.UPLOADED) return;
+
+    throw new ValidationException('Upload cannot be confirmed', {
+      uploadStatus: [`Current upload status is ${uploadStatus ?? 'UNKNOWN'}`],
+    });
+  }
+
+  private async markRequirementInProgressIfNeeded(
+    manager: EntityManager,
+    applicationRequirementId: string,
+  ): Promise<void> {
+    const requirementRepo = manager.getRepository(ApplicationRequiredDocuments);
+    const requirement = await requirementRepo.findOne({
+      where: { id: applicationRequirementId },
+    });
+
+    if (!requirement) {
+      throw new NotFoundException('Application requirement not found');
+    }
+
+    if (
+      requirement.overallStatus == null ||
+      requirement.overallStatus === ApplicationRequirementStatus.Pending
+    ) {
+      requirement.overallStatus = ApplicationRequirementStatus.InProgress;
+      await requirementRepo.save(requirement);
+    }
   }
 
   private async confirmApplicationScopedUpload(

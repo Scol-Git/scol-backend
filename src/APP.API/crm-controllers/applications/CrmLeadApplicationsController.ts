@@ -24,6 +24,9 @@ import { Role } from '@shared/enums/Role.enum';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 
 @ApiTags('CRM Applications')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard, RoleGuard)
+@RequireRole(Role.ADMIN, Role.COUNSELLOR)
 @Controller('crm/leads/:leadId/applications')
 export class CrmLeadApplicationsController {
   constructor(
@@ -32,9 +35,6 @@ export class CrmLeadApplicationsController {
   ) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, RoleGuard)
-  @RequireRole(Role.ADMIN, Role.COUNSELLOR)
-  @ApiBearerAuth('JWT-auth')
   async createApplicationForLead(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -48,9 +48,6 @@ export class CrmLeadApplicationsController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RoleGuard)
-  @RequireRole(Role.ADMIN, Role.COUNSELLOR)
-  @ApiBearerAuth('JWT-auth')
   async getApplicationsForLead(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -59,9 +56,6 @@ export class CrmLeadApplicationsController {
   }
 
   @Get(':applicationId/stage-progress')
-  @UseGuards(JwtAuthGuard, RoleGuard)
-  @RequireRole(Role.ADMIN, Role.COUNSELLOR)
-  @ApiBearerAuth('JWT-auth')
   async getApplicationStageProgress(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -75,9 +69,6 @@ export class CrmLeadApplicationsController {
   }
 
   @Get(':applicationId/document-progress')
-  @UseGuards(JwtAuthGuard, RoleGuard)
-  @RequireRole(Role.ADMIN, Role.COUNSELLOR)
-  @ApiBearerAuth('JWT-auth')
   async getApplicationDocumentProgress(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -91,9 +82,6 @@ export class CrmLeadApplicationsController {
   }
 
   @Get(':applicationId')
-  @UseGuards(JwtAuthGuard, RoleGuard)
-  @RequireRole(Role.ADMIN, Role.COUNSELLOR)
-  @ApiBearerAuth('JWT-auth')
   async getApplicationById(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
