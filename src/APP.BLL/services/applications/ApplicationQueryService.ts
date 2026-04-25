@@ -68,11 +68,18 @@ export class ApplicationQueryService {
     currentUserId: string,
     applicationId: string,
   ): Promise<GetApplicationDetailsResponseDto> {
-    await this.applicationAccessService.ensureLeadCanAccessApplicationOrThrow(
-      currentUserId,
-      applicationId,
-    );
+    const application =
+      await this.applicationAccessService.ensureLeadCanAccessApplicationOrThrow(
+        currentUserId,
+        applicationId,
+      );
 
+    return this.getApplicationDetailsForAuthorizedApplication(application.id);
+  }
+
+  async getApplicationDetailsForAuthorizedApplication(
+    applicationId: string,
+  ): Promise<GetApplicationDetailsResponseDto> {
     const application =
       await this.loadApplicationOverviewOrThrow(applicationId);
 
@@ -136,11 +143,20 @@ export class ApplicationQueryService {
     currentUserId: string,
     applicationId: string,
   ): Promise<GetApplicationStageProgressResponseDto> {
-    await this.applicationAccessService.ensureLeadCanAccessApplicationOrThrow(
-      currentUserId,
-      applicationId,
-    );
+    const application =
+      await this.applicationAccessService.ensureLeadCanAccessApplicationOrThrow(
+        currentUserId,
+        applicationId,
+      );
 
+    return this.getApplicationStageProgressForAuthorizedApplication(
+      application.id,
+    );
+  }
+
+  async getApplicationStageProgressForAuthorizedApplication(
+    applicationId: string,
+  ): Promise<GetApplicationStageProgressResponseDto> {
     const application =
       await this.loadApplicationCurrentStageOrThrow(applicationId);
     const stages = await this.loadOrderedStages();
@@ -153,11 +169,20 @@ export class ApplicationQueryService {
     currentUserId: string,
     applicationId: string,
   ): Promise<GetApplicationDocumentProgressResponseDto> {
-    await this.applicationAccessService.ensureLeadCanAccessApplicationOrThrow(
-      currentUserId,
-      applicationId,
-    );
+    const application =
+      await this.applicationAccessService.ensureLeadCanAccessApplicationOrThrow(
+        currentUserId,
+        applicationId,
+      );
 
+    return this.getApplicationDocumentProgressForAuthorizedApplication(
+      application.id,
+    );
+  }
+
+  async getApplicationDocumentProgressForAuthorizedApplication(
+    applicationId: string,
+  ): Promise<GetApplicationDocumentProgressResponseDto> {
     const application =
       await this.loadApplicationCurrentStageOrThrow(applicationId);
 

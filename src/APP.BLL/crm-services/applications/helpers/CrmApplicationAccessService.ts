@@ -4,6 +4,7 @@ import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { Role } from '@shared/enums/Role.enum';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { SysUsers } from '@entity/entities/SysUsers.entity';
+import { Applications } from '@entity/entities/Applications.entity';
 
 @Injectable()
 export class CrmApplicationAccessService {
@@ -33,6 +34,27 @@ export class CrmApplicationAccessService {
         leadId: ['You are not authorized to access this lead'],
       },
     );
+  }
+
+  async ensureCrmCanAccessApplicationForLeadOrThrow(
+    currentUserId: string,
+    leadId: string,
+    applicationId: string,
+  ): Promise<Applications> {
+    await this.ensureCrmCanAccessLeadOrThrow(currentUserId, leadId);
+
+    const application = await this.db.applications.findOne({
+      where: {
+        id: applicationId,
+        leadId,
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    return application;
   }
 
   private async loadCrmUserWithRolesOrThrow(userId: string): Promise<SysUsers> {
