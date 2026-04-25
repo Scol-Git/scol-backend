@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
+import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
 import { Applications } from '@entity/entities/Applications.entity';
 import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
@@ -8,16 +9,19 @@ import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applicat
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
 import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
-import { ApplicationRequirementOverallStatus } from '@shared/enums/ApplicationRequirementOverallStatus.enum';
+import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 import { ApplicationStageProgressState } from '@shared/enums/ApplicationStageProgressState.enum';
+import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocumentSourceType.enum';
 import {
   ApplicationRequirementWithDocuments,
   DocumentProgressViewModel,
   StageProgressViewModel,
+  UploadedDocumentView,
 } from './helpers/application-read-model.types';
 import { ApplicationAccessService } from './helpers/ApplicationAccessService';
 import { ApplicationMapper } from './helpers/ApplicationMapper';
 import { In } from 'typeorm';
+import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
 
 @Injectable()
 export class ApplicationQueryService {
@@ -76,20 +80,45 @@ export class ApplicationQueryService {
       currentStageId,
     );
 
-    const requirementIds = requirements.map((requirement) => requirement.id);
+    /** Load application-scoped documents */
+    const applicationScopedRequirementIds = requirements
+      .filter(
+        (requirement) =>
+          requirement.sourceType === ApplicationDocumentSourceType.Application,
+      )
+      .map((requirement) => requirement.id);
 
-    const documents = await this.loadActiveApplicationDocumentsForRequirements(
-      applicationId,
-      requirementIds,
+    const applicationDocuments =
+      await this.loadApplicationDocumentsForRequirements(
+        applicationId,
+        applicationScopedRequirementIds,
+      );
+
+    /** Load lead-scoped documents */
+    const leadScopedDocTypeIds = requirements
+      .filter(
+        (requirement) =>
+          requirement.sourceType === ApplicationDocumentSourceType.Lead,
+      )
+      .map((requirement) => requirement.sysDocumentTypeId);
+
+    const leadDocuments = await this.loadLeadDocumentsForRequirements(
+      application.leadId,
+      leadScopedDocTypeIds,
     );
 
-    const documentsByRequirementId =
-      this.groupDocumentsByRequirementId(documents);
+    const applicationDocumentsByRequirementId =
+      this.groupApplicationDocumentsByRequirementId(applicationDocuments);
+    const leadDocumentsByDocTypeId =
+      this.groupLeadDocumentsByDocTypeId(leadDocuments);
 
-    const requirementsWithDocuments = this.buildRequirementWithDocuments(
+    const requirementsWithDocuments = this.buildRequirementWithUnifiedDocuments(
       requirements,
-      documentsByRequirementId,
+      applicationDocumentsByRequirementId,
+      leadDocumentsByDocTypeId,
     );
+
+    this.sortChecklistRowsForDetailsResponse(requirementsWithDocuments);
 
     return this.mapper.toGetApplicationDetailsResponse(
       application,
@@ -135,6 +164,7 @@ export class ApplicationQueryService {
       applicationId,
       currentStageId,
     );
+
     const viewModel = this.buildDocumentProgressViewModel(requirements);
 
     return this.mapper.toDocumentProgressResponse(viewModel);
@@ -209,28 +239,76 @@ export class ApplicationQueryService {
     let totalRequired = 0;
     let uploadedCount = 0;
 
-    for (const requirement of requirements) {
+    const items = requirements.map((requirement) => {
+      const effectiveOverallStatus =
+        requirement.overallStatus ?? ApplicationRequirementStatus.Pending;
+
       if (requirement.isRequired === true) {
         totalRequired += 1;
         if (
-          requirement.overallStatus !==
-          ApplicationRequirementOverallStatus.Missing
+          effectiveOverallStatus === ApplicationRequirementStatus.InProgress ||
+          effectiveOverallStatus === ApplicationRequirementStatus.Verified
         ) {
           uploadedCount += 1;
         }
       }
-    }
 
-    const items = requirements.map((requirement) => ({
-      requirement,
-      order: requirement.displayOrder ?? 0,
-    }));
+      return {
+        requirement,
+        order: requirement.displayOrder ?? Number.MAX_SAFE_INTEGER,
+      };
+    });
+
+    this.sortDocumentProgressItems(items);
 
     return {
       totalRequired,
       uploadedCount,
       items,
     };
+  }
+
+  private sortDocumentProgressItems(
+    items: DocumentProgressViewModel['items'],
+  ): void {
+    items.sort((a, b) => {
+      const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      const nameA = a.requirement.SysDocumentType?.documentTypeName ?? '';
+      const nameB = b.requirement.SysDocumentType?.documentTypeName ?? '';
+      const nameCmp = nameA.localeCompare(nameB);
+      if (nameCmp !== 0) {
+        return nameCmp;
+      }
+      return a.requirement.id.localeCompare(b.requirement.id);
+    });
+  }
+
+  /**
+   * Deterministic checklist order: displayOrder ASC (nulls last), document type name ASC, requirement id ASC.
+   */
+  private sortChecklistRowsForDetailsResponse(
+    rows: ApplicationRequirementWithDocuments[],
+  ): void {
+    rows.sort((a, b) => {
+      const orderA = a.requirement.displayOrder ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.requirement.displayOrder ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      const nameA = a.requirement.SysDocumentType?.documentTypeName ?? '';
+      const nameB = b.requirement.SysDocumentType?.documentTypeName ?? '';
+      const nameCmp = nameA.localeCompare(nameB);
+      if (nameCmp !== 0) {
+        return nameCmp;
+      }
+
+      return a.requirement.id.localeCompare(b.requirement.id);
+    });
   }
 
   private async loadApplicationOverviewOrThrow(
@@ -255,6 +333,9 @@ export class ApplicationQueryService {
     return application;
   }
 
+  /**
+   * Requirements for the application's current stage only — do not broaden reads across all stages.
+   */
   private async loadCurrentStageRequirements(
     applicationId: string,
     currentStageId: string,
@@ -271,7 +352,7 @@ export class ApplicationQueryService {
     });
   }
 
-  private async loadActiveApplicationDocumentsForRequirements(
+  private async loadApplicationDocumentsForRequirements(
     applicationId: string,
     requirementIds: string[],
   ): Promise<ApplicationDocuments[]> {
@@ -281,8 +362,11 @@ export class ApplicationQueryService {
     return this.db.applicationDocuments.find({
       where: {
         applicationId,
-        isActive: true,
         applicationRequirementId: In(requirementIds),
+        overallStatus: In([
+          ApplicationDocumentStatus.InProgress,
+          ApplicationDocumentStatus.Verified,
+        ]),
       },
       order: {
         updatedAt: 'DESC',
@@ -291,7 +375,31 @@ export class ApplicationQueryService {
     });
   }
 
-  private groupDocumentsByRequirementId(
+  private async loadLeadDocumentsForRequirements(
+    leadId: string | undefined,
+    sysDocumentTypeIds: string[],
+  ): Promise<LeadDocuments[]> {
+    if (!leadId || sysDocumentTypeIds.length === 0) {
+      return [];
+    }
+
+    return this.db.leadDocuments.find({
+      where: {
+        leadId,
+        sysDocumentTypeId: In(sysDocumentTypeIds),
+        overallStatus: In([
+          ApplicationDocumentStatus.InProgress,
+          ApplicationDocumentStatus.Verified,
+        ]),
+      },
+      order: {
+        updatedAt: 'DESC',
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  private groupApplicationDocumentsByRequirementId(
     documents: ApplicationDocuments[],
   ): Map<string, ApplicationDocuments[]> {
     const byRequirementId = new Map<string, ApplicationDocuments[]>();
@@ -306,13 +414,50 @@ export class ApplicationQueryService {
     return byRequirementId;
   }
 
-  private buildRequirementWithDocuments(
+  private groupLeadDocumentsByDocTypeId(
+    documents: LeadDocuments[],
+  ): Map<string, LeadDocuments[]> {
+    const byDocTypeId = new Map<string, LeadDocuments[]>();
+
+    for (const document of documents) {
+      const existing = byDocTypeId.get(document.sysDocumentTypeId) ?? [];
+      existing.push(document);
+      byDocTypeId.set(document.sysDocumentTypeId, existing);
+    }
+
+    return byDocTypeId;
+  }
+
+  private buildRequirementWithUnifiedDocuments(
     requirements: ApplicationRequiredDocuments[],
-    documentsByRequirementId: Map<string, ApplicationDocuments[]>,
+    applicationDocumentsByRequirementId: Map<string, ApplicationDocuments[]>,
+    leadDocumentsByDocTypeId: Map<string, LeadDocuments[]>,
   ): ApplicationRequirementWithDocuments[] {
     return requirements.map((requirement) => {
-      const uploadedDocuments =
-        documentsByRequirementId.get(requirement.id)?.slice() ?? [];
+      let uploadedDocuments: UploadedDocumentView[];
+
+      if (requirement.sourceType === ApplicationDocumentSourceType.Lead) {
+        const leadDocsForType =
+          leadDocumentsByDocTypeId.get(requirement.sysDocumentTypeId) ?? [];
+
+        uploadedDocuments = leadDocsForType.map((document) => ({
+          documentId: document.id,
+          documentScope: 'LEAD' as const,
+          fileName: document.latestFileName ?? null,
+          overallStatus: document.overallStatus ?? null,
+          createdAt: document.createdAt,
+        }));
+      } else {
+        uploadedDocuments = (
+          applicationDocumentsByRequirementId.get(requirement.id) ?? []
+        ).map((document) => ({
+          documentId: document.id,
+          documentScope: 'APPLICATION' as const,
+          fileName: document.latestFileName ?? null,
+          overallStatus: document.overallStatus ?? null,
+          createdAt: document.createdAt,
+        }));
+      }
 
       uploadedDocuments.sort(
         (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),

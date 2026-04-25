@@ -11,7 +11,14 @@ import { ApplicationValidator } from './helpers/ApplicationValidator';
 import { ApplicationActivityService } from './helpers/ApplicationActivityService';
 import { ApplicationSerialNumberService } from './helpers/ApplicationSerialNumberService';
 import { ApplicationRequirementResolver } from './helpers/ApplicationRequirementResolver';
+import { ApplicationRequirementBootstrapService } from './helpers/ApplicationRequirementBootstrapService';
 import { ApplicationDocumentUploadPolicy } from './helpers/ApplicationDocumentUploadPolicy';
+import { ApplicationDocumentLinker } from './helpers/ApplicationDocumentLinker';
+import { ApplicationDocumentVersionSequencer } from './helpers/ApplicationDocumentVersionSequencer';
+import { ApplicationDocumentStorageKeyBuilder } from './helpers/ApplicationDocumentStorageKeyBuilder';
+
+// TODO(later phases): introduce ApplicationWorkflowService for CRM-only transitions
+// (requirement/document/app status, stage changes) without expanding phases 1–6 surface area.
 
 @Module({
   imports: [EligibilityModule, StorageModule],
@@ -26,6 +33,10 @@ import { ApplicationDocumentUploadPolicy } from './helpers/ApplicationDocumentUp
     ApplicationActivityService,
     ApplicationSerialNumberService,
     ApplicationRequirementResolver,
+    ApplicationRequirementBootstrapService,
+    ApplicationDocumentLinker,
+    ApplicationDocumentVersionSequencer,
+    ApplicationDocumentStorageKeyBuilder,
     ApplicationDocumentUploadPolicy,
   ],
   exports: [

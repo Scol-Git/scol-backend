@@ -12,7 +12,7 @@ import { ApplicationMapper } from './helpers/ApplicationMapper';
 import { ApplicationValidator } from './helpers/ApplicationValidator';
 import { ApplicationCreationContextService } from './helpers/ApplicationCreationContextService';
 import { ApplicationSerialNumberService } from './helpers/ApplicationSerialNumberService';
-import { ApplicationRequirementResolver } from './helpers/ApplicationRequirementResolver';
+import { ApplicationRequirementBootstrapService } from './helpers/ApplicationRequirementBootstrapService';
 import { ApplicationActivityService } from './helpers/ApplicationActivityService';
 import { ApplicationStage } from '@shared/enums/ApplicationStage.enum';
 import { ApplicationStatus } from '@shared/enums/ApplicationStatus.enum';
@@ -25,7 +25,7 @@ export class ApplicationCreationService {
     private readonly validator: ApplicationValidator,
     private readonly creationContextService: ApplicationCreationContextService,
     private readonly serialNumberService: ApplicationSerialNumberService,
-    private readonly requirementResolver: ApplicationRequirementResolver,
+    private readonly requirementBootstrap: ApplicationRequirementBootstrapService,
     private readonly activityService: ApplicationActivityService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
   ) {}
@@ -126,9 +126,9 @@ export class ApplicationCreationService {
       }),
     );
 
-    await this.requirementResolver.generateSnapshotForApplication(
+    await this.requirementBootstrap.bootstrapForNewApplication(
       manager,
-      application.id,
+      application,
       countryId,
     );
 

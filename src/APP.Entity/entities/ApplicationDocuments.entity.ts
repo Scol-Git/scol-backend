@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { DocumentScope } from '@shared/enums/DocumentScope.enum';
-import { ApplicationDocumentOverallStatus } from '@shared/enums/ApplicationDocumentOverallStatus.enum';
+import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
 import { BaseEntity } from './BaseEntity.template';
 import { Applications } from './Applications.entity';
 import { SysDocumentTypes } from './SysDocumentTypes.entity';
@@ -26,7 +26,6 @@ import { ApplicationActivities } from './ApplicationActivities.entity';
 @Index('IX_ApplicationDocuments_applicationRequirementId', [
   'applicationRequirementId',
 ])
-@Index('IX_ApplicationDocuments_leadDocumentId', ['leadDocumentId'])
 @Entity('ApplicationDocuments')
 export class ApplicationDocuments extends BaseEntity {
   @Column({
@@ -63,31 +62,6 @@ export class ApplicationDocuments extends BaseEntity {
   latestFileName?: string;
 
   @Column({
-    name: 'sourceScope',
-    type: 'varchar',
-    length: 50,
-    nullable: false,
-  })
-  @AutoMap()
-  sourceScope!: DocumentScope;
-
-  @Column({
-    name: 'leadDocumentId',
-    type: 'uuid',
-    nullable: true,
-  })
-  @AutoMap()
-  leadDocumentId?: string;
-
-  @Column({
-    name: 'pinnedLeadVersionId',
-    type: 'uuid',
-    nullable: true,
-  })
-  @AutoMap()
-  pinnedLeadVersionId?: string;
-
-  @Column({
     name: 'currentVersionId',
     type: 'uuid',
     nullable: true,
@@ -102,7 +76,7 @@ export class ApplicationDocuments extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  overallStatus?: ApplicationDocumentOverallStatus;
+  overallStatus?: ApplicationDocumentStatus;
 
   @Column({
     name: 'remarks',
@@ -162,14 +136,6 @@ export class ApplicationDocuments extends BaseEntity {
   )
   @JoinColumn({ name: 'applicationRequirementId' })
   ApplicationRequiredDocument!: ApplicationRequiredDocuments;
-
-  @ManyToOne(() => LeadDocuments, { nullable: true })
-  @JoinColumn({ name: 'leadDocumentId' })
-  LeadDocument?: LeadDocuments;
-
-  @ManyToOne(() => LeadDocumentVersions, { nullable: true })
-  @JoinColumn({ name: 'pinnedLeadVersionId' })
-  PinnedLeadVersion?: LeadDocumentVersions;
 
   @OneToMany(() => ApplicationDocumentVersions, (v) => v.ApplicationDocument)
   ApplicationDocumentVersions!: ApplicationDocumentVersions[];

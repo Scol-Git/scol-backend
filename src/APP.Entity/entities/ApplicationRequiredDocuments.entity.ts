@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocumentSourceType.enum';
-import { ApplicationRequirementOverallStatus } from '@shared/enums/ApplicationRequirementOverallStatus.enum';
+import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 import { BaseEntity } from './BaseEntity.template';
 import { Applications } from './Applications.entity';
 import { SysApplicationStage } from './SysApplicationStage.entity';
@@ -88,7 +88,7 @@ export class ApplicationRequiredDocuments extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  overallStatus?: ApplicationRequirementOverallStatus;
+  overallStatus?: ApplicationRequirementStatus;
 
   @Column({
     name: 'allowedMimeTypes',

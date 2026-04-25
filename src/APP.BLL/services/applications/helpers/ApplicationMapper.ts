@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
 import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
 import { Applications } from '@entity/entities/Applications.entity';
 import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
@@ -26,10 +25,12 @@ import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetA
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { ApplicationDocumentChecklistDocumentTypeDto } from '@shared/dtos/applications/ApplicationDocumentChecklistItemDto';
+import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 import {
   ApplicationRequirementWithDocuments,
   DocumentProgressViewModel,
   StageProgressViewModel,
+  UploadedDocumentView,
 } from './application-read-model.types';
 
 const MONTH_NAMES_EN = [
@@ -59,14 +60,14 @@ export class ApplicationMapper {
   }
 
   toGenerateUploadUrlResponse(input: {
-    applicationDocumentId: string;
+    documentId: string;
     documentVersionId: string;
     uploadUrl: string;
     mimeType: string;
     expiresInSeconds: number;
   }): GenerateApplicationDocumentUploadUrlResponseDto {
     return {
-      applicationDocumentId: input.applicationDocumentId,
+      documentId: input.documentId,
       documentVersionId: input.documentVersionId,
       uploadUrl: input.uploadUrl,
       headers: {
@@ -275,13 +276,14 @@ export class ApplicationMapper {
     return {
       documentType,
       order,
-      overallStatus: requirement.overallStatus ?? null,
+      overallStatus:
+        requirement.overallStatus ?? ApplicationRequirementStatus.Pending,
     };
   }
 
   private toApplicationDocumentChecklistItem(
     requirement: ApplicationRequiredDocuments,
-    uploadedDocuments: ApplicationDocuments[],
+    uploadedDocuments: UploadedDocumentView[],
   ): ApplicationDocumentChecklistItemDto {
     const dt = requirement.SysDocumentType;
     if (!dt) {
@@ -298,7 +300,8 @@ export class ApplicationMapper {
       },
       isRequired: requirement.isRequired !== false,
       isMultipleAllowed: requirement.isMultipleAllowed,
-      overallStatus: requirement.overallStatus ?? null,
+      overallStatus:
+        requirement.overallStatus ?? ApplicationRequirementStatus.Pending,
       allowedMimeTypes: requirement.allowedMimeTypes ?? null,
       maxFileSizeBytes: requirement.maxFileSizeBytes ?? null,
       uploadedDocuments: uploadedDocuments.map((d) =>
@@ -308,12 +311,12 @@ export class ApplicationMapper {
   }
 
   private toApplicationUploadedDocumentDto(
-    applicationDocument: ApplicationDocuments,
+    uploadedDocument: UploadedDocumentView,
   ): ApplicationUploadedDocumentDto {
     return {
-      applicationDocumentId: applicationDocument.id,
-      fileName: applicationDocument.latestFileName ?? null,
-      overallStatus: applicationDocument.overallStatus ?? null,
+      applicationDocumentId: uploadedDocument.documentId,
+      fileName: uploadedDocument.fileName ?? null,
+      overallStatus: uploadedDocument.overallStatus ?? null,
     };
   }
 

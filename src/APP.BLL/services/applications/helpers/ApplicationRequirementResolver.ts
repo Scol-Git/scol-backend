@@ -4,7 +4,7 @@ import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequir
 import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocuments.entity';
 import { SysDocumentTypes } from '@entity/entities/SysDocumentTypes.entity';
 import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocumentSourceType.enum';
-import { ApplicationRequirementOverallStatus } from '@shared/enums/ApplicationRequirementOverallStatus.enum';
+import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 import { DocumentScope } from '@shared/enums/DocumentScope.enum';
 
 type SysStageRequiredDocumentWithType = SysStageRequiredDocuments & {
@@ -94,7 +94,7 @@ export class ApplicationRequirementResolver {
       sourceType: this.resolveApplicationDocumentSourceType(
         sysDocumentType.documentScope,
       ),
-      overallStatus: ApplicationRequirementOverallStatus.Missing,
+      overallStatus: ApplicationRequirementStatus.Pending,
     };
   }
 

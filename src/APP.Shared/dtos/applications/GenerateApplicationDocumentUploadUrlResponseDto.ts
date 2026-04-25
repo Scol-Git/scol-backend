@@ -6,8 +6,11 @@ export class GenerateApplicationDocumentUploadUrlHeadersDto {
 }
 
 export class GenerateApplicationDocumentUploadUrlResponseDto {
-  @ApiProperty()
-  applicationDocumentId!: string;
+  @ApiProperty({
+    description:
+      'Polymorphic: ApplicationDocuments.id (APPLICATION scope) or LeadDocuments.id (LEAD scope)',
+  })
+  documentId!: string;
 
   @ApiProperty({
     description:

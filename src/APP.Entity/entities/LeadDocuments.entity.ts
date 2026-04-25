@@ -12,7 +12,7 @@ import { BaseEntity } from './BaseEntity.template';
 import { SysLeadProfiles } from './SysLeadProfiles.entity';
 import { SysDocumentTypes } from './SysDocumentTypes.entity';
 import { LeadDocumentVersions } from './LeadDocumentVersions.entity';
-import { LeadDocumentOverallStatus } from '@shared/enums/LeadDocumentOverallStatus.enum';
+import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
 
 /**
  * Lead-level document aggregate (files before/during application submission).
@@ -61,7 +61,7 @@ export class LeadDocuments extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  overallStatus?: LeadDocumentOverallStatus;
+  overallStatus?: ApplicationDocumentStatus;
 
   @Column({
     name: 'verificationStatus',

@@ -15,6 +15,8 @@
       "@entity/*": ["src/APP.Entity/*"],
       "@shared/*": ["src/APP.Shared/*"]
     },
-    "strict": true
+    "strict": true,
+    "sourceMap": true,
+    "inlineSources": true
   }
 }

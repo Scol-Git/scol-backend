@@ -5,9 +5,9 @@
 export type PendingUploadVersionOwner = 'APPLICATION' | 'LEAD';
 
 export interface PendingUploadInitializationResult {
-  applicationDocumentId: string;
+  documentId: string;
+  documentScope: PendingUploadVersionOwner;
   documentVersionId: string;
-  documentVersionOwner: PendingUploadVersionOwner;
   storageKey: string;
   mimeType: string;
 }

@@ -2,21 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { GenerateApplicationDocumentUploadUrlRequestDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlRequestDto';
-import { ApplicationRequirementOverallStatus } from '@shared/enums/ApplicationRequirementOverallStatus.enum';
 import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocumentSourceType.enum';
+import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 
 @Injectable()
 export class ApplicationDocumentUploadPolicy {
   validateUploadOrThrow(
     requirement: ApplicationRequiredDocuments,
     dto: GenerateApplicationDocumentUploadUrlRequestDto,
-    existingActiveDocumentCount: number,
+    existingVerifiedDocumentCount: number,
   ): void {
     this.validateRequirementSourceScopeOrThrow(requirement);
     this.validateRequirementStatusOrThrow(requirement);
     this.validateMimeOrThrow(requirement, dto);
     this.validateFileSizeOrThrow(requirement, dto);
-    this.validateSlotCountOrThrow(requirement, existingActiveDocumentCount);
+    this.validateSlotCountOrThrow(requirement, existingVerifiedDocumentCount);
   }
 
   private validateRequirementSourceScopeOrThrow(
@@ -29,18 +29,23 @@ export class ApplicationDocumentUploadPolicy {
       );
     }
   }
+
   private validateRequirementStatusOrThrow(
     requirement: ApplicationRequiredDocuments,
   ): void {
+    const status =
+      requirement.overallStatus ?? ApplicationRequirementStatus.Pending;
+
     if (
-      requirement.overallStatus ===
-        ApplicationRequirementOverallStatus.Satisfied ||
-      requirement.overallStatus === ApplicationRequirementOverallStatus.Uploaded
+      status === ApplicationRequirementStatus.InProgress ||
+      status === ApplicationRequirementStatus.Verified
     ) {
       throw new ValidationException(
-        'Document Type is already uploaded or satisfied',
+        'Document Type is already uploaded for this application',
         {
-          requirement: ['Document Type is already uploaded or satisfied'],
+          requirement: [
+            'Document Type is already uploaded for this application',
+          ],
         },
       );
     }
@@ -98,12 +103,10 @@ export class ApplicationDocumentUploadPolicy {
 
   private validateSlotCountOrThrow(
     requirement: ApplicationRequiredDocuments,
-    existingActiveDocumentCount: number,
+    existingVerifiedDocumentCount: number,
   ): void {
     if (!requirement.isMultipleAllowed) {
-      // Single slot: 0 = first upload; 1 = re-upload via same endpoint (reuse aggregate + new version).
-      // Do not compare to maxCount here — one active row is always valid for re-upload.
-      if (existingActiveDocumentCount > 1) {
+      if (existingVerifiedDocumentCount > 1) {
         throw new ValidationException(
           'Invalid document state: multiple active documents for a single-upload requirement',
           { requirement: ['Too many active documents for this requirement'] },
@@ -122,7 +125,7 @@ export class ApplicationDocumentUploadPolicy {
         },
       );
     }
-    if (existingActiveDocumentCount > requirement.maxCount) {
+    if (existingVerifiedDocumentCount >= requirement.maxCount) {
       throw new ValidationException(
         'Invalid document state: more active documents than configured for this requirement',
         {
