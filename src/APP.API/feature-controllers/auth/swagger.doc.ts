@@ -97,14 +97,11 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Validation error',
             value: {
               status: 'error',
-              message:
-                'Invalid Bangladesh phone number format',
+              message: 'Invalid Bangladesh phone number format',
               statusCode: 400,
               error: {
                 details: {
-                  phone: [
-                    'Invalid Bangladesh phone number format',
-                  ],
+                  phone: ['Invalid Bangladesh phone number format'],
                 },
               },
             },
@@ -161,8 +158,7 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Invalid OTP',
             value: {
               status: 'error',
-              message:
-                'Incorrect OTP. Try again',
+              message: 'Incorrect OTP. Try again',
               statusCode: 400,
               error: {
                 code: 'INVALID_OTP',
@@ -184,8 +180,7 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Maximum attempts exceeded',
             value: {
               status: 'error',
-              message:
-                'Maximum OTP attempts exceeded',
+              message: 'Maximum OTP attempts exceeded',
               statusCode: 400,
               error: {
                 code: 'OTP_ATTEMPTS_EXCEEDED',
@@ -308,14 +303,11 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Validation error',
             value: {
               status: 'error',
-              message:
-                'Invalid Bangladesh phone number format',
+              message: 'Invalid Bangladesh phone number format',
               statusCode: 400,
               error: {
                 details: {
-                  phone: [
-                    'Invalid Bangladesh phone number format',
-                  ],
+                  phone: ['Invalid Bangladesh phone number format'],
                 },
               },
             },
@@ -356,7 +348,7 @@ const docs: Record<string, SwaggerDocSet> = {
           summary: 'Login with email (for admins/counselors)',
           value: {
             email: 'admin@scol.com',
-            password: 'SecureP@ss123',
+            password: 'AdminChangeMeNow123!',
           },
         },
       },
@@ -544,14 +536,11 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Invalid phone format',
             value: {
               status: 'error',
-              message:
-                'Invalid Bangladesh phone number format',
+              message: 'Invalid Bangladesh phone number format',
               statusCode: 400,
               error: {
                 details: {
-                  phone: [
-                    'Invalid Bangladesh phone number format',
-                  ],
+                  phone: ['Invalid Bangladesh phone number format'],
                 },
               },
             },
@@ -579,8 +568,7 @@ const docs: Record<string, SwaggerDocSet> = {
             summary: 'Account locked',
             value: {
               status: 'error',
-              message:
-                'Account locked: too many attempts',
+              message: 'Account locked: too many attempts',
               statusCode: 401,
               error: {
                 code: 'ACCOUNT_LOCKED',

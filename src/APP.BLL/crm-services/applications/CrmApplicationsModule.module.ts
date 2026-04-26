@@ -4,6 +4,8 @@ import { CrmApplicationAccessService } from './helpers/CrmApplicationAccessServi
 import { CrmApplicationCreationService } from './CrmApplicationCreationService';
 import { CrmApplicationQueryService } from './CrmApplicationQueryService';
 import { CrmApplicationDocumentService } from './CrmApplicationDocumentService';
+import { CrmApplicationDocumentReviewService } from './CrmApplicationDocumentReviewService';
+import { CrmApplicationDocumentReviewPolicy } from './helpers/CrmApplicationDocumentReviewPolicy';
 
 @Module({
   imports: [ApplicationsModule],
@@ -12,11 +14,14 @@ import { CrmApplicationDocumentService } from './CrmApplicationDocumentService';
     CrmApplicationCreationService,
     CrmApplicationQueryService,
     CrmApplicationDocumentService,
+    CrmApplicationDocumentReviewPolicy,
+    CrmApplicationDocumentReviewService,
   ],
   exports: [
     CrmApplicationCreationService,
     CrmApplicationQueryService,
     CrmApplicationDocumentService,
+    CrmApplicationDocumentReviewService,
   ],
 })
 export class CrmApplicationsModule {}

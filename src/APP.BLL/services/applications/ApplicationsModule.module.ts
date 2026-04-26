@@ -43,6 +43,7 @@ import { ApplicationDocumentStorageKeyBuilder } from './helpers/ApplicationDocum
     ApplicationCreationService,
     ApplicationQueryService,
     ApplicationDocumentService,
+    ApplicationActivityService,
   ],
 })
 export class ApplicationsModule {}

@@ -3,6 +3,8 @@ import { EntityManager } from 'typeorm';
 import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
 import { ApplicationActivityType } from '@shared/enums/ApplicationActivityType.enum';
 import { ApplicationActivityEntityType } from '@shared/enums/ApplicationActivityEntityType.enum';
+import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
+import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 import { UploadStatus } from '@shared/enums/UploadStatus.enum';
 
 export interface CreateApplicationActivityInput {
@@ -37,6 +39,27 @@ export interface LogDocumentUploadedInput {
   documentVersionId: string;
   documentScope: 'APPLICATION' | 'LEAD';
   fileName?: string | null;
+  remarks?: string;
+}
+
+export interface LogDocumentStatusChangedInput {
+  applicationId: string;
+  actedByUserId?: string;
+  documentRequirementId?: string;
+  documentId: string;
+  documentVersionId: string;
+  documentScope: 'APPLICATION' | 'LEAD';
+  fromStatus: ApplicationDocumentStatus;
+  toStatus: ApplicationDocumentStatus;
+  remarks?: string;
+}
+
+export interface LogRequirementStatusChangedInput {
+  applicationId: string;
+  actedByUserId?: string;
+  documentRequirementId: string;
+  fromStatus: ApplicationRequirementStatus;
+  toStatus: ApplicationRequirementStatus;
   remarks?: string;
 }
 
@@ -109,6 +132,51 @@ export class ApplicationActivityService {
         documentVersionId: input.documentVersionId,
         fileName: input.fileName ?? null,
       },
+    });
+  }
+
+  async logDocumentStatusChanged(
+    manager: EntityManager,
+    input: LogDocumentStatusChangedInput,
+  ): Promise<ApplicationActivities> {
+    return this.log(manager, {
+      applicationId: input.applicationId,
+      activityType: ApplicationActivityType.DocStatusChanged,
+      entityType: ApplicationActivityEntityType.ApplicationDocumentVersion,
+      entityId: input.documentVersionId,
+      actedByUserId: input.actedByUserId,
+      documentRequirementId: input.documentRequirementId,
+      applicationDocumentId:
+        input.documentScope === 'APPLICATION' ? input.documentId : undefined,
+      documentVersionId:
+        input.documentScope === 'APPLICATION'
+          ? input.documentVersionId
+          : undefined,
+      fromValue: input.fromStatus,
+      toValue: input.toStatus,
+      remarks: input.remarks,
+      metaData: {
+        documentScope: input.documentScope,
+        documentId: input.documentId,
+        documentVersionId: input.documentVersionId,
+      },
+    });
+  }
+
+  async logRequirementStatusChanged(
+    manager: EntityManager,
+    input: LogRequirementStatusChangedInput,
+  ): Promise<ApplicationActivities> {
+    return this.log(manager, {
+      applicationId: input.applicationId,
+      activityType: ApplicationActivityType.RequirementStatusChanged,
+      entityType: ApplicationActivityEntityType.ApplicationRequirement,
+      entityId: input.documentRequirementId,
+      actedByUserId: input.actedByUserId,
+      documentRequirementId: input.documentRequirementId,
+      fromValue: input.fromStatus,
+      toValue: input.toStatus,
+      remarks: input.remarks,
     });
   }
 }

@@ -13,6 +13,11 @@ import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
 import { CrmApplicationDocumentService } from '@bll/crm-services/applications/CrmApplicationDocumentService';
+import { CrmApplicationDocumentReviewService } from '@bll/crm-services/applications/CrmApplicationDocumentReviewService';
+import { ChangeCrmApplicationDocumentStatusRequestDto } from '@shared/dtos/applications/ChangeCrmApplicationDocumentStatusRequestDto';
+import { ChangeCrmApplicationDocumentStatusResponseDto } from '@shared/dtos/applications/ChangeCrmApplicationDocumentStatusResponseDto';
+import { ChangeCrmApplicationRequirementStatusRequestDto } from '@shared/dtos/applications/ChangeCrmApplicationRequirementStatusRequestDto';
+import { ChangeCrmApplicationRequirementStatusResponseDto } from '@shared/dtos/applications/ChangeCrmApplicationRequirementStatusResponseDto';
 import { ConfirmApplicationDocumentUploadRequestDto } from '@shared/dtos/applications/ConfirmApplicationDocumentUploadRequestDto';
 import { ConfirmApplicationDocumentUploadResponseDto } from '@shared/dtos/applications/ConfirmApplicationDocumentUploadResponseDto';
 import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentDownloadResponseDto';
@@ -29,6 +34,7 @@ import type { ICurrentUser } from '@shared/interfaces/domain';
 export class CrmApplicationDocumentsController {
   constructor(
     private readonly crmApplicationDocumentService: CrmApplicationDocumentService,
+    private readonly crmApplicationDocumentReviewService: CrmApplicationDocumentReviewService,
   ) {}
 
   @Post('document-types/:documentTypeId/upload-url')
@@ -77,6 +83,40 @@ export class CrmApplicationDocumentsController {
       leadId,
       applicationId,
       documentId,
+    );
+  }
+
+  @Post('documents/:documentId/status-changes')
+  async changeDocumentStatus(
+    @CurrentUser() user: ICurrentUser,
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Body() dto: ChangeCrmApplicationDocumentStatusRequestDto,
+  ): Promise<ChangeCrmApplicationDocumentStatusResponseDto> {
+    return this.crmApplicationDocumentReviewService.changeDocumentStatus(
+      user.userId,
+      leadId,
+      applicationId,
+      documentId,
+      dto,
+    );
+  }
+
+  @Post('document-types/:documentTypeId/status-changes')
+  async changeRequirementStatus(
+    @CurrentUser() user: ICurrentUser,
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('documentTypeId', ParseUUIDPipe) applicationRequirementId: string,
+    @Body() dto: ChangeCrmApplicationRequirementStatusRequestDto,
+  ): Promise<ChangeCrmApplicationRequirementStatusResponseDto> {
+    return this.crmApplicationDocumentReviewService.changeRequirementStatus(
+      user.userId,
+      leadId,
+      applicationId,
+      applicationRequirementId,
+      dto,
     );
   }
 }

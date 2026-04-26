@@ -12,4 +12,6 @@ export enum ApplicationActivityType {
   DocRejected = 'DOC_REJECTED',
   DocReuploaded = 'DOC_REUPLOADED',
   DocVerified = 'DOC_VERIFIED',
+  DocStatusChanged = 'DOC_STATUS_CHANGED',
+  RequirementStatusChanged = 'REQUIREMENT_STATUS_CHANGED',
 }
