@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { EntityManager, Not } from 'typeorm';
+import { EntityManager } from 'typeorm';
 import { Applications } from '@entity/entities/Applications.entity';
 import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
 import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
@@ -254,7 +254,6 @@ export class CrmApplicationDocumentReviewService {
       where: {
         id: documentId,
         applicationId: application.id,
-        overallStatus: Not(ApplicationDocumentStatus.Pending),
       },
     });
 
@@ -304,7 +303,6 @@ export class CrmApplicationDocumentReviewService {
       where: {
         id: documentId,
         leadId: application.leadId,
-        overallStatus: Not(ApplicationDocumentStatus.Pending),
       },
     });
 
@@ -446,7 +444,9 @@ export class CrmApplicationDocumentReviewService {
 
     reviewable.version.verificationStatus = plan.verificationStatus;
     reviewable.version.verifiedByUserId = plan.verifiedByUserId;
-    reviewable.version.verifiedAt = plan.verifiedAt;
+    if (plan.verifiedAt !== undefined) {
+      reviewable.version.verifiedAt = plan.verifiedAt;
+    }
 
     await versionRepo.save(reviewable.version);
     await documentRepo.save(reviewable.document);
@@ -483,6 +483,24 @@ export class CrmApplicationDocumentReviewService {
 
     if (input.toDocumentStatus === ApplicationDocumentStatus.InProgress) {
       requirement.overallStatus = ApplicationRequirementStatus.InProgress;
+      return requirementRepo.save(requirement);
+    }
+
+    if (input.toDocumentStatus === ApplicationDocumentStatus.Verified) {
+      const requiredVerifiedCount = Math.max(1, requirement.minCount ?? 1);
+
+      const verifiedDocumentCount =
+        await this.countVerifiedDocumentsForRequirement(
+          manager,
+          input.application,
+          requirement,
+        );
+
+      requirement.overallStatus =
+        verifiedDocumentCount >= requiredVerifiedCount
+          ? ApplicationRequirementStatus.Verified
+          : ApplicationRequirementStatus.InProgress;
+
       return requirementRepo.save(requirement);
     }
 

@@ -63,6 +63,30 @@ export interface LogRequirementStatusChangedInput {
   remarks?: string;
 }
 
+export interface LogApplicationStatusChangedInput {
+  applicationId: string;
+  actedByUserId?: string;
+  fromStatusId: string;
+  toStatusId: string;
+  fromStatusCode?: string;
+  toStatusCode?: string;
+  remarks?: string;
+}
+
+export interface LogApplicationStageChangedInput {
+  applicationId: string;
+  actedByUserId?: string;
+  fromStageId: string;
+  toStageId: string;
+  fromStageCode?: string;
+  toStageCode?: string;
+  fromStatusId?: string;
+  toStatusId?: string;
+  fromStatusCode?: string;
+  toStatusCode?: string;
+  remarks?: string;
+}
+
 @Injectable()
 export class ApplicationActivityService {
   async log(
@@ -177,6 +201,57 @@ export class ApplicationActivityService {
       fromValue: input.fromStatus,
       toValue: input.toStatus,
       remarks: input.remarks,
+    });
+  }
+
+  async logApplicationStatusChanged(
+    manager: EntityManager,
+    input: LogApplicationStatusChangedInput,
+  ): Promise<ApplicationActivities> {
+    return this.log(manager, {
+      applicationId: input.applicationId,
+      activityType: ApplicationActivityType.StatusChanged,
+      entityType: ApplicationActivityEntityType.Application,
+      entityId: input.applicationId,
+      actedByUserId: input.actedByUserId,
+      statusId: input.toStatusId,
+      fromValue: input.fromStatusCode ?? input.fromStatusId,
+      toValue: input.toStatusCode ?? input.toStatusId,
+      remarks: input.remarks,
+      metaData: {
+        fromStatusId: input.fromStatusId,
+        toStatusId: input.toStatusId,
+        fromStatusCode: input.fromStatusCode,
+        toStatusCode: input.toStatusCode,
+      },
+    });
+  }
+
+  async logApplicationStageChanged(
+    manager: EntityManager,
+    input: LogApplicationStageChangedInput,
+  ): Promise<ApplicationActivities> {
+    return this.log(manager, {
+      applicationId: input.applicationId,
+      activityType: ApplicationActivityType.StageChanged,
+      entityType: ApplicationActivityEntityType.Application,
+      entityId: input.applicationId,
+      actedByUserId: input.actedByUserId,
+      stageId: input.toStageId,
+      statusId: input.toStatusId,
+      fromValue: input.fromStageCode ?? input.fromStageId,
+      toValue: input.toStageCode ?? input.toStageId,
+      remarks: input.remarks,
+      metaData: {
+        fromStageId: input.fromStageId,
+        toStageId: input.toStageId,
+        fromStageCode: input.fromStageCode,
+        toStageCode: input.toStageCode,
+        fromStatusId: input.fromStatusId,
+        toStatusId: input.toStatusId,
+        fromStatusCode: input.fromStatusCode,
+        toStatusCode: input.toStatusCode,
+      },
     });
   }
 }

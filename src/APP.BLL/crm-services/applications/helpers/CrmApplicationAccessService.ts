@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SysLeadProfiles } from '@entity/entities/SysLeadProfiles.entity';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { Role } from '@shared/enums/Role.enum';
-import { ValidationException } from '@shared/exceptions/ValidationException';
 import { SysUsers } from '@entity/entities/SysUsers.entity';
 import { Applications } from '@entity/entities/Applications.entity';
 
@@ -28,12 +31,7 @@ export class CrmApplicationAccessService {
       }
     }
 
-    throw new ValidationException(
-      'You are not authorized to access this lead',
-      {
-        leadId: ['You are not authorized to access this lead'],
-      },
-    );
+    throw new ForbiddenException('You are not authorized to access this lead');
   }
 
   async ensureCrmCanAccessApplicationForLeadOrThrow(

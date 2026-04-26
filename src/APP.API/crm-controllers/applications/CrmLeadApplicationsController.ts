@@ -14,6 +14,11 @@ import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
 import { CrmApplicationCreationService } from '@bll/crm-services/applications/CrmApplicationCreationService';
 import { CrmApplicationQueryService } from '@bll/crm-services/applications/CrmApplicationQueryService';
+import { CrmApplicationWorkflowService } from '@bll/crm-services/applications/CrmApplicationWorkflowService';
+import { ChangeCrmApplicationStageRequestDto } from '@shared/dtos/applications/ChangeCrmApplicationStageRequestDto';
+import { ChangeCrmApplicationStageResponseDto } from '@shared/dtos/applications/ChangeCrmApplicationStageResponseDto';
+import { ChangeCrmApplicationStatusRequestDto } from '@shared/dtos/applications/ChangeCrmApplicationStatusRequestDto';
+import { ChangeCrmApplicationStatusResponseDto } from '@shared/dtos/applications/ChangeCrmApplicationStatusResponseDto';
 import { CreateApplicationRequestDto } from '@shared/dtos/applications/CreateApplicationRequestDto';
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
 import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
@@ -32,6 +37,7 @@ export class CrmLeadApplicationsController {
   constructor(
     private readonly crmApplicationCreation: CrmApplicationCreationService,
     private readonly crmApplicationQuery: CrmApplicationQueryService,
+    private readonly crmApplicationWorkflow: CrmApplicationWorkflowService,
   ) {}
 
   @Post()
@@ -78,6 +84,36 @@ export class CrmLeadApplicationsController {
       user.userId,
       leadId,
       applicationId,
+    );
+  }
+
+  @Post(':applicationId/status-changes')
+  async changeApplicationStatus(
+    @CurrentUser() user: ICurrentUser,
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Body() dto: ChangeCrmApplicationStatusRequestDto,
+  ): Promise<ChangeCrmApplicationStatusResponseDto> {
+    return this.crmApplicationWorkflow.changeApplicationStatus(
+      user.userId,
+      leadId,
+      applicationId,
+      dto,
+    );
+  }
+
+  @Post(':applicationId/stage-changes')
+  async changeApplicationStage(
+    @CurrentUser() user: ICurrentUser,
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Body() dto: ChangeCrmApplicationStageRequestDto,
+  ): Promise<ChangeCrmApplicationStageResponseDto> {
+    return this.crmApplicationWorkflow.changeApplicationStage(
+      user.userId,
+      leadId,
+      applicationId,
+      dto,
     );
   }
 
