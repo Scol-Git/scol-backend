@@ -48,6 +48,8 @@ import { EntityManager } from 'typeorm';
 import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
 import { UserContextAccessor } from '@shared/context/UserContextAccessor';
 import { randomUUID } from 'crypto';
+import { SysRoles } from '@entity/entities/SysRoles.entity';
+import { Role } from '@shared/enums/Role.enum';
 
 /**
  * Auth Service
@@ -154,8 +156,7 @@ export class AuthService {
     return {
       otpAccessToken: otpToken,
       expiresIn: this.securityConfig.otp.ttlSeconds,
-      message:
-        'Registration successful. Verify phone',
+      message: 'Registration successful. Verify phone',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       //...(this.isDevelopment && { devOtp: plainOtp }),
       devOtp: plainOtp,
@@ -380,6 +381,7 @@ export class AuthService {
         async (manager: EntityManager) => {
           const userRepo = manager.getRepository(SysUsers);
           const profileRepo = manager.getRepository(SysLeadProfiles);
+          const roleRepo = manager.getRepository(SysRoles);
           //session?id
           // Race condition guard: Re-check phone uniqueness
           const existingUser = await userRepo.findOne({
@@ -390,6 +392,18 @@ export class AuthService {
             throw new PhoneAlreadyExistsException(otpUserPayload.phone);
           }
 
+          //fetch Lead role
+          const leadRole = await roleRepo.findOne({
+            where: { name: Role.LEAD },
+          });
+
+          if (!leadRole) {
+            throw new BusinessException(
+              'Lead role not found',
+              'LEAD_ROLE_NOT_FOUND',
+            );
+          }
+
           // Create new user
           const newUser = userRepo.create({
             phone: otpUserPayload.phone,
@@ -398,6 +412,7 @@ export class AuthService {
             userType: UserType.Lead,
             isPhoneVerified: true,
             failedLoginAttempts: 0,
+            roles: [leadRole],
           });
 
           const savedUser = await userRepo.save(newUser);
@@ -479,9 +494,7 @@ export class AuthService {
       otpUserPayload.purpose !== 'phone_verify' &&
       otpUserPayload.purpose !== 'password_reset'
     ) {
-      throw new InvalidTokenException(
-        'Resend OTP not allowed',
-      );
+      throw new InvalidTokenException('Resend OTP not allowed');
     }
 
     // 2. Resolve OTP purpose + session identifier
@@ -524,10 +537,7 @@ export class AuthService {
         purposeId,
       );
 
-      throw new BusinessException(
-        'OTP session has expired',
-        'OTP_EXPIRED',
-      );
+      throw new BusinessException('OTP session has expired', 'OTP_EXPIRED');
     }
 
     // 5. Generate new OTP
@@ -733,7 +743,9 @@ export class AuthService {
     });
 
     const academicFormStatus =
-      await this.leadProfileService.determinedAcademicFormStatus(session.SysUser.id);
+      await this.leadProfileService.determinedAcademicFormStatus(
+        session.SysUser.id,
+      );
     return {
       user: {
         userId: session.SysUser.id,
@@ -834,9 +846,7 @@ export class AuthService {
       });
 
       // Return 401 with generic message to prevent user enumeration
-      throw new UnauthorizedException(
-        'OTP sent if account exists',
-      );
+      throw new UnauthorizedException('OTP sent if account exists');
     }
 
     // Check if account is locked or suspended
@@ -907,8 +917,7 @@ export class AuthService {
     return {
       otpAccessToken: otpToken,
       expiresIn: 300,
-      message:
-        'OTP sent if account exists',
+      message: 'OTP sent if account exists',
       retryAfter: this.securityConfig.otp.resendCooldownSeconds,
       // ...(this.isDevelopment && { devOtp: plainOtp }),
       devOtp: plainOtp,

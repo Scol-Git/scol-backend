@@ -12,6 +12,7 @@ import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { UniCourses } from './UniCourses.entity';
 import { CourseIntakeScholarships } from './CourseIntakeScholarships.entity';
+import { Applications } from './Applications.entity';
 
 /**
  * @class UniCourseIntakes
@@ -186,4 +187,10 @@ feesMetaData?: MetaDataItem[];
     { cascade: true },
   )
   CourseIntakeScholarship!: CourseIntakeScholarships[];
+
+  /**
+   * One-to-Many: Applications targeting this intake
+   */
+  @OneToMany(() => Applications, (app) => app.UniCourseIntake)
+  Applications!: Applications[];
 }

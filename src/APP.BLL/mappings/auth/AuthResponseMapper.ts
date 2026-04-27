@@ -33,6 +33,10 @@ export class AuthResponseMapper {
     authResponse.user = {
       userId: user.id,
       academicFormStatus,
+      fullName: profile?.fullName ?? null,
+      joinedAt: profile?.createdAt
+        ? new Date(profile.createdAt).getFullYear()
+        : null,
     };
     authResponse.accessToken = tokens.accessToken;
     authResponse.refreshToken = tokens.refreshToken;

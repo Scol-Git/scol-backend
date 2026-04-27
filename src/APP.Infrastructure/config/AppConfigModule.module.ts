@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppEnvSchema } from './AppEnvSchema.schema';
+import storageConfig from './storage.config';
 import { InfrastructureConfig } from './layer-configs/InfrastructureConfig.service';
 import { ApplicationConfig } from './layer-configs/ApplicationConfig.service';
 import { SecurityConfig } from './layer-configs/SecurityConfig.service';
@@ -32,6 +33,7 @@ import {
       cache: true,
       validationSchema: AppEnvSchema,
       envFilePath: ['.env.local', '.env'],
+      load: [storageConfig],
     }),
   ],
   providers: [

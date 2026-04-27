@@ -3,6 +3,7 @@ import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
 import { SysStates } from './SysStates.entity';
+import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
 
 /**
  * @class SysCountries
@@ -23,6 +24,15 @@ export class SysCountries extends BaseEntity {
   @AutoMap()
   countryName!: string;
 
+  @Column({
+    name: 'countryCode',
+    type: 'varchar',
+    length: 10, // you can adjust (e.g., 2 or 3 if ISO codes)
+    nullable: true,
+  })
+  @AutoMap()
+  countryCode?: string;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================
@@ -40,4 +50,7 @@ export class SysCountries extends BaseEntity {
    */
   @OneToMany(() => SysStates, (state) => state.SysCountry)
   SysState!: SysStates[];
+
+  @OneToMany(() => SysStageRequiredDocuments, (row) => row.SysCountry)
+  SysStageRequiredDocuments!: SysStageRequiredDocuments[];
 }

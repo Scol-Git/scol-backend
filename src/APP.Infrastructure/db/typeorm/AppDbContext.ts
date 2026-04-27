@@ -40,6 +40,19 @@ import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
 import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
+import { SysDocumentTypes } from '@entity/entities/SysDocumentTypes.entity';
+import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
+import { SysApplicationStatus } from '@entity/entities/SysApplicationStatus.entity';
+import { SysApplicationStage2Status } from '@entity/entities/SysApplicationStage2Status.entity';
+import { Applications } from '@entity/entities/Applications.entity';
+import { CourseRequiredDocuments } from '@entity/entities/CourseRequiredDocuments.entity';
+import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
+import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
+import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
+import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocuments.entity';
+import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
+import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
+import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 
 /**
  * AppDbContext - EF Core-style DbContext for TypeORM
@@ -149,6 +162,46 @@ export class AppDbContext {
 
     @InjectRepository(CourseIntakeScholarships)
     public readonly scholarships: Repository<CourseIntakeScholarships>,
+
+    // Document / application entities
+    @InjectRepository(SysDocumentTypes)
+    public readonly documentTypes: Repository<SysDocumentTypes>,
+
+    @InjectRepository(SysApplicationStage)
+    public readonly applicationStages: Repository<SysApplicationStage>,
+
+    @InjectRepository(SysApplicationStatus)
+    public readonly applicationStatuses: Repository<SysApplicationStatus>,
+
+    @InjectRepository(SysApplicationStage2Status)
+    public readonly applicationStageToStatuses: Repository<SysApplicationStage2Status>,
+
+    @InjectRepository(Applications)
+    public readonly applications: Repository<Applications>,
+
+    @InjectRepository(CourseRequiredDocuments)
+    public readonly courseRequiredDocuments: Repository<CourseRequiredDocuments>,
+
+    @InjectRepository(ApplicationRequiredDocuments)
+    public readonly applicationRequiredDocuments: Repository<ApplicationRequiredDocuments>,
+
+    @InjectRepository(ApplicationDocuments)
+    public readonly applicationDocuments: Repository<ApplicationDocuments>,
+
+    @InjectRepository(ApplicationDocumentVersions)
+    public readonly applicationDocumentVersions: Repository<ApplicationDocumentVersions>,
+
+    @InjectRepository(SysStageRequiredDocuments)
+    public readonly sysStageRequiredDocuments: Repository<SysStageRequiredDocuments>,
+
+    @InjectRepository(ApplicationActivities)
+    public readonly applicationActivities: Repository<ApplicationActivities>,
+
+    @InjectRepository(LeadDocuments)
+    public readonly leadDocuments: Repository<LeadDocuments>,
+
+    @InjectRepository(LeadDocumentVersions)
+    public readonly leadDocumentVersions: Repository<LeadDocumentVersions>,
   ) {}
 
   /**

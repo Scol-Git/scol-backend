@@ -12,6 +12,8 @@ import { HomeModule } from './feature-controllers/home/HomeModule.module';
 import { SearchModule } from './feature-controllers/search/SearchModule.module';
 import { CategoriesModule } from './feature-controllers/categories/CategoriesModule.module';
 import { CoursesModule } from './feature-controllers/courses/CoursesModule.module';
+import { ApplicationsModule } from './feature-controllers/applications/ApplicationsModule.module';
+import { CrmControllersModule } from './crm-controllers/CrmControllersModule.module';
 
 // Standalone controllers
 import { HealthController } from './feature-controllers/health/HealthController.controller';
@@ -42,15 +44,14 @@ import { HealthCheckModule } from '@bll/services/health/HealthCheckModule.module
     SearchModule, // Search endpoints
     CategoriesModule, // Category endpoints (cities, etc.)
     CoursesModule, // GET /courses/:id (course details by intake id)
+    ApplicationsModule, // POST /applications
+    CrmControllersModule,
 
     // BLL modules for standalone controllers
     AuthBllModule, // For InternalCronController
     HealthCheckModule, // For HealthController
   ],
-  controllers: [
-    HealthController,
-    InternalCronController,
-  ],
+  controllers: [HealthController, InternalCronController],
   providers: [HttpExceptionFilter, RequestLoggingMiddleware],
 })
 export class ApiModule implements NestModule {

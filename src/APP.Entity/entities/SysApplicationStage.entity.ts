@@ -1,0 +1,86 @@
+import {
+  Entity,
+  Column,
+  OneToMany,
+  Index,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { AutoMap } from '@automapper/classes';
+import { BaseEntity } from './BaseEntity.template';
+import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.entity';
+import { Applications } from './Applications.entity';
+import { SysApplicationStage2Status } from './SysApplicationStage2Status.entity';
+import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
+import { ApplicationActivities } from './ApplicationActivities.entity';
+
+/**
+ * Lookup: application workflow stage (e.g. draft, submitted).
+ */
+@Index('UQ_sys_ApplicationStage_stageCode', ['stageCode'], { unique: true })
+@Entity('sys_ApplicationStage')
+export class SysApplicationStage extends BaseEntity {
+  @Column({
+    name: 'stageCode',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  @AutoMap()
+  stageCode!: string;
+
+  @Column({
+    name: 'stageName',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  @AutoMap()
+  stageName?: string;
+
+  @Column({
+    name: 'stageOrder',
+    type: 'int',
+    nullable: true,
+  })
+  @AutoMap()
+  stageOrder?: number;
+
+  @Column({
+    name: 'isTerminal',
+    type: 'boolean',
+    nullable: true,
+  })
+  @AutoMap()
+  isTerminal?: boolean;
+
+  @Column({
+    name: 'stageInformation',
+    type: 'varchar',
+    length: 2000,
+    nullable: true,
+  })
+  @AutoMap()
+  stageInformation?: string;
+
+  // ========================================
+  // Navigation Properties (EF Core style)
+  // ========================================
+  @OneToMany(
+    () => ApplicationRequiredDocuments,
+    (req) => req.SysApplicationStage,
+  )
+  ApplicationRequiredDocuments!: ApplicationRequiredDocuments[];
+
+  @OneToMany(() => Applications, (app) => app.CurrentSysApplicationStage)
+  CurrentApplications!: Applications[];
+
+  @OneToMany(() => SysApplicationStage2Status, (row) => row.SysApplicationStage)
+  ApplicationStageToStatuses!: SysApplicationStage2Status[];
+
+  @OneToMany(() => SysStageRequiredDocuments, (row) => row.SysApplicationStage)
+  SysStageRequiredDocuments!: SysStageRequiredDocuments[];
+
+  @OneToMany(() => ApplicationActivities, (a) => a.SysApplicationStage)
+  ApplicationActivities!: ApplicationActivities[];
+}
