@@ -71,32 +71,44 @@ export class SearchCacheKeyBuilder {
    * Converts Maps/Sets to sorted arrays for deterministic cache key hashing.
    */
   static fromSearchContext(context: SearchContext): CacheRelevantUserContext {
-    const base = {
-      userState: context.userState,
-      academicFormStatus: context.academicFormStatus,
-      rankingMode: context.rankingMode,
-    };
-    const profile = context.normalizedProfile;
-    if (!profile) {
-      return base;
+    if (
+      context.rankingMode === RankingMode.BUSINESS_ONLY ||
+      !context.normalizedProfile?.leadId
+    ) {
+      return {
+        scope: 'GLOBAL',
+        rankingMode: RankingMode.BUSINESS_ONLY,
+      };
     }
-    const academicResults = Array.from(profile.academicResultsByDegreeId.entries())
+
+    const profile = context.normalizedProfile;
+    const academicResults = Array.from(
+      profile.academicResultsByDegreeId.entries(),
+    )
       .map(([degreeId, r]) => ({ degreeId, gpa: r.gpa }))
       .sort((a, b) => a.degreeId.localeCompare(b.degreeId));
     const englishResults = Array.from(profile.englishResultsByTestId.entries())
       .map(([testId, r]) => ({
         testId,
         overallScore: r.overallScore,
-        sectionScores: r.sectionScores.map((s) => ({
-          sectionId: s.sectionId,
-          score: s.score,
-        })),
+        sectionScores: r.sectionScores
+          .map((s) => ({
+            sectionId: s.sectionId,
+            score: s.score,
+          }))
+          .sort((a, b) => a.sectionId.localeCompare(b.sectionId)),
       }))
       .sort((a, b) => a.testId.localeCompare(b.testId));
     const preferredCountryIds = Array.from(profile.preferredCountryIds).sort();
-    const preferredProgrammeIds = Array.from(profile.preferredProgrammeIds).sort();
+    const preferredProgrammeIds = Array.from(
+      profile.preferredProgrammeIds,
+    ).sort();
+
     return {
-      ...base,
+      scope: 'USER',
+      rankingMode: context.rankingMode,
+      userState: context.userState,
+      academicFormStatus: context.academicFormStatus,
       leadId: profile.leadId,
       academicResults,
       englishResults,
@@ -184,7 +196,7 @@ export class SearchCacheKeyBuilder {
    * @returns Cache key string
    */
   static forFilterOptions(
-    filterType: 'countries' | 'cities' | 'programmes',
+    filterType: 'countries' | 'cities' | 'programmes' | 'advanced',
   ): string {
     return `${this.PREFIX}:${this.DOMAINS.FILTERS}:${filterType}`;
   }
@@ -220,27 +232,22 @@ export class SearchCacheKeyBuilder {
 
 /**
  * Serializable user context for cache key.
- * Includes everything that affects search results (ranking/eligibility).
- * Anonymous: userState, academicFormStatus, rankingMode only.
- * Logged-in with profile: plus leadId and profile data (sorted arrays for deterministic hash).
+ * GLOBAL: shared BUSINESS_ONLY cache (anonymous + incomplete-profile users).
+ * USER: personalized ranking/eligibility; includes profile signature.
  */
 export interface CacheRelevantUserContext {
-  userState: UserState;
-  academicFormStatus: AcademicFormStatus;
+  scope: 'GLOBAL' | 'USER';
   rankingMode: RankingMode;
-  /** Set when user has a profile (logged-in, form complete or partial) */
+  userState?: UserState;
+  academicFormStatus?: AcademicFormStatus;
   leadId?: string | null;
-  /** Academic results sorted by degreeId for deterministic hash */
   academicResults?: Array<{ degreeId: string; gpa: number }>;
-  /** English results sorted by testId for deterministic hash */
   englishResults?: Array<{
     testId: string;
     overallScore: number;
     sectionScores: Array<{ sectionId: string; score: number }>;
   }>;
-  /** Sorted for deterministic hash */
   preferredCountryIds?: string[];
-  /** Sorted for deterministic hash */
   preferredProgrammeIds?: string[];
 }
 
@@ -248,7 +255,7 @@ export interface CacheRelevantUserContext {
  * Parameters for building search results cache key
  */
 export interface SearchResultsKeyParams {
-  /** Full user context so cached results are per-user and invalidate when profile/form changes */
+  /** GLOBAL for BUSINESS_ONLY shared cache; USER for personalized profile signature */
   userContext: CacheRelevantUserContext;
   /** Search text (optional) */
   searchText?: string;

@@ -2,11 +2,7 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { EntityManager, In, Repository } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ILogger } from '@shared/interfaces/logging';
-import type { ICacheService } from '@shared/interfaces/infrastructure';
-import {
-  ILogger as ILoggerToken,
-  ICacheService as ICacheToken,
-} from '@shared/tokens/injection.tokens';
+import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import { AcademicFormValidator } from './AcademicFormValidator';
 import { AcademicFormMapper } from './AcademicFormMapper';
 import { AcademicFormRequestDto } from '@shared/dtos/leads/AcademicFormRequestDto';
@@ -19,7 +15,7 @@ import { LeadPreferredCountries } from '@entity/entities/LeadPreferredCountries.
 import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.entity';
 import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
 import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
-import { SearchCacheKeyBuilder } from '../search/shared/cache/SearchCacheKeyBuilder';
+import { SearchCacheInvalidationService } from '../search/shared/cache/SearchCacheInvalidationService';
 
 const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
 
@@ -43,8 +39,8 @@ export class LeadProfileService {
     private readonly db: AppDbContext,
     private readonly validator: AcademicFormValidator,
     private readonly mapper: AcademicFormMapper,
+    private readonly searchCacheInvalidation: SearchCacheInvalidationService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
-    @Inject(ICacheToken) private readonly cache: ICacheService,
   ) {}
 
   /**
@@ -122,23 +118,15 @@ export class LeadProfileService {
       await this.saveAcademicFormInTransaction(manager, leadProfile.id, dto);
     });
 
-    // Invalidate caches (profile data changed affects search results)
-    const userContextKey = SearchCacheKeyBuilder.forUserContext(userId);
-    const searchResultsPrefix = SearchCacheKeyBuilder.getSearchResultsPrefix();
-
-    await Promise.all([
-      this.cache.remove(userContextKey),
-      this.cache.clearByPrefix(searchResultsPrefix),
-    ]);
+    await this.searchCacheInvalidation.invalidateAfterAcademicFormChanged(
+      userId,
+    );
 
     this.logger.info('Academic form updated successfully', {
       context: 'LeadProfileService.updateAcademicForm',
       userId,
       leadId: leadProfile.id,
-      cacheInvalidated: {
-        userContext: userContextKey,
-        searchResults: `${searchResultsPrefix}*`,
-      },
+      cacheInvalidated: true,
     });
 
     // Return the updated form data (same response as GET)
