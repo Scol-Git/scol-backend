@@ -119,7 +119,7 @@ export class LeadProfileMapper {
               ? [
                   {
                     // use the CURRENT version id if you have it
-                    documentId: doc.currentLeadDocumentVersionId ?? doc.id,
+                    documentId: doc.id,
                     fileName: doc.latestFileName,
                     overallStatus: doc.overallStatus,
                   },
