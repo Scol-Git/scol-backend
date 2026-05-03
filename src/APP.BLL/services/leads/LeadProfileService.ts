@@ -20,6 +20,9 @@ import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.en
 import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
 import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { SearchCacheKeyBuilder } from '../search/shared/cache/SearchCacheKeyBuilder';
+import { LeadProfileMapper } from './LeadProfileMapper';
+import { LeadProfileResponseDto } from '@shared/dtos/leads/LeadProfileResponseDto';
+import { ValidationException } from '@shared/exceptions/ValidationException';
 
 const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
 
@@ -608,5 +611,30 @@ export class LeadProfileService {
     if (filledCount === 0) return AcademicFormStatus.INCOMPLETE;
     if (filledCount === fields.length) return AcademicFormStatus.COMPLETED;
     return AcademicFormStatus.PARTIALLY_COMPLETED;
+  }
+
+  // TODO : Sajed  work
+  async getLeadProfile(userId: string): Promise<LeadProfileResponseDto> {
+    const profile = await this.db.leadProfiles.findOne({
+      where: { userId },
+      relations: {
+        SysUser: true,
+        LeadAcademicResult: { SysAcademicDegree: true },
+        LeadEnglishTestResult: {
+          SysEnglishTest: { SysEnglishTestSection: true },
+          LeadEnglishTestSectionResult: true,
+        },
+        LeadDocuments: {
+          SysDocumentType: true, // 🔥 REQUIRED
+        },
+      },
+    });
+
+    //TODO use ValidationException
+    if (!profile) {
+      throw new ValidationException('Lead profile not found');
+    }
+
+    return LeadProfileMapper.toResponse(profile);
   }
 }
