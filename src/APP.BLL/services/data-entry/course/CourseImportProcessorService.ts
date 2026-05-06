@@ -9,7 +9,7 @@ import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
-import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
+import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarships.entity';
 import type { CourseImportConfig } from './CourseImportConfig';
 import {

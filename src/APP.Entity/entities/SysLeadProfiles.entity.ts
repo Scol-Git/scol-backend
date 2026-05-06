@@ -5,6 +5,7 @@ import {
   JoinColumn,
   OneToMany,
   Index,
+  ManyToOne,
 } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
@@ -14,12 +15,15 @@ import { LeadTestResults } from './LeadTestResults.entity';
 import { LeadEnglishTestResults } from './LeadEnglishTestResults.entity';
 import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
 import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
+import { Applications } from './Applications.entity';
+import { LeadDocuments } from './LeadDocuments.entity';
 
 /**
  * @class SysLeadProfiles
  * @extends {BaseEntity}
  */
 @Index('IX_SysLeadProfiles_user', ['userId'], { unique: true })
+@Index('IX_SysLeadProfiles_assignedToUserId', ['assignedToUserId'])
 @Entity('sys_LeadProfiles')
 export class SysLeadProfiles extends BaseEntity {
   @Column({
@@ -83,6 +87,19 @@ export class SysLeadProfiles extends BaseEntity {
   @AutoMap()
   imgUrl?: string;
 
+  /**
+   * CRM user assigned to this lead.
+   *
+   * Usually ADMIN / COUNSELLOR.
+   */
+  @Column({
+    name: 'assignedToUserId',
+    type: 'uuid',
+    nullable: true,
+  })
+  @AutoMap()
+  assignedToUserId?: string | null;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================
@@ -108,7 +125,9 @@ export class SysLeadProfiles extends BaseEntity {
    * One-to-Many: English test results (legacy)
    * A lead can have multiple test results (IELTS, TOEFL, etc.)
    */
-  @OneToMany(() => LeadTestResults, (result) => result.SysLeadProfile, { cascade: true })
+  @OneToMany(() => LeadTestResults, (result) => result.SysLeadProfile, {
+    cascade: true,
+  })
   LeadTestResult!: LeadTestResults[];
 
   /**
@@ -137,4 +156,26 @@ export class SysLeadProfiles extends BaseEntity {
     cascade: true,
   })
   LeadPreferredProgram!: LeadPreferredPrograms[];
+
+  /**
+   * One-to-Many: Applications submitted by this lead
+   */
+  @OneToMany(() => Applications, (app) => app.SysLeadProfile)
+  Applications!: Applications[];
+
+  /**
+   * One-to-Many: Lead-scoped documents
+   */
+  @OneToMany(() => LeadDocuments, (doc) => doc.SysLeadProfile)
+  LeadDocuments!: LeadDocuments[];
+
+  /**
+   * Many-to-One: Assigned CRM user
+   * One CRM user can be assigned to many lead profiles.
+   */
+  @ManyToOne(() => SysUsers, (user) => user.AssignedLeadProfiles, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'assignedToUserId' })
+  AssignedToUser?: SysUsers | null;
 }

@@ -13,7 +13,8 @@ import { SysProgrammes } from './SysProgrammes.entity';
 import { SysAcademicDegrees } from './SysAcademicDegrees.entity';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
 import { CourseEngReq } from './CourseEngReq.entity';
-import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
+import { CourseRequiredDocuments } from './CourseRequiredDocuments.entity';
+import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 
 /**
  * @class UniCourses
@@ -142,7 +143,6 @@ export class UniCourses extends BaseEntity {
   @ManyToOne(() => SysAcademicDegrees)
   @JoinColumn({ name: 'sysDegreeId' })
   SysAcademicDegree!: SysAcademicDegrees;
-  
 
   /**
    * Many-to-One: Minimum required degree
@@ -173,4 +173,10 @@ export class UniCourses extends BaseEntity {
    */
   @OneToMany(() => CourseEngReq, (req) => req.UniCourse)
   CourseEngReq!: CourseEngReq[];
+
+  /**
+   * One-to-Many: Default document requirements for this course
+   */
+  @OneToMany(() => CourseRequiredDocuments, (req) => req.UniCourse)
+  CourseRequiredDocuments!: CourseRequiredDocuments[];
 }

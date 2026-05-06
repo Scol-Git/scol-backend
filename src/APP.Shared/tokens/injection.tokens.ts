@@ -122,6 +122,12 @@ export const IPasswordHasher = Symbol('IPasswordHasher');
  */
 export const ISmsService = Symbol('ISmsService');
 
+/**
+ * Token for IStorageService
+ * Provides object storage abstraction (Backblaze B2 implementation)
+ */
+export const IStorageService = Symbol('IStorageService');
+
 // ============================================================================
 // Configuration Tokens
 // ============================================================================

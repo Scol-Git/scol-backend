@@ -1,4 +1,4 @@
-import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
+import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 import type { CsvRow } from '../../common/abstractions/CsvImportProcessor';
 
 /** One item in rankingMetaData: subtitle optional, description array of strings. */

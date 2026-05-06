@@ -18,4 +18,16 @@ export class AuthResponseUserDto {
     enum: AcademicFormStatus,
   })
   academicFormStatus!: AcademicFormStatus;
+
+  @ApiProperty({
+    description: 'User full name',
+    example: 'John Doe',
+  })
+  fullName?: string | null;
+
+  @ApiProperty({
+    description: 'User joined year',
+    example: 2023,
+  })
+  joinedAt?: number | null;
 }

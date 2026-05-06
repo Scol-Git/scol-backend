@@ -39,6 +39,19 @@ import { CourseIntakeScholarships } from '@entity/entities/CourseIntakeScholarsh
 import { UniAcademicReq } from '@entity/entities/UniAcademicReq.entity';
 import { UniEngReq } from '@entity/entities/UniEngReq.entity';
 import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
+import { SysDocumentTypes } from '@entity/entities/SysDocumentTypes.entity';
+import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
+import { SysApplicationStatus } from '@entity/entities/SysApplicationStatus.entity';
+import { SysApplicationStage2Status } from '@entity/entities/SysApplicationStage2Status.entity';
+import { Applications } from '@entity/entities/Applications.entity';
+import { CourseRequiredDocuments } from '@entity/entities/CourseRequiredDocuments.entity';
+import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
+import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
+import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
+import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocuments.entity';
+import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
+import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
+import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -85,6 +98,19 @@ import { AppDbContext } from './AppDbContext';
             UniAcademicReq,
             UniEngReq,
             CourseEngReq,
+            SysDocumentTypes,
+            SysApplicationStage,
+            SysApplicationStatus,
+            SysApplicationStage2Status,
+            Applications,
+            CourseRequiredDocuments,
+            ApplicationRequiredDocuments,
+            ApplicationDocuments,
+            ApplicationDocumentVersions,
+            SysStageRequiredDocuments,
+            ApplicationActivities,
+            LeadDocuments,
+            LeadDocumentVersions,
           ],
           synchronize: false,
           logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
@@ -129,6 +155,19 @@ import { AppDbContext } from './AppDbContext';
       UniAcademicReq,
       UniEngReq,
       CourseEngReq,
+      SysDocumentTypes,
+      SysApplicationStage,
+      SysApplicationStatus,
+      SysApplicationStage2Status,
+      Applications,
+      CourseRequiredDocuments,
+      ApplicationRequiredDocuments,
+      ApplicationDocuments,
+      ApplicationDocumentVersions,
+      SysStageRequiredDocuments,
+      ApplicationActivities,
+      LeadDocuments,
+      LeadDocumentVersions,
     ]),
   ],
   providers: [AppDbContext],

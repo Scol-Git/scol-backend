@@ -71,4 +71,11 @@ export const AppEnvSchema = Joi.object({
   // Exempt users and roles (comma-separated, optional)
   RATE_LIMIT_EXEMPT_USERS: Joi.string().allow('').optional(),
   RATE_LIMIT_EXEMPT_ROLES: Joi.string().allow('').optional(),
+
+  // Backblaze B2 (optional; required when using Document upload)
+  B2_KEY_ID: Joi.string().optional(),
+  B2_APPLICATION_KEY: Joi.string().optional(),
+  B2_BUCKET_NAME: Joi.string().optional(),
+  B2_ENDPOINT: Joi.string().uri().optional(),
+  B2_REGION: Joi.string().optional(),
 });

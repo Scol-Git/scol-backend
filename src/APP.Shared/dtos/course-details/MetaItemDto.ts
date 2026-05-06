@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { MetaDataItem } from './MetaDataItem.type';
+import { MetaDataItem } from '../../types/MetaDataItem.type';
 
 // subtitle is now @ApiProperty (required), not @ApiPropertyOptional
 export class MetaInformationItemDto implements MetaDataItem {

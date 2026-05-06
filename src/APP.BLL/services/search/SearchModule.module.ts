@@ -8,10 +8,7 @@ import { CourseSearchService } from './CourseSearchService';
 
 // Shared services
 import { UserSearchContextResolver } from './shared/UserSearchContextResolver';
-import { CourseQueryBuilder } from './shared/CourseQueryBuilder';
-import { CourseEligibilityClassifier } from './shared/CourseEligibilityClassifier';
 import { CourseCursorPaginationService } from './shared/CourseCursorPaginationService';
-import { SearchFilterService } from './shared/SearchFilterService';
 import { CourseResponseMapper } from '../../mappings/search/CourseResponseMapper';
 
 // Pipeline executor (3-phase optimized search)
@@ -46,10 +43,7 @@ import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor
 
     // Shared services (internal)
     UserSearchContextResolver,
-    CourseQueryBuilder,
-    CourseEligibilityClassifier,
     CourseCursorPaginationService,
-    SearchFilterService,
     CourseResponseMapper,
   ],
   exports: [HomeSearchService, CourseSearchService],

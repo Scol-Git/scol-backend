@@ -11,7 +11,7 @@ import type {
 } from '../dto/UniversityCsvRow';
 import type { LocationMaps } from './LocationMaps';
 import { stateKey, cityKey, universityKey } from './ImportKeys';
-import { MetaDataItem } from '@shared/dtos/course-details/MetaDataItem.type';
+import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 const LOG_CONTEXT = '[BulkImport:University:UniversityResolver]';
 
 /**

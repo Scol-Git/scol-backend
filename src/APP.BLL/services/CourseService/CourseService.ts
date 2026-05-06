@@ -20,7 +20,7 @@ const COURSE_DETAILS_RELATIONS = {
     minSysAcademicDegree: true,
     higherSysAcademicDegree: true,
   },
-  CourseIntakeScholarship: true,
+ 
 };
 
 @Injectable()
