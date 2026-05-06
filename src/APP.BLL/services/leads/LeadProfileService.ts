@@ -613,7 +613,6 @@ export class LeadProfileService {
     return AcademicFormStatus.PARTIALLY_COMPLETED;
   }
 
-  // TODO : Sajed  work
   async getLeadProfile(userId: string): Promise<LeadProfileResponseDto> {
     const profile = await this.db.leadProfiles.findOne({
       where: { userId },
@@ -621,11 +620,10 @@ export class LeadProfileService {
         SysUser: true,
         LeadAcademicResult: { SysAcademicDegree: true },
         LeadEnglishTestResult: {
-          SysEnglishTest: { SysEnglishTestSection: true },
-          LeadEnglishTestSectionResult: true,
+          SysEnglishTest: true ,
         },
         LeadDocuments: {
-          SysDocumentType: true, // 🔥 REQUIRED
+          SysDocumentType: true,
         },
       },
     });

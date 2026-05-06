@@ -1,5 +1,3 @@
-// TODO Sajed Work
-
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class FieldDto {
@@ -13,7 +11,6 @@ export class FieldDto {
   value!: any;
 }
 
-//!  make another dto for the personal information section to include the dynamic extra fields like img_url and joined, or make the SectionDto more flexible to accommodate such fields without breaking the structure.
 export class SectionDto {
   @ApiProperty()
   sectionTitle!: string;
@@ -23,16 +20,62 @@ export class SectionDto {
 
   @ApiPropertyOptional({ type: [FieldDto] })
   fields?: FieldDto[];
+}
 
-  // ✅ add these
+export class PersonalInformationSectionDto extends SectionDto {
+  @ApiPropertyOptional()
   joined?: string;
+
+  @ApiPropertyOptional()
   img_url?: string | null;
-  items?: any[];
+}
+
+/**
+ * Uploaded Document DTO
+ */
+export class UploadedDocumentDto {
+  @ApiProperty()
+  documentId!: string;
+
+  @ApiPropertyOptional()
+  fileName?: string;
+
+  @ApiPropertyOptional()
+  overallStatus?: string;
+}
+
+export class DocumentTypeDto {
+  @ApiProperty()
+  documentTypeId!: string;
+
+  @ApiPropertyOptional()
+  documentTypeCode?: string;
+
+  @ApiPropertyOptional()
+  documentTypeName?: string;
+}
+/**
+ * Academic Record Item (ONE per document type)
+ */
+export class AcademicRecordItemDto {
+  @ApiProperty({ type: DocumentTypeDto })
+  documentType!: DocumentTypeDto;
+
+  @ApiProperty({ type: [UploadedDocumentDto] })
+  uploadedDocuments!: UploadedDocumentDto[];
+}
+
+/**
+ * Academic Record Section
+ */
+export class AcademicRecordSectionDto extends SectionDto {
+  @ApiProperty({ type: [AcademicRecordItemDto] })
+  items!: AcademicRecordItemDto[];
 }
 
 export class LeadProfileResponseDto {
-  @ApiProperty({ type: SectionDto })
-  personalInformation!: SectionDto;
+  @ApiProperty({ type: PersonalInformationSectionDto })
+  personalInformation!: PersonalInformationSectionDto;
 
   @ApiProperty({ type: SectionDto })
   academicBackground!: SectionDto;
@@ -43,6 +86,6 @@ export class LeadProfileResponseDto {
   @ApiProperty({ type: SectionDto })
   contactInformation!: SectionDto;
 
-  @ApiProperty({ type: SectionDto })
-  academicRecord!: SectionDto;
+  @ApiProperty({ type: AcademicRecordSectionDto })
+  academicRecord!: AcademicRecordSectionDto;
 }
