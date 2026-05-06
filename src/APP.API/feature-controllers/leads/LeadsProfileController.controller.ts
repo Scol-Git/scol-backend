@@ -44,6 +44,16 @@ export class LeadsProfileController {
   constructor(private readonly leadProfileService: LeadProfileService) {}
 
   /**
+   * GET: Full Lead Profile (UI profile page)
+   */
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  async getLeadProfile(@CurrentUser() user: ICurrentUser) {
+    return this.leadProfileService.getLeadProfile(user.userId);
+  }
+
+  /**
    * Get academic form data
    * GET /leads/profile/academic-form
    *
