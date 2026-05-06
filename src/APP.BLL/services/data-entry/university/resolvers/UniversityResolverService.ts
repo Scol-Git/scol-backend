@@ -5,13 +5,11 @@ import { CommissionType } from '@shared/enums/CommissionType.enum';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import type {
-  UniversityCsvRow,
+  ValidatedUniversityCsvRow,
   ResolvedUniversityRow,
-  RankingMetaDataItem,
 } from '../dto/UniversityCsvRow';
 import type { LocationMaps } from './LocationMaps';
 import { stateKey, cityKey, universityKey } from './ImportKeys';
-import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 const LOG_CONTEXT = '[BulkImport:University:UniversityResolver]';
 
 /**
@@ -36,7 +34,7 @@ export class UniversityResolverService {
 
   async upsertUniversities(
     manager: EntityManager,
-    rows: UniversityCsvRow[],
+    rows: ValidatedUniversityCsvRow[],
     locationMaps: LocationMaps,
   ): Promise<Map<string, string>> {
     const resolved = this.getUniqueResolvedRows(rows, locationMaps);
@@ -47,7 +45,7 @@ export class UniversityResolverService {
   }
 
   private getUniqueResolvedRows(
-    rows: UniversityCsvRow[],
+    rows: ValidatedUniversityCsvRow[],
     { countryMap, stateMap, cityMap }: LocationMaps,
   ): ResolvedUniversityRow[] {
     const seen = new Set<string>();
@@ -69,10 +67,8 @@ export class UniversityResolverService {
       const key = universityKey(uniName, sysCountryId, sysCityId);
       if (seen.has(key)) continue;
       seen.add(key);
-      const rankingMetaData = JSON.parse(
-        row.rankingMetaData.trim(),
-      ) as RankingMetaDataItem[];
-      const locationMapMetaData = row.locationMapMetaData.trim();
+      const rankingMetaData = row.rankingMetaDataItems;
+      const locationMapMetaData = row.locationMapUrl;
       const establishedYearRaw = row.establishedYear?.trim();
       const establishedYear =
         establishedYearRaw !== undefined && establishedYearRaw !== ''
@@ -141,8 +137,8 @@ export class UniversityResolverService {
         coverImageUrl: row.coverImageUrl || undefined,
         campusLifeLinks:
           campusLifeLinksArr.length > 0 ? campusLifeLinksArr : undefined,
-          rankingMetaData:     row.rankingMetaData as unknown as MetaDataItem[],
-          locationMapMetaData: JSON.stringify(row.locationMapMetaData),
+        rankingMetaData: row.rankingMetaData,
+        locationMapMetaData: row.locationMapMetaData,
         establishedYear: row.establishedYear,
         universityType: row.universityType,
         currRanking: row.currRanking,

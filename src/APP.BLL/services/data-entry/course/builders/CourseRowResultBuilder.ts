@@ -5,6 +5,10 @@ import type {
   CourseReviewedIdFields,
   ErrorCourseRow,
 } from '../dto/CourseImportRowTypes';
+import {
+  formatImportError,
+  ImportErrorCode,
+} from '../../common/abstractions/ImportErrorCode';
 
 /**
  * Builds resolution error and reviewed rows (same role as {@link UniversityRowResultBuilder}).
@@ -27,6 +31,13 @@ export class CourseRowResultBuilder {
     errorReason: string,
   ): ErrorCourseRow {
     return { ...base, errorReason };
+  }
+
+  unexpectedError(base: Record<string, string>, message: string): ErrorCourseRow {
+    return this.resolutionError(
+      base,
+      formatImportError(ImportErrorCode.UNEXPECTED_ERROR, message),
+    );
   }
 
   reviewed(

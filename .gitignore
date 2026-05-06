@@ -81,3 +81,7 @@ BulkImport/
 docs/
 
 # Note: package-lock.json is NOT ignored - it ensures reproducible builds
+
+# Local helper files
+merge-folder_cmd.txt
+merge_folder_to_txt.py

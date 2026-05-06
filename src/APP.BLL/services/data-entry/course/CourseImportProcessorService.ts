@@ -27,11 +27,14 @@ import {
   parseCourseDurationMonths,
   parseOptionalDecimal,
   parseOptionalDate,
-  parseJsonValue,
-  parseRequiredDecimal,
 } from './parsers/courseCsvFieldParsers';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
+import {
+  formatImportError,
+  ImportErrorCode,
+} from '../common/abstractions/ImportErrorCode';
+import { parseMetaDataItems } from '../common/engine/MetaDataParser';
 
 const LOG_CONTEXT = '[BulkImport:Course:Processor]';
 
@@ -67,12 +70,51 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     for (let i = 0; i < valid.length; i += batchSize) {
       const chunk = valid.slice(i, i + batchSize);
       await manager.connection.transaction(async (tm) => {
+        const universityCache = await this.universityResolver.buildCache(
+          tm,
+          chunk.map((row) => row.uniName),
+        );
+        const programmeCache = await this.programmeDegreeResolver.buildProgrammeCache(
+          tm,
+          chunk.map((row) => row.programmeName),
+        );
+        const degreeCache = await this.programmeDegreeResolver.buildDegreeCache(
+          tm,
+          chunk.flatMap((row) => [
+            row.degreeName,
+            row.minDegreeName,
+            row.higherDegreeName ?? '',
+          ]),
+        );
+        const engTestCache = await this.buildEngTestCache(tm);
         for (const row of chunk) {
-          const result = await this.processOneRow(tm, row);
-          if (result.error) {
-            resolutionErrors.push(result.error);
-          } else if (result.reviewed) {
-            reviewedRows.push(result.reviewed);
+          const base = this.resultBuilder.flattenInputRow(row);
+          try {
+            const result = await this.processOneRow(
+              tm,
+              row,
+              universityCache,
+              programmeCache,
+              degreeCache,
+              engTestCache,
+            );
+            if (result.error) {
+              resolutionErrors.push(result.error);
+            } else if (result.reviewed) {
+              reviewedRows.push(result.reviewed);
+            }
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : 'Unhandled row processing error';
+            this.logger.error(
+              `${LOG_CONTEXT} Unexpected row failure for course "${(row.courseName ?? '').trim()}": ${message}`,
+            );
+            resolutionErrors.push(
+              this.resultBuilder.resolutionError(
+                base,
+                formatImportError(ImportErrorCode.UNEXPECTED_ERROR, message),
+              ),
+            );
           }
         }
       });
@@ -99,6 +141,10 @@ export class CourseImportProcessorService implements CsvImportProcessor {
   private async processOneRow(
     tm: EntityManager,
     row: CsvRow,
+    universityCache: Map<string, string[]>,
+    programmeCache: Map<string, string>,
+    degreeCache: Map<string, string>,
+    engTestCache: Map<string, string>,
   ): Promise<{
     reviewed?: Record<string, string>;
     error?: ErrorCourseRow;
@@ -108,6 +154,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     const uniResult = await this.universityResolver.resolveUniversity(
       tm,
       row.uniName,
+      universityCache,
     );
     if ('error' in uniResult) {
       return {
@@ -119,11 +166,13 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     const progResult = await this.programmeDegreeResolver.findOrCreateProgramme(
       tm,
       row.programmeName,
+      programmeCache,
     );
 
     const award = await this.programmeDegreeResolver.findOrCreateDegree(
       tm,
       row.degreeName,
+      degreeCache,
     );
     if ('error' in award) {
       return { error: this.resultBuilder.resolutionError(base, award.error) };
@@ -132,6 +181,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     const minDeg = await this.programmeDegreeResolver.findOrCreateDegree(
       tm,
       row.minDegreeName,
+      degreeCache,
     );
     if ('error' in minDeg) {
       return {
@@ -145,6 +195,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
       const hd = await this.programmeDegreeResolver.findOrCreateDegree(
         tm,
         hName,
+        degreeCache,
       );
       if ('error' in hd) {
         return { error: this.resultBuilder.resolutionError(base, hd.error) };
@@ -152,11 +203,11 @@ export class CourseImportProcessorService implements CsvImportProcessor {
       higherSysDegreeId = hd.id;
     }
 
-    const minGpaNum = parseRequiredDecimal(row.minGpa)!;
-    const minGpaStr = String(minGpaNum);
+    const minGpaStr = row.minGpa.trim();
     let higherGpaStr: string | undefined;
     if (hName) {
-      higherGpaStr = String(parseRequiredDecimal(row.higherGpa)!);
+      const higherRaw = (row.higherGpa ?? '').trim();
+      higherGpaStr = higherRaw || undefined;
     }
 
     const courseRepo = tm.getRepository(UniCourses);
@@ -170,9 +221,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     });
 
     const arRaw = (row.AcademicRequirementsMetaData ?? '').trim();
-    const reqMetaParsed = arRaw
-      ? parseJsonValue(row.AcademicRequirementsMetaData)
-      : null;
+    const reqMetaParsed = arRaw ? parseMetaDataItems(arRaw) : null;
 
     const courseEntity = existingCourse ?? courseRepo.create();
     courseEntity.uniId = uniId;
@@ -195,7 +244,18 @@ export class CourseImportProcessorService implements CsvImportProcessor {
 
     const savedCourse = await courseRepo.save(courseEntity);
 
-    const intake = parseIntakeInfo(row.intakeInfo)!;
+    const intake = parseIntakeInfo(row.intakeInfo);
+    if (!intake) {
+      return {
+        error: this.resultBuilder.resolutionError(
+          base,
+          formatImportError(
+            ImportErrorCode.INVALID_FORMAT,
+            'intakeInfo must be parseable (e.g. Sep-26 or Sep 2026)',
+          ),
+        ),
+      };
+    }
     const intakeRepo = tm.getRepository(UniCourseIntakes);
     const existingIntake = await intakeRepo.findOne({
       where: {
@@ -223,29 +283,35 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     /** Bulk upload does not persist `intakeMetaData` (column ignored; set elsewhere if needed). */
     const fm = (row.feesMetaData ?? '').trim();
     if (fm) {
-      const parsed = parseJsonValue(fm);
+      const parsed = parseMetaDataItems(fm);
       if (Array.isArray(parsed)) {
         intakeEntity.feesMetaData = parsed as MetaDataItem[];
       }
+    } else {
+      intakeEntity.feesMetaData = undefined;
     }
     
     const sm = (row.scholarshipMetaData ?? '').trim();
     if (sm) {
-      const parsed = parseJsonValue(sm);
+      const parsed = parseMetaDataItems(sm);
       if (Array.isArray(parsed)) {
         intakeEntity.scholarshipMetaData = parsed as MetaDataItem[];
       }
+    } else {
+      intakeEntity.scholarshipMetaData = undefined;
     }
     intakeEntity.isActive = true;
 
     const savedIntake = await intakeRepo.save(intakeEntity);
 
-    await tm.getRepository(CourseEngReq).delete({
-      uniCourseId: savedCourse.id,
-    });
-
     const engRepo = tm.getRepository(CourseEngReq);
     const engTestRepo = tm.getRepository(SysEnglishTests);
+    const existingReqs = await engRepo.find({
+      where: { uniCourseId: savedCourse.id },
+    });
+    const existingReqMap = new Map(
+      existingReqs.map((item) => [item.sysEngTestId, item]),
+    );
 
     let sysEngTestIdIelts = '';
     let courseEngReqIdIelts = '';
@@ -253,6 +319,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     let courseEngReqIdToefl = '';
     let sysEngTestIdPte = '';
     let courseEngReqIdPte = '';
+    const touchedEngTestIds = new Set<string>();
 
     const tests: Array<{
       testName: 'IELTS' | 'TOEFL' | 'PTE';
@@ -283,53 +350,88 @@ export class CourseImportProcessorService implements CsvImportProcessor {
 
       const testName = t.testName;
 
-      let testEnt = await engTestRepo
-        .createQueryBuilder('e')
-        .where('LOWER(e.testName) = LOWER(:n)', { n: testName })
-        .getOne();
-
-      if (!testEnt) {
-        testEnt = engTestRepo.create({ testName });
-        await engTestRepo.save(testEnt);
+      const cacheKey = testName.toUpperCase();
+      let testId = engTestCache.get(cacheKey);
+      if (!testId) {
+        const createdTest = await engTestRepo.save(engTestRepo.create({ testName }));
+        testId = createdTest.id;
+        engTestCache.set(cacheKey, testId);
       }
 
-      const req = engRepo.create({
-        uniCourseId: savedCourse.id,
-        sysEngTestId: testEnt.id,
-        minOverallReq: o !== '' ? parseOptionalDecimal(o) : undefined,
-        minSectionReq: s !== '' ? parseOptionalDecimal(s) : undefined,
-      });
+      const existingReq = existingReqMap.get(testId);
+      const req =
+        existingReq ??
+        engRepo.create({
+          uniCourseId: savedCourse.id,
+          sysEngTestId: testId,
+        });
+      req.minOverallReq = o !== '' ? parseOptionalDecimal(o) : undefined;
+      req.minSectionReq = s !== '' ? parseOptionalDecimal(s) : undefined;
       const savedReq = await engRepo.save(req);
+      touchedEngTestIds.add(testId);
 
       if (t.testName === 'IELTS') {
-        sysEngTestIdIelts = testEnt.id;
+        sysEngTestIdIelts = testId;
         courseEngReqIdIelts = savedReq.id;
       } else if (t.testName === 'TOEFL') {
-        sysEngTestIdToefl = testEnt.id;
+        sysEngTestIdToefl = testId;
         courseEngReqIdToefl = savedReq.id;
       } else {
-        sysEngTestIdPte = testEnt.id;
+        sysEngTestIdPte = testId;
         courseEngReqIdPte = savedReq.id;
       }
     }
-
-    await tm.getRepository(CourseIntakeScholarships).delete({
-      courseIntakeId: savedIntake.id,
-    });
+    const untouchedReqs = existingReqs.filter(
+      (item) => !touchedEngTestIds.has(item.sysEngTestId),
+    );
+    for (const req of untouchedReqs) {
+      req.minOverallReq = undefined;
+      req.minSectionReq = undefined;
+    }
+    if (untouchedReqs.length > 0) {
+      await engRepo.save(untouchedReqs);
+    }
 
     let scholarshipId = '';
     const schName = (row.scholarshipName ?? '').trim();
+    const schRepo = tm.getRepository(CourseIntakeScholarships);
     if (schName) {
-      const schRepo = tm.getRepository(CourseIntakeScholarships);
-      const sch = schRepo.create({
-        courseIntakeId: savedIntake.id,
-        name: schName,
-        amount: parseOptionalDecimal(row.scholarshipAmount ?? ''),
-        amountType: (row.scholarshipType ?? '').trim() || undefined,
-        isActive: true,
+      const existingSch = await schRepo.findOne({
+        where: { courseIntakeId: savedIntake.id, name: schName },
       });
+      const sch =
+        existingSch ??
+        schRepo.create({
+          courseIntakeId: savedIntake.id,
+          name: schName,
+        });
+      sch.amount = parseOptionalDecimal(row.scholarshipAmount ?? '');
+      sch.amountType = (row.scholarshipType ?? '').trim() || undefined;
+      sch.isActive = true;
       const savedSch = await schRepo.save(sch);
       scholarshipId = savedSch.id;
+      const otherActive = await schRepo.find({
+        where: { courseIntakeId: savedIntake.id, isActive: true },
+      });
+      const otherToDeactivate = otherActive.filter(
+        (item) => item.id !== savedSch.id,
+      );
+      for (const item of otherToDeactivate) {
+        item.isActive = false;
+      }
+      if (otherToDeactivate.length > 0) {
+        await schRepo.save(otherToDeactivate);
+      }
+    } else {
+      const activeScholarships = await schRepo.find({
+        where: { courseIntakeId: savedIntake.id, isActive: true },
+      });
+      for (const item of activeScholarships) {
+        item.isActive = false;
+      }
+      if (activeScholarships.length > 0) {
+        await schRepo.save(activeScholarships);
+      }
     }
 
     return {
@@ -350,5 +452,12 @@ export class CourseImportProcessorService implements CsvImportProcessor {
         scholarshipId,
       }),
     };
+  }
+
+  private async buildEngTestCache(tm: EntityManager): Promise<Map<string, string>> {
+    const tests = await tm.getRepository(SysEnglishTests).find();
+    return new Map(
+      tests.map((test) => [test.testName.toUpperCase(), test.id]),
+    );
   }
 }

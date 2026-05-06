@@ -4,9 +4,13 @@ import type { CourseCsvRow, ErrorCourseRow } from '../dto/CourseImportRowTypes';
 import { parseIntakeInfo } from '../parsers/courseIntakeInfoParser';
 import {
   parseCourseDurationMonths,
-  parseJsonValue,
   parseRequiredDecimal,
 } from '../parsers/courseCsvFieldParsers';
+import {
+  formatImportError,
+  ImportErrorCode,
+} from '../../common/abstractions/ImportErrorCode';
+import { parseMetaDataItems } from '../../common/engine/MetaDataParser';
 
 export type { CourseCsvRow, ErrorCourseRow };
 
@@ -43,47 +47,77 @@ export class CourseRowValidator {
     for (const key of REQUIRED) {
       const v = row[key as keyof CourseCsvRow];
       if (v === undefined || v === null || String(v).trim() === '') {
-        return `missing required field(s): ${key}`;
+        return formatImportError(
+          ImportErrorCode.MISSING_REQUIRED_FIELD,
+          `missing required field(s): ${key}`,
+        );
       }
     }
 
     if (parseRequiredDecimal(row.minGpa) === null) {
-      return 'minGpa must be a number';
+      return formatImportError(
+        ImportErrorCode.INVALID_FORMAT,
+        'minGpa must be a number',
+      );
     }
 
     const higherDeg = (row.higherDegreeName ?? '').trim();
     const higherGpaRaw = (row.higherGpa ?? '').trim();
     if (higherDeg && higherGpaRaw === '') {
-      return 'higherGpa is required when higherDegreeName is set';
+      return formatImportError(
+        ImportErrorCode.MISSING_REQUIRED_FIELD,
+        'higherGpa is required when higherDegreeName is set',
+      );
     }
     if (!higherDeg && higherGpaRaw !== '') {
-      return 'higherDegreeName is required when higherGpa is set';
+      return formatImportError(
+        ImportErrorCode.MISSING_REQUIRED_FIELD,
+        'higherDegreeName is required when higherGpa is set',
+      );
     }
     if (higherDeg && parseRequiredDecimal(row.higherGpa) === null) {
-      return 'higherGpa must be a number when higherDegreeName is set';
+      return formatImportError(
+        ImportErrorCode.INVALID_FORMAT,
+        'higherGpa must be a number when higherDegreeName is set',
+      );
     }
 
     const intake = parseIntakeInfo(row.intakeInfo);
     if (!intake) {
-      return 'intakeInfo must be parseable (e.g. Sep-26 or Sep 2026)';
+      return formatImportError(
+        ImportErrorCode.INVALID_FORMAT,
+        'intakeInfo must be parseable (e.g. Sep-26 or Sep 2026)',
+      );
     }
 
     const durRaw = (row.courseDuration ?? '').trim();
     if (durRaw && parseCourseDurationMonths(row.courseDuration) === null) {
-      return 'courseDuration must contain a number (months)';
+      return formatImportError(
+        ImportErrorCode.INVALID_FORMAT,
+        'courseDuration must contain a number (months)',
+      );
     }
 
     const ar = (row.AcademicRequirementsMetaData ?? '').trim();
-    if (ar && parseJsonValue(ar) === null) {
-      return 'AcademicRequirementsMetaData: invalid JSON';
+    if (ar && !parseMetaDataItems(ar)) {
+      return formatImportError(
+        ImportErrorCode.INVALID_JSON,
+        'AcademicRequirementsMetaData must be MetaDataItem[]',
+      );
     }
     const fm = (row.feesMetaData ?? '').trim();
-    if (fm && parseJsonValue(fm) === null) {
-      return 'feesMetaData: invalid JSON';
+    if (fm && !parseMetaDataItems(fm)) {
+      return formatImportError(
+        ImportErrorCode.INVALID_JSON,
+        'feesMetaData must be MetaDataItem[]',
+      );
     }
     const sm = (row.scholarshipMetaData ?? '').trim();
-    if (sm && parseJsonValue(sm) === null) {
-      return 'scholarshipMetaData: invalid JSON';
+    if (sm && !parseMetaDataItems(sm)) {
+      return formatImportError(
+        ImportErrorCode.INVALID_JSON,
+        'scholarshipMetaData must be MetaDataItem[]',
+      );
     }
 
     const engCols = [
@@ -97,7 +131,10 @@ export class CourseRowValidator {
     for (const c of engCols) {
       const x = (row[c] ?? '').trim();
       if (x !== '' && parseRequiredDecimal(x) === null) {
-        return `${c} must be a number when set`;
+        return formatImportError(
+          ImportErrorCode.INVALID_FORMAT,
+          `${c} must be a number when set`,
+        );
       }
     }
 
@@ -110,7 +147,10 @@ export class CourseRowValidator {
     for (const c of feeCols) {
       const x = (row[c] ?? '').trim();
       if (x !== '' && parseRequiredDecimal(x) === null) {
-        return `${c} must be a number when set`;
+        return formatImportError(
+          ImportErrorCode.INVALID_FORMAT,
+          `${c} must be a number when set`,
+        );
       }
     }
 

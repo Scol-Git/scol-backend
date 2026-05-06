@@ -14,6 +14,7 @@ export function parseCourseDurationMonths(raw: string): number | null {
 export function parseOptionalDecimal(raw: string): string | undefined {
   const t = raw.trim();
   if (!t) return undefined;
+  if (!/^-?\d+(?:\.\d+)?$/.test(t.replace(/,/g, ''))) return undefined;
   const n = Number(t.replace(/,/g, ''));
   if (Number.isNaN(n)) return undefined;
   return String(n);
@@ -22,6 +23,7 @@ export function parseOptionalDecimal(raw: string): string | undefined {
 export function parseRequiredDecimal(raw: string): number | null {
   const t = raw.trim();
   if (!t) return null;
+  if (!/^-?\d+(?:\.\d+)?$/.test(t.replace(/,/g, ''))) return null;
   const n = Number(t.replace(/,/g, ''));
   return Number.isNaN(n) ? null : n;
 }
@@ -30,8 +32,21 @@ export function parseRequiredDecimal(raw: string): number | null {
 export function parseOptionalDate(raw: string): Date | undefined {
   const t = raw.trim();
   if (!t) return undefined;
+  const m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return undefined;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
   const d = new Date(t + 'T00:00:00Z');
-  return Number.isNaN(d.getTime()) ? undefined : d;
+  if (Number.isNaN(d.getTime())) return undefined;
+  if (
+    d.getUTCFullYear() !== year ||
+    d.getUTCMonth() + 1 !== month ||
+    d.getUTCDate() !== day
+  ) {
+    return undefined;
+  }
+  return d;
 }
 
 export function parseJsonObject(raw: string): Record<string, unknown> | null {

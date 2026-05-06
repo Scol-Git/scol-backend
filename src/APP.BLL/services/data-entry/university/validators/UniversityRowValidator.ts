@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { CommissionType } from '@shared/enums/CommissionType.enum';
-import type { UniversityCsvRow, ErrorUniversityRow } from '../dto/UniversityCsvRow';
+import type {
+  UniversityCsvRow,
+  ErrorUniversityRow,
+  ValidatedUniversityCsvRow,
+} from '../dto/UniversityCsvRow';
+import { parseMetaDataItems } from '../../common/engine/MetaDataParser';
+import {
+  formatImportError,
+  ImportErrorCode,
+} from '../../common/abstractions/ImportErrorCode';
 
 const REQUIRED_FIELDS: (keyof UniversityCsvRow)[] = [
   'commission',
@@ -32,7 +41,10 @@ export class UniversityRowValidator {
       return v === undefined || v === null || String(v).trim() === '';
     });
     if (missing.length === 0) return null;
-    return `missing required field(s): ${missing.join(', ')}`;
+    return formatImportError(
+      ImportErrorCode.MISSING_REQUIRED_FIELD,
+      `missing required field(s): ${missing.join(', ')}`,
+    );
   }
 
   /**
@@ -43,23 +55,35 @@ export class UniversityRowValidator {
     const commissionRaw = row.commission.trim();
     const num = Number(commissionRaw);
     if (commissionRaw === '' || Number.isNaN(num)) {
-      return 'commission must be a number';
+      return formatImportError(
+        ImportErrorCode.INVALID_FORMAT,
+        'commission must be a number',
+      );
     }
     const commissionType = row.commissionType.trim();
     if (!VALID_COMMISSION_TYPES.includes(commissionType as (typeof VALID_COMMISSION_TYPES)[number])) {
-      return `commissionType must be ${VALID_COMMISSION_TYPES.join(' or ')}`;
+      return formatImportError(
+        ImportErrorCode.INVALID_FORMAT,
+        `commissionType must be ${VALID_COMMISSION_TYPES.join(' or ')}`,
+      );
     }
 
     const establishedYearRaw = row.establishedYear.trim();
     const establishedYearNum = Number(establishedYearRaw);
     if (establishedYearRaw === '' || Number.isNaN(establishedYearNum)) {
-      return 'establishedYear must be a number';
+      return formatImportError(
+        ImportErrorCode.INVALID_FORMAT,
+        'establishedYear must be a number',
+      );
     }
 
     const currRankingRaw = row.currRanking.trim();
     const currRankingNum = Number(currRankingRaw);
     if (currRankingRaw === '' || Number.isNaN(currRankingNum)) {
-      return 'currRanking must be a number';
+      return formatImportError(
+        ImportErrorCode.INVALID_FORMAT,
+        'currRanking must be a number',
+      );
     }
 
     return null;
@@ -69,51 +93,24 @@ export class UniversityRowValidator {
    * Validates rankingMetaData and locationMapMetaData: valid JSON and expected shape.
    * @returns Error message or null if valid.
    */
-  validateJsonMetaData(row: UniversityCsvRow): string | null {
+  parseValidatedJson(row: UniversityCsvRow): {
+    rankingMetaDataItems: ValidatedUniversityCsvRow['rankingMetaDataItems'];
+    locationMapUrl: string;
+  } | null {
     const rankingRaw = row.rankingMetaData.trim();
-    let ranking: unknown;
-    try {
-      ranking = JSON.parse(rankingRaw);
-    } catch {
-      return 'rankingMetaData: invalid JSON';
-    }
-    if (!Array.isArray(ranking)) {
-      return 'rankingMetaData: must be array of { subtitle?, description: string[] }';
-    }
-    for (let i = 0; i < ranking.length; i++) {
-      const item = ranking[i];
-      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
-        return 'rankingMetaData: must be array of { subtitle?, description: string[] }';
-      }
-      const desc = (item as Record<string, unknown>)['description'];
-      if (!Array.isArray(desc) || desc.some((d) => typeof d !== 'string')) {
-        return 'rankingMetaData: must be array of { subtitle?, description: string[] }';
-      }
-      const sub = (item as Record<string, unknown>)['subtitle'];
-      if (sub !== undefined && sub !== null && typeof sub !== 'string') {
-        return 'rankingMetaData: must be array of { subtitle?, description: string[] }';
-      }
-    }
+    const rankingMetaDataItems = parseMetaDataItems(rankingRaw);
+    if (!rankingMetaDataItems) return null;
 
     const locationRaw = row.locationMapMetaData.trim();
-    let location: unknown;
     try {
-      location = JSON.parse(locationRaw);
+      const url = new URL(locationRaw);
+      return {
+        rankingMetaDataItems,
+        locationMapUrl: url.href,
+      };
     } catch {
-      return 'locationMapMetaData: invalid JSON';
+      return null;
     }
-    if (
-      location === null ||
-      typeof location !== 'object' ||
-      Array.isArray(location)
-    ) {
-      return 'locationMapMetaData: must be { href: string, text: string }';
-    }
-    const obj = location as Record<string, unknown>;
-    if (typeof obj['href'] !== 'string' || typeof obj['text'] !== 'string') {
-      return 'locationMapMetaData: must be { href: string, text: string }';
-    }
-    return null;
   }
 
   /**
@@ -121,10 +118,10 @@ export class UniversityRowValidator {
    * @returns valid rows and invalid rows with errorReason.
    */
   validateRows(rows: UniversityCsvRow[]): {
-    valid: UniversityCsvRow[];
+    valid: ValidatedUniversityCsvRow[];
     invalid: ErrorUniversityRow[];
   } {
-    const valid: UniversityCsvRow[] = [];
+    const valid: ValidatedUniversityCsvRow[] = [];
     const invalid: ErrorUniversityRow[] = [];
     for (const row of rows) {
       const requiredError = this.validateRequired(row);
@@ -137,12 +134,22 @@ export class UniversityRowValidator {
         invalid.push({ ...row, errorReason: formatError });
         continue;
       }
-      const jsonError = this.validateJsonMetaData(row);
-      if (jsonError) {
-        invalid.push({ ...row, errorReason: jsonError });
+      const parsed = this.parseValidatedJson(row);
+      if (!parsed) {
+        invalid.push({
+          ...row,
+          errorReason: formatImportError(
+            ImportErrorCode.INVALID_JSON,
+            'rankingMetaData must be MetaDataItem[] and locationMapMetaData must be a valid URL string',
+          ),
+        });
         continue;
       }
-      valid.push(row);
+      valid.push({
+        ...row,
+        rankingMetaDataItems: parsed.rankingMetaDataItems,
+        locationMapUrl: parsed.locationMapUrl,
+      });
     }
     return { valid, invalid };
   }

@@ -1,7 +1,7 @@
 import { MetaDataItem } from '@shared/types/MetaDataItem.type';
 import type { CsvRow } from '../../common/abstractions/CsvImportProcessor';
 
-/** One item in rankingMetaData: subtitle optional, description array of strings. */
+/** One item in rankingMetaData: subtitle string, description string[]. */
 export type RankingMetaDataItem = MetaDataItem;
 
 
@@ -29,6 +29,11 @@ export interface UniversityCsvRow {
   currRanking: string;
 }
 
+export interface ValidatedUniversityCsvRow extends UniversityCsvRow {
+  rankingMetaDataItems: MetaDataItem[];
+  locationMapUrl: string;
+}
+
 /**
  * University row with resolved location and entity IDs (reviewed output).
  */
@@ -48,7 +53,7 @@ export interface ErrorUniversityRow extends UniversityCsvRow {
 
 /**
  * University row with resolved location IDs, used for DB upsert in UniversityResolverService.
- * Validation guarantees rankingMetaData and locationMapMetaData are present on valid rows.
+ * Validation guarantees typed rankingMetaData and URL-normalized locationMapMetaData.
  */
 export interface ResolvedUniversityRow {
   uniName: string;
@@ -63,8 +68,8 @@ export interface ResolvedUniversityRow {
   address: string;
   coverImageUrl: string;
   campusLifeLinks: string;
-  rankingMetaData:     MetaDataItem[];
-  locationMapMetaData: string;  
+  rankingMetaData: MetaDataItem[];
+  locationMapMetaData: string;
   establishedYear?: number;
   universityType?: string;
   currRanking?: number;

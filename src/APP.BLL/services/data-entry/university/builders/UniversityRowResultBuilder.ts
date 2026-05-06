@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { UniversityCsvRow, ReviewedUniversityRow, ErrorUniversityRow } from '../dto/UniversityCsvRow';
 import type { LocationMaps } from '../resolvers/LocationMaps';
 import { stateKey, cityKey, universityKey } from '../resolvers/ImportKeys';
+import {
+  formatImportError,
+  ImportErrorCode,
+} from '../../common/abstractions/ImportErrorCode';
 
 @Injectable()
 export class UniversityRowResultBuilder {
@@ -59,24 +63,33 @@ export class UniversityRowResultBuilder {
     const cityName = row.cityName.trim();
     const uniName = row.uniName.trim();
 
-    if (!countryName) return 'no country name found';
-    if (!stateName) return 'no state name found';
-    if (!cityName) return 'no city name found';
-    if (!uniName) return 'no university name found';
+    if (!countryName)
+      return formatImportError(ImportErrorCode.MISSING_REQUIRED_FIELD, 'no country name found');
+    if (!stateName)
+      return formatImportError(ImportErrorCode.MISSING_REQUIRED_FIELD, 'no state name found');
+    if (!cityName)
+      return formatImportError(ImportErrorCode.MISSING_REQUIRED_FIELD, 'no city name found');
+    if (!uniName)
+      return formatImportError(ImportErrorCode.MISSING_REQUIRED_FIELD, 'no university name found');
 
     const sysCountryId = countryMap.get(countryName.toLowerCase());
-    if (!sysCountryId) return 'country not found';
+    if (!sysCountryId)
+      return formatImportError(ImportErrorCode.RESOLUTION_FAILED, 'country not found');
 
     const sysStateId = stateMap.get(stateKey(sysCountryId, stateName));
-    if (!sysStateId) return 'state not found for country';
+    if (!sysStateId)
+      return formatImportError(ImportErrorCode.RESOLUTION_FAILED, 'state not found for country');
 
     const sysCityId = cityMap.get(cityKey(sysStateId, cityName));
-    if (!sysCityId) return 'city not found for state';
+    if (!sysCityId)
+      return formatImportError(ImportErrorCode.RESOLUTION_FAILED, 'city not found for state');
 
     const key = universityKey(uniName, sysCountryId, sysCityId);
     const uniId = universityIdByKey.get(key);
-    if (!uniId) return 'university resolution failed';
-    if (seenUniKeys.has(key)) return 'duplicate row';
+    if (!uniId)
+      return formatImportError(ImportErrorCode.RESOLUTION_FAILED, 'university resolution failed');
+    if (seenUniKeys.has(key))
+      return formatImportError(ImportErrorCode.DUPLICATE_ROW, 'duplicate row');
 
     return null;
   }
