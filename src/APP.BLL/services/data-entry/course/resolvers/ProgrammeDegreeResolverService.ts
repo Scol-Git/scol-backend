@@ -23,13 +23,16 @@ export class ProgrammeDegreeResolverService {
   ): Promise<Map<string, string>> {
     const cache = new Map<string, string>();
     const unique = [...new Set(names.map((x) => x.trim()).filter(Boolean))];
+    if (unique.length === 0) return cache;
+    const lowered = unique.map((n) => n.toLowerCase());
     const repo = tm.getRepository(SysProgrammes);
-    for (const name of unique) {
-      const existing = await repo
-        .createQueryBuilder('p')
-        .where('LOWER(TRIM(p.name)) = LOWER(TRIM(:n))', { n: name })
-        .getOne();
-      if (existing) cache.set(name.toLowerCase(), existing.id);
+    const existing = await repo
+      .createQueryBuilder('p')
+      .select(['p.id', 'p.name'])
+      .where('LOWER(TRIM(p.name)) IN (:...ns)', { ns: lowered })
+      .getMany();
+    for (const row of existing) {
+      cache.set(row.name.trim().toLowerCase(), row.id);
     }
     return cache;
   }
@@ -40,13 +43,16 @@ export class ProgrammeDegreeResolverService {
   ): Promise<Map<string, string>> {
     const cache = new Map<string, string>();
     const unique = [...new Set(names.map((x) => x.trim()).filter(Boolean))];
+    if (unique.length === 0) return cache;
+    const lowered = unique.map((n) => n.toLowerCase());
     const repo = tm.getRepository(SysAcademicDegrees);
-    for (const name of unique) {
-      const existing = await repo
-        .createQueryBuilder('d')
-        .where('LOWER(TRIM(d.degreeName)) = LOWER(TRIM(:n))', { n: name })
-        .getOne();
-      if (existing) cache.set(name.toLowerCase(), existing.id);
+    const existing = await repo
+      .createQueryBuilder('d')
+      .select(['d.id', 'd.degreeName'])
+      .where('LOWER(TRIM(d.degreeName)) IN (:...ns)', { ns: lowered })
+      .getMany();
+    for (const row of existing) {
+      cache.set(row.degreeName.trim().toLowerCase(), row.id);
     }
     return cache;
   }

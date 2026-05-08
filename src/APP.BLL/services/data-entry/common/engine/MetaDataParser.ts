@@ -6,7 +6,7 @@ function isMetaDataItem(value: unknown): value is MetaDataItem {
   }
   const row = value as Record<string, unknown>;
   return (
-    typeof row.subtitle === 'string' &&
+    (row.subtitle === undefined || typeof row.subtitle === 'string') &&
     Array.isArray(row.description) &&
     row.description.every((item) => typeof item === 'string')
   );

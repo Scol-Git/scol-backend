@@ -30,6 +30,7 @@ export class LocalFileStore implements FileStore {
         name: dirent.name,
         path: fullPath,
         lastModified: fileStats.mtime,
+        sizeBytes: fileStats.size,
       });
     }
     return result;

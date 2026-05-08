@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { UniversityCsvRow, ReviewedUniversityRow, ErrorUniversityRow } from '../dto/UniversityCsvRow';
+import type {
+  ValidatedUniversityCsvRow,
+  ReviewedUniversityRow,
+  ErrorUniversityRow,
+} from '../dto/UniversityCsvRow';
 import type { LocationMaps } from '../resolvers/LocationMaps';
-import { stateKey, cityKey, universityKey } from '../resolvers/ImportKeys';
+import { universityKey } from '../resolvers/ImportKeys';
+import { resolveUniversityRowLocations } from '../resolvers/universityLocationResolution';
 import {
   formatImportError,
   ImportErrorCode,
@@ -14,7 +19,7 @@ export class UniversityRowResultBuilder {
    * Checks: country/state/city existence, university resolution, duplicate rows.
    */
   buildImportResults(
-    rows: UniversityCsvRow[],
+    rows: ValidatedUniversityCsvRow[],
     locationMaps: LocationMaps,
     universityIdByKey: Map<string, string>,
   ): { reviewedRows: ReviewedUniversityRow[]; errorRows: ErrorUniversityRow[] } {
@@ -23,74 +28,71 @@ export class UniversityRowResultBuilder {
     const seenUniKeys = new Set<string>();
 
     for (const row of rows) {
-      const reason = this.getResolutionErrorReason(
+      const outcome = this.classifyUniversityImportRow(
         row,
         locationMaps,
         universityIdByKey,
         seenUniKeys,
       );
-      if (reason) {
-        errorRows.push({ ...row, errorReason: reason });
+      if (outcome.kind === 'error') {
+        errorRows.push({ ...row, errorReason: outcome.reason });
         continue;
       }
-      const countryName = row.countryName.trim();
-      const stateName = row.stateName.trim();
-      const cityName = row.cityName.trim();
-      const uniName = row.uniName.trim();
-      const { countryMap, stateMap, cityMap } = locationMaps;
-      const sysCountryId = countryMap.get(countryName.toLowerCase())!;
-      const sysStateId = stateMap.get(stateKey(sysCountryId, stateName))!;
-      const sysCityId = cityMap.get(cityKey(sysStateId, cityName))!;
-      const key = universityKey(uniName, sysCountryId, sysCityId);
+      const { sysCountryId, sysStateId, sysCityId, key, id } = outcome;
       seenUniKeys.add(key);
-      const id = universityIdByKey.get(key)!;
       reviewedRows.push({ ...row, sysCountryId, sysStateId, sysCityId, id });
     }
     return { reviewedRows, errorRows };
   }
 
   /**
-   * Resolution-only checks: location existence, university id, duplicate. No validation.
+   * Location + upsert map + duplicate checks. Location messages match {@link resolveUniversityRowLocations}.
    */
-  private getResolutionErrorReason(
-    row: UniversityCsvRow,
-    { countryMap, stateMap, cityMap }: LocationMaps,
+  private classifyUniversityImportRow(
+    row: ValidatedUniversityCsvRow,
+    locationMaps: LocationMaps,
     universityIdByKey: Map<string, string>,
     seenUniKeys: Set<string>,
-  ): string | null {
-    const countryName = row.countryName.trim();
-    const stateName = row.stateName.trim();
-    const cityName = row.cityName.trim();
+  ):
+    | { kind: 'error'; reason: string }
+    | {
+        kind: 'ok';
+        key: string;
+        id: string;
+        sysCountryId: string;
+        sysStateId: string;
+        sysCityId: string;
+      } {
+    const loc = resolveUniversityRowLocations(row, locationMaps);
+    if (!loc.ok) {
+      return { kind: 'error', reason: loc.errorReason };
+    }
+    const { sysCountryId, sysStateId, sysCityId } = loc;
     const uniName = row.uniName.trim();
-
-    if (!countryName)
-      return formatImportError(ImportErrorCode.MISSING_REQUIRED_FIELD, 'no country name found');
-    if (!stateName)
-      return formatImportError(ImportErrorCode.MISSING_REQUIRED_FIELD, 'no state name found');
-    if (!cityName)
-      return formatImportError(ImportErrorCode.MISSING_REQUIRED_FIELD, 'no city name found');
-    if (!uniName)
-      return formatImportError(ImportErrorCode.MISSING_REQUIRED_FIELD, 'no university name found');
-
-    const sysCountryId = countryMap.get(countryName.toLowerCase());
-    if (!sysCountryId)
-      return formatImportError(ImportErrorCode.RESOLUTION_FAILED, 'country not found');
-
-    const sysStateId = stateMap.get(stateKey(sysCountryId, stateName));
-    if (!sysStateId)
-      return formatImportError(ImportErrorCode.RESOLUTION_FAILED, 'state not found for country');
-
-    const sysCityId = cityMap.get(cityKey(sysStateId, cityName));
-    if (!sysCityId)
-      return formatImportError(ImportErrorCode.RESOLUTION_FAILED, 'city not found for state');
-
     const key = universityKey(uniName, sysCountryId, sysCityId);
     const uniId = universityIdByKey.get(key);
-    if (!uniId)
-      return formatImportError(ImportErrorCode.RESOLUTION_FAILED, 'university resolution failed');
-    if (seenUniKeys.has(key))
-      return formatImportError(ImportErrorCode.DUPLICATE_ROW, 'duplicate row');
-
-    return null;
+    if (!uniId) {
+      return {
+        kind: 'error',
+        reason: formatImportError(
+          ImportErrorCode.RESOLUTION_FAILED,
+          'university not found at resolved location (no upserted row for this name and country/state/city)',
+        ),
+      };
+    }
+    if (seenUniKeys.has(key)) {
+      return {
+        kind: 'error',
+        reason: formatImportError(ImportErrorCode.DUPLICATE_ROW, 'duplicate row'),
+      };
+    }
+    return {
+      kind: 'ok',
+      key,
+      id: uniId,
+      sysCountryId,
+      sysStateId,
+      sysCityId,
+    };
   }
 }

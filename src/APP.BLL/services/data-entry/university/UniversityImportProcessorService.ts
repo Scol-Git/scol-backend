@@ -5,7 +5,7 @@ import type {
   CsvRow,
   CsvProcessingResult,
 } from '../common/abstractions/CsvImportProcessor';
-import { normalizeCsvRow } from './dto/UniversityCsvRow';
+import { normalizeCsvRow, type ValidatedUniversityCsvRow } from './dto/UniversityCsvRow';
 import { UniversityRowValidator } from './validators/UniversityRowValidator';
 import { LocationResolverService } from './resolvers/LocationResolverService';
 import { UniversityResolverService } from './resolvers/UniversityResolverService';
@@ -32,6 +32,7 @@ export class UniversityImportProcessorService implements CsvImportProcessor {
     const universityRows = rows.map(normalizeCsvRow);
     const { valid, invalid: validationErrorRows } =
       this.validator.validateRows(universityRows);
+    const validatedUniversityRows: ValidatedUniversityCsvRow[] = valid;
     if (validationErrorRows.length > 0) {
       this.logger.info(
         `${LOG_CONTEXT} Validation: ${validationErrorRows.length} row(s) failed (required fields or format)`,
@@ -39,16 +40,16 @@ export class UniversityImportProcessorService implements CsvImportProcessor {
     }
     const locationMaps = await this.locationResolver.resolveLocations(
       manager,
-      valid,
+      validatedUniversityRows,
     );
     const universityIdByKey = await this.universityResolver.upsertUniversities(
       manager,
-      valid,
+      validatedUniversityRows,
       locationMaps,
     );
     const { reviewedRows, errorRows: resolutionErrorRows } =
       this.resultBuilder.buildImportResults(
-        valid,
+        validatedUniversityRows,
         locationMaps,
         universityIdByKey,
       );

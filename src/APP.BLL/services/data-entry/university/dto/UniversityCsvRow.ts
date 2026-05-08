@@ -23,6 +23,7 @@ export interface UniversityCsvRow {
   coverImageUrl: string;
   campusLifeLinks: string;
   rankingMetaData: string;
+  /** Map link: plain URL, or legacy JSON `{"href":"...","text":"..."}`, or JSON string `"https://..."`. */
   locationMapMetaData: string;
   establishedYear: string;
   universityType: string;

@@ -19,8 +19,10 @@ import {
   formatImportError,
   ImportErrorCode,
 } from '../common/abstractions/ImportErrorCode';
+import { ADVISORY_LOCK_BULK_IMPORT_COURSE } from '../common/infrastructure/advisoryLockKeys';
 
 const LOG_CONTEXT = '[BulkImport:Course:Service]';
+const MAX_CSV_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB
 
 @Injectable()
 export class CourseImportService {
@@ -76,6 +78,16 @@ export class CourseImportService {
       );
       return this.emptyResult();
     }
+    if (stagingFile.sizeBytes > MAX_CSV_SIZE_BYTES) {
+      const sizeMb = (stagingFile.sizeBytes / (1024 * 1024)).toFixed(1);
+      const maxMb = (MAX_CSV_SIZE_BYTES / (1024 * 1024)).toFixed(0);
+      throw new BadRequestException(
+        formatImportError(
+          ImportErrorCode.INVALID_FORMAT,
+          `CSV too large (${sizeMb} MB). Maximum allowed is ${maxMb} MB.`,
+        ),
+      );
+    }
 
     this.logger.info(`${LOG_CONTEXT} Starting import: ${stagingFile.name}`);
     const csvText = await this.fileStore.readFile(stagingFile.path);
@@ -112,8 +124,8 @@ export class CourseImportService {
 
     const archivePath = `${folders.archive}/${importTimestamp}_${stagingFile.name}`;
     await this.fileStore.ensureDir(folders.archive);
-    await this.fileStore.moveFile(stagingFile.path, archivePath);
     await this.fileStore.writeFile(`${markerDir}/${importKey}.done`, archivePath);
+    await this.fileStore.moveFile(stagingFile.path, archivePath);
     this.logger.info(
       `${LOG_CONTEXT} Archived ${stagingFile.name} to ${archivePath}`,
     );
@@ -151,8 +163,8 @@ export class CourseImportService {
     const runner = this.db.manager.connection.createQueryRunner();
     await runner.connect();
     const rows = await runner.query(
-      'SELECT pg_try_advisory_lock(hashtext($1)) AS "locked"',
-      ['bulk_import_course'],
+      'SELECT pg_try_advisory_lock($1::bigint) AS "locked"',
+      [ADVISORY_LOCK_BULK_IMPORT_COURSE.toString()],
     );
     const locked = Boolean(rows?.[0]?.locked);
     if (!locked) {
@@ -164,8 +176,8 @@ export class CourseImportService {
 
   private async releaseLockRunner(runner: QueryRunner): Promise<void> {
     try {
-      await runner.query('SELECT pg_advisory_unlock(hashtext($1))', [
-        'bulk_import_course',
+      await runner.query('SELECT pg_advisory_unlock($1::bigint)', [
+        ADVISORY_LOCK_BULK_IMPORT_COURSE.toString(),
       ]);
     } finally {
       await runner.release();

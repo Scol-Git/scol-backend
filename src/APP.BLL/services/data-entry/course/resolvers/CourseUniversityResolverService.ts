@@ -17,32 +17,32 @@ export class CourseUniversityResolverService {
   ): Promise<Map<string, string[]>> {
     const keys = [...new Set(uniNames.map((name) => name.trim()).filter(Boolean))];
     const cache = new Map<string, string[]>();
-    for (const name of keys) {
-      const rows = await tm
-        .createQueryBuilder(SysUniversities, 'u')
-        .select(['u.id'])
-        .where('LOWER(TRIM(u.uniName)) = LOWER(TRIM(:name))', { name })
-        .getMany();
-      cache.set(name.toLowerCase(), rows.map((row) => row.id));
+    if (keys.length === 0) return cache;
+    const lowered = keys.map((k) => k.toLowerCase());
+    const rows = await tm
+      .createQueryBuilder(SysUniversities, 'u')
+      .select(['u.id', 'u.uniName'])
+      .where('LOWER(TRIM(u.uniName)) IN (:...names)', { names: lowered })
+      .getMany();
+    for (const row of rows) {
+      const k = row.uniName.trim().toLowerCase();
+      const list = cache.get(k) ?? [];
+      list.push(row.id);
+      cache.set(k, list);
     }
     return cache;
   }
 
+  /**
+   * Resolves using only `cache` (from {@link buildCache}). Callers must pre-fetch; no DB fallback.
+   */
   async resolveUniversity(
-    tm: EntityManager,
     uniNameRaw: string,
-    cache?: Map<string, string[]>,
+    cache: Map<string, string[]>,
   ): Promise<{ uniId: string } | { error: string }> {
     const name = uniNameRaw.trim();
-    const cacheKey = name.toLowerCase();
-    const cached = cache?.get(cacheKey);
-    const list =
-      cached !== undefined
-        ? cached.map((id) => ({ id }))
-        : await tm
-            .createQueryBuilder(SysUniversities, 'u')
-            .where('LOWER(TRIM(u.uniName)) = LOWER(TRIM(:name))', { name })
-            .getMany();
+    const ids = cache.get(name.toLowerCase()) ?? [];
+    const list = ids.map((id) => ({ id }));
 
     if (list.length === 0) {
       return {

@@ -5,6 +5,7 @@ export interface FileEntry {
   name: string;
   path: string;
   lastModified: Date;
+  sizeBytes: number;
 }
 
 /**

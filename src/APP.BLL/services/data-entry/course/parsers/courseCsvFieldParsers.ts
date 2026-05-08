@@ -12,20 +12,18 @@ export function parseCourseDurationMonths(raw: string): number | null {
 
 /** Parses decimal fields for DB string columns (TypeORM decimal as string). */
 export function parseOptionalDecimal(raw: string): string | undefined {
-  const t = raw.trim();
+  const t = raw.trim().replace(/,/g, '');
   if (!t) return undefined;
-  if (!/^-?\d+(?:\.\d+)?$/.test(t.replace(/,/g, ''))) return undefined;
-  const n = Number(t.replace(/,/g, ''));
-  if (Number.isNaN(n)) return undefined;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return undefined;
   return String(n);
 }
 
 export function parseRequiredDecimal(raw: string): number | null {
-  const t = raw.trim();
+  const t = raw.trim().replace(/,/g, '');
   if (!t) return null;
-  if (!/^-?\d+(?:\.\d+)?$/.test(t.replace(/,/g, ''))) return null;
-  const n = Number(t.replace(/,/g, ''));
-  return Number.isNaN(n) ? null : n;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** ISO date `YYYY-MM-DD` or empty. */
@@ -47,26 +45,4 @@ export function parseOptionalDate(raw: string): Date | undefined {
     return undefined;
   }
   return d;
-}
-
-export function parseJsonObject(raw: string): Record<string, unknown> | null {
-  const t = raw.trim();
-  if (!t) return null;
-  try {
-    const v = JSON.parse(t) as unknown;
-    if (v === null || typeof v !== 'object' || Array.isArray(v)) return null;
-    return v as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-export function parseJsonValue(raw: string): unknown | null {
-  const t = raw.trim();
-  if (!t) return null;
-  try {
-    return JSON.parse(t) as unknown;
-  } catch {
-    return null;
-  }
 }

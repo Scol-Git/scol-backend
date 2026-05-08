@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import * as path from 'path';
+import { TypeOrmModule } from '@infra/db/typeorm/TypeOrmModule.module';
 import {
   IFileStore as IFileStoreToken,
   IFileStoreCourse as IFileStoreCourseToken,
@@ -28,6 +29,7 @@ const defaultBasePath = path.join(process.cwd(), 'BulkImport', 'University');
 const defaultCourseBasePath = path.join(process.cwd(), 'BulkImport', 'Course');
 
 @Module({
+  imports: [TypeOrmModule],
   providers: [
     {
       provide: IFileStoreToken,

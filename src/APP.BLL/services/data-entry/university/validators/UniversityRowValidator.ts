@@ -29,6 +29,43 @@ const REQUIRED_FIELDS: (keyof UniversityCsvRow)[] = [
 
 const VALID_COMMISSION_TYPES = [CommissionType.AMOUNT, CommissionType.PERCENTAGE] as const;
 
+/**
+ * Normalizes `locationMapMetaData` CSV cell to a URL string.
+ * Supports: plain URL, JSON `{"href":"..."}` (legacy), or JSON-encoded string `"https://..."`.
+ */
+function parseLocationMapUrlFromCell(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    return new URL(trimmed).href;
+  } catch {
+    /* fall through */
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (typeof parsed === 'string') {
+      try {
+        return new URL(parsed.trim()).href;
+      } catch {
+        return null;
+      }
+    }
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const href = (parsed as { href?: unknown }).href;
+      if (typeof href === 'string' && href.trim()) {
+        try {
+          return new URL(href.trim()).href;
+        } catch {
+          return null;
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 @Injectable()
 export class UniversityRowValidator {
   /**
@@ -101,16 +138,9 @@ export class UniversityRowValidator {
     const rankingMetaDataItems = parseMetaDataItems(rankingRaw);
     if (!rankingMetaDataItems) return null;
 
-    const locationRaw = row.locationMapMetaData.trim();
-    try {
-      const url = new URL(locationRaw);
-      return {
-        rankingMetaDataItems,
-        locationMapUrl: url.href,
-      };
-    } catch {
-      return null;
-    }
+    const locationMapUrl = parseLocationMapUrlFromCell(row.locationMapMetaData);
+    if (!locationMapUrl) return null;
+    return { rankingMetaDataItems, locationMapUrl };
   }
 
   /**
@@ -140,7 +170,7 @@ export class UniversityRowValidator {
           ...row,
           errorReason: formatImportError(
             ImportErrorCode.INVALID_JSON,
-            'rankingMetaData must be MetaDataItem[] and locationMapMetaData must be a valid URL string',
+            'rankingMetaData must be MetaDataItem[] and locationMapMetaData must be a URL or legacy {"href":"..."} JSON',
           ),
         });
         continue;

@@ -9,7 +9,8 @@ import type {
   ResolvedUniversityRow,
 } from '../dto/UniversityCsvRow';
 import type { LocationMaps } from './LocationMaps';
-import { stateKey, cityKey, universityKey } from './ImportKeys';
+import { universityKey } from './ImportKeys';
+import { resolveUniversityRowLocations } from './universityLocationResolution';
 const LOG_CONTEXT = '[BulkImport:University:UniversityResolver]';
 
 /**
@@ -44,25 +45,22 @@ export class UniversityResolverService {
     return this.upsertUniversitiesInternal(manager, resolved);
   }
 
+  /**
+   * Rows that cannot resolve country/state/city are omitted here; user-facing reasons use the same
+   * rules in {@link resolveUniversityRowLocations} via {@link UniversityRowResultBuilder}.
+   */
   private getUniqueResolvedRows(
     rows: ValidatedUniversityCsvRow[],
-    { countryMap, stateMap, cityMap }: LocationMaps,
+    locationMaps: LocationMaps,
   ): ResolvedUniversityRow[] {
     const seen = new Set<string>();
     const result: ResolvedUniversityRow[] = [];
     for (const row of rows) {
-      const countryName = row.countryName.trim();
-      const stateName = row.stateName.trim();
-      const cityName = row.cityName.trim();
-      const uniName = row.uniName.trim();
-      if (!countryName || !stateName || !cityName || !uniName) continue;
+      const loc = resolveUniversityRowLocations(row, locationMaps);
+      if (!loc.ok) continue;
 
-      const sysCountryId = countryMap.get(countryName.toLowerCase());
-      if (!sysCountryId) continue;
-      const sysStateId = stateMap.get(stateKey(sysCountryId, stateName));
-      if (!sysStateId) continue;
-      const sysCityId = cityMap.get(cityKey(sysStateId, cityName));
-      if (!sysCityId) continue;
+      const { sysCountryId, sysStateId, sysCityId } = loc;
+      const uniName = row.uniName.trim();
 
       const key = universityKey(uniName, sysCountryId, sysCityId);
       if (seen.has(key)) continue;
@@ -127,6 +125,7 @@ export class UniversityResolverService {
           : row.commissionType === 'PERCENTAGE'
             ? CommissionType.PERCENTAGE
             : undefined;
+      // locationMapMetaData: new writes are plain URLs; legacy DB values may be JSON.stringify(url).
       const payload = {
         commission: row.commission || undefined,
         commissionType,

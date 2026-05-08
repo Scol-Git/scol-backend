@@ -21,6 +21,7 @@ import {
 } from './validators/CourseRowValidator';
 import { CourseUniversityResolverService } from './resolvers/CourseUniversityResolverService';
 import { ProgrammeDegreeResolverService } from './resolvers/ProgrammeDegreeResolverService';
+import type { CourseBatchCache } from './resolvers/CourseBatchCache';
 import { CourseRowResultBuilder } from './builders/CourseRowResultBuilder';
 import { parseIntakeInfo } from './parsers/courseIntakeInfoParser';
 import {
@@ -67,26 +68,38 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     this.logger.info(
       `${LOG_CONTEXT} Processing ${valid.length} valid row(s) in batch(es) of ${batchSize}`,
     );
+
+    // One-shot prefetch on the outer manager (committed snapshot). Same Map instances are passed
+    // into every batch so findOrCreate* / new SysEnglishTests rows keep caches warm across batches
+    // without re-querying inside each transaction (avoids isolation visibility surprises).
+    const universityCache = await this.universityResolver.buildCache(
+      manager,
+      valid.map((r) => r.uniName),
+    );
+    const programmeCache = await this.programmeDegreeResolver.buildProgrammeCache(
+      manager,
+      valid.map((r) => r.programmeName),
+    );
+    const degreeCache = await this.programmeDegreeResolver.buildDegreeCache(
+      manager,
+      valid.flatMap((r) => [
+        r.degreeName,
+        r.minDegreeName,
+        r.higherDegreeName ?? '',
+      ]),
+    );
+    const engTestCache = await this.buildEngTestCache(manager);
+
     for (let i = 0; i < valid.length; i += batchSize) {
       const chunk = valid.slice(i, i + batchSize);
       await manager.connection.transaction(async (tm) => {
-        const universityCache = await this.universityResolver.buildCache(
+        const batchCache = await this.buildBatchCache(
           tm,
-          chunk.map((row) => row.uniName),
+          chunk,
+          universityCache,
+          programmeCache,
+          degreeCache,
         );
-        const programmeCache = await this.programmeDegreeResolver.buildProgrammeCache(
-          tm,
-          chunk.map((row) => row.programmeName),
-        );
-        const degreeCache = await this.programmeDegreeResolver.buildDegreeCache(
-          tm,
-          chunk.flatMap((row) => [
-            row.degreeName,
-            row.minDegreeName,
-            row.higherDegreeName ?? '',
-          ]),
-        );
-        const engTestCache = await this.buildEngTestCache(tm);
         for (const row of chunk) {
           const base = this.resultBuilder.flattenInputRow(row);
           try {
@@ -97,6 +110,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
               programmeCache,
               degreeCache,
               engTestCache,
+              batchCache,
             );
             if (result.error) {
               resolutionErrors.push(result.error);
@@ -145,6 +159,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     programmeCache: Map<string, string>,
     degreeCache: Map<string, string>,
     engTestCache: Map<string, string>,
+    batchCache: CourseBatchCache,
   ): Promise<{
     reviewed?: Record<string, string>;
     error?: ErrorCourseRow;
@@ -152,7 +167,6 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     const base = this.resultBuilder.flattenInputRow(row);
 
     const uniResult = await this.universityResolver.resolveUniversity(
-      tm,
       row.uniName,
       universityCache,
     );
@@ -211,14 +225,14 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     }
 
     const courseRepo = tm.getRepository(UniCourses);
-    const existingCourse = await courseRepo.findOne({
-      where: {
-        uniId,
-        sysProgrammeId: progResult.id,
-        sysDegreeId: award.id,
-        courseName: row.courseName.trim(),
-      },
-    });
+    const courseName = row.courseName.trim();
+    const courseCacheKey = this.makeCourseKey(
+      uniId,
+      progResult.id,
+      award.id,
+      courseName,
+    );
+    const existingCourse = batchCache.courseByKey.get(courseCacheKey) ?? null;
 
     const arRaw = (row.AcademicRequirementsMetaData ?? '').trim();
     const reqMetaParsed = arRaw ? parseMetaDataItems(arRaw) : null;
@@ -227,7 +241,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     courseEntity.uniId = uniId;
     courseEntity.sysProgrammeId = progResult.id;
     courseEntity.sysDegreeId = award.id;
-    courseEntity.courseName = row.courseName.trim();
+    courseEntity.courseName = courseName;
     courseEntity.minSysDegreeId = minDeg.id;
     courseEntity.minGpa = minGpaStr;
     courseEntity.higherSysDegreeId = higherSysDegreeId;
@@ -243,6 +257,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     courseEntity.externalUrl = ext || undefined;
 
     const savedCourse = await courseRepo.save(courseEntity);
+    batchCache.courseByKey.set(courseCacheKey, savedCourse);
 
     const intake = parseIntakeInfo(row.intakeInfo);
     if (!intake) {
@@ -257,13 +272,12 @@ export class CourseImportProcessorService implements CsvImportProcessor {
       };
     }
     const intakeRepo = tm.getRepository(UniCourseIntakes);
-    const existingIntake = await intakeRepo.findOne({
-      where: {
-        uniCourseId: savedCourse.id,
-        intakeMonth: intake.month,
-        intakeYear: intake.year,
-      },
-    });
+    const intakeCacheKey = this.makeIntakeKey(
+      savedCourse.id,
+      intake.month,
+      intake.year,
+    );
+    const existingIntake = batchCache.intakeByKey.get(intakeCacheKey) ?? null;
 
     const intakeEntity = existingIntake ?? intakeRepo.create();
     intakeEntity.uniCourseId = savedCourse.id;
@@ -303,12 +317,11 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     intakeEntity.isActive = true;
 
     const savedIntake = await intakeRepo.save(intakeEntity);
+    batchCache.intakeByKey.set(intakeCacheKey, savedIntake);
 
     const engRepo = tm.getRepository(CourseEngReq);
     const engTestRepo = tm.getRepository(SysEnglishTests);
-    const existingReqs = await engRepo.find({
-      where: { uniCourseId: savedCourse.id },
-    });
+    const existingReqs = batchCache.engReqByCourseId.get(savedCourse.id) ?? [];
     const existingReqMap = new Map(
       existingReqs.map((item) => [item.sysEngTestId, item]),
     );
@@ -368,6 +381,12 @@ export class CourseImportProcessorService implements CsvImportProcessor {
       req.minOverallReq = o !== '' ? parseOptionalDecimal(o) : undefined;
       req.minSectionReq = s !== '' ? parseOptionalDecimal(s) : undefined;
       const savedReq = await engRepo.save(req);
+      if (!existingReqMap.has(testId)) {
+        const list = batchCache.engReqByCourseId.get(savedCourse.id) ?? [];
+        list.push(savedReq);
+        batchCache.engReqByCourseId.set(savedCourse.id, list);
+      }
+      existingReqMap.set(testId, savedReq);
       touchedEngTestIds.add(testId);
 
       if (t.testName === 'IELTS') {
@@ -384,21 +403,23 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     const untouchedReqs = existingReqs.filter(
       (item) => !touchedEngTestIds.has(item.sysEngTestId),
     );
-    for (const req of untouchedReqs) {
-      req.minOverallReq = undefined;
-      req.minSectionReq = undefined;
-    }
     if (untouchedReqs.length > 0) {
-      await engRepo.save(untouchedReqs);
+      await engRepo.remove(untouchedReqs);
+      batchCache.engReqByCourseId.set(
+        savedCourse.id,
+        (batchCache.engReqByCourseId.get(savedCourse.id) ?? []).filter(
+          (item) => !untouchedReqs.some((removed) => removed.id === item.id),
+        ),
+      );
     }
 
     let scholarshipId = '';
     const schName = (row.scholarshipName ?? '').trim();
     const schRepo = tm.getRepository(CourseIntakeScholarships);
     if (schName) {
-      const existingSch = await schRepo.findOne({
-        where: { courseIntakeId: savedIntake.id, name: schName },
-      });
+      const scholarshipCacheKey = this.makeScholarshipKey(savedIntake.id, schName);
+      const existingSch =
+        batchCache.scholarshipByKey.get(scholarshipCacheKey) ?? null;
       const sch =
         existingSch ??
         schRepo.create({
@@ -409,29 +430,8 @@ export class CourseImportProcessorService implements CsvImportProcessor {
       sch.amountType = (row.scholarshipType ?? '').trim() || undefined;
       sch.isActive = true;
       const savedSch = await schRepo.save(sch);
+      batchCache.scholarshipByKey.set(scholarshipCacheKey, savedSch);
       scholarshipId = savedSch.id;
-      const otherActive = await schRepo.find({
-        where: { courseIntakeId: savedIntake.id, isActive: true },
-      });
-      const otherToDeactivate = otherActive.filter(
-        (item) => item.id !== savedSch.id,
-      );
-      for (const item of otherToDeactivate) {
-        item.isActive = false;
-      }
-      if (otherToDeactivate.length > 0) {
-        await schRepo.save(otherToDeactivate);
-      }
-    } else {
-      const activeScholarships = await schRepo.find({
-        where: { courseIntakeId: savedIntake.id, isActive: true },
-      });
-      for (const item of activeScholarships) {
-        item.isActive = false;
-      }
-      if (activeScholarships.length > 0) {
-        await schRepo.save(activeScholarships);
-      }
     }
 
     return {
@@ -459,5 +459,134 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     return new Map(
       tests.map((test) => [test.testName.toUpperCase(), test.id]),
     );
+  }
+
+  private async buildBatchCache(
+    tm: EntityManager,
+    chunk: CsvRow[],
+    universityCache: Map<string, string[]>,
+    programmeCache: Map<string, string>,
+    degreeCache: Map<string, string>,
+  ): Promise<CourseBatchCache> {
+    const courseRepo = tm.getRepository(UniCourses);
+    const intakeRepo = tm.getRepository(UniCourseIntakes);
+    const engRepo = tm.getRepository(CourseEngReq);
+    const schRepo = tm.getRepository(CourseIntakeScholarships);
+
+    const courseByKey = new Map<string, UniCourses>();
+    const intakeByKey = new Map<string, UniCourseIntakes>();
+    const engReqByCourseId = new Map<string, CourseEngReq[]>();
+    const scholarshipByKey = new Map<string, CourseIntakeScholarships>();
+
+    const courseLookupKeys = chunk
+      .map((row) => {
+        const uniIds = universityCache.get(row.uniName.trim().toLowerCase()) ?? [];
+        const progId = programmeCache.get(row.programmeName.trim().toLowerCase());
+        const degreeId = degreeCache.get(row.degreeName.trim().toLowerCase());
+        if (uniIds.length !== 1 || !progId || !degreeId) return null;
+        return {
+          uniId: uniIds[0],
+          sysProgrammeId: progId,
+          sysDegreeId: degreeId,
+          courseName: row.courseName.trim(),
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    if (courseLookupKeys.length > 0) {
+      const uniIds = [...new Set(courseLookupKeys.map((k) => k.uniId))];
+      const courseNames = [
+        ...new Set(courseLookupKeys.map((k) => k.courseName.toLowerCase())),
+      ];
+      const allCourses = await courseRepo
+        .createQueryBuilder('c')
+        .where('c.uniId IN (:...uniIds)', { uniIds })
+        .andWhere('LOWER(c.courseName) IN (:...courseNames)', { courseNames })
+        .getMany();
+      const allowed = new Set(
+        courseLookupKeys.map((k) =>
+          this.makeCourseKey(k.uniId, k.sysProgrammeId, k.sysDegreeId, k.courseName),
+        ),
+      );
+      for (const course of allCourses) {
+        const key = this.makeCourseKey(
+          course.uniId,
+          course.sysProgrammeId,
+          course.sysDegreeId,
+          course.courseName,
+        );
+        if (allowed.has(key)) {
+          courseByKey.set(key, course);
+        }
+      }
+    }
+
+    const existingCourseIds = [...new Set([...courseByKey.values()].map((c) => c.id))];
+    if (existingCourseIds.length > 0) {
+      const [allIntakes, allEngReqs] = await Promise.all([
+        intakeRepo
+          .createQueryBuilder('i')
+          .where('i.uniCourseId IN (:...ids)', { ids: existingCourseIds })
+          .getMany(),
+        engRepo
+          .createQueryBuilder('e')
+          .where('e.uniCourseId IN (:...ids)', { ids: existingCourseIds })
+          .getMany(),
+      ]);
+
+      for (const intake of allIntakes) {
+        intakeByKey.set(
+          this.makeIntakeKey(intake.uniCourseId, intake.intakeMonth, intake.intakeYear),
+          intake,
+        );
+      }
+      for (const req of allEngReqs) {
+        const list = engReqByCourseId.get(req.uniCourseId) ?? [];
+        list.push(req);
+        engReqByCourseId.set(req.uniCourseId, list);
+      }
+    }
+
+    const existingIntakeIds = [...new Set([...intakeByKey.values()].map((i) => i.id))];
+    if (existingIntakeIds.length > 0) {
+      const allScholarships = await schRepo
+        .createQueryBuilder('s')
+        .where('s.courseIntakeId IN (:...ids)', { ids: existingIntakeIds })
+        .getMany();
+      for (const scholarship of allScholarships) {
+        scholarshipByKey.set(
+          this.makeScholarshipKey(scholarship.courseIntakeId, scholarship.name),
+          scholarship,
+        );
+      }
+    }
+
+    return {
+      courseByKey,
+      intakeByKey,
+      engReqByCourseId,
+      scholarshipByKey,
+    };
+  }
+
+  private makeCourseKey(
+    uniId: string,
+    programmeId: string,
+    degreeId: string,
+    courseName: string,
+  ): string {
+    return `${uniId}::${programmeId}::${degreeId}::${courseName.trim().toLowerCase()}`;
+  }
+
+  private makeIntakeKey(
+    uniCourseId: string,
+    intakeMonth: number,
+    intakeYear: number,
+  ): string {
+    return `${uniCourseId}::${intakeMonth}::${intakeYear}`;
+  }
+
+  private makeScholarshipKey(courseIntakeId: string, scholarshipName: string): string {
+    return `${courseIntakeId}::${scholarshipName.trim().toLowerCase()}`;
   }
 }

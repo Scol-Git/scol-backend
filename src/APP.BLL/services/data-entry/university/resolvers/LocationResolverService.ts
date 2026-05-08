@@ -5,7 +5,7 @@ import { SysStates } from '@entity/entities/SysStates.entity';
 import { SysCities } from '@entity/entities/SysCities.entity';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
-import type { UniversityCsvRow } from '../dto/UniversityCsvRow';
+import type { ValidatedUniversityCsvRow } from '../dto/UniversityCsvRow';
 import type { LocationMaps } from './LocationMaps';
 import { stateKey, cityKey } from './ImportKeys';
 
@@ -15,7 +15,10 @@ const LOG_CONTEXT = '[BulkImport:University:LocationResolver]';
 export class LocationResolverService {
   constructor(@Inject(ILoggerToken) private readonly logger: ILogger) {}
 
-  async resolveLocations(manager: EntityManager, rows: UniversityCsvRow[]): Promise<LocationMaps> {
+  async resolveLocations(
+    manager: EntityManager,
+    rows: ValidatedUniversityCsvRow[],
+  ): Promise<LocationMaps> {
     const uniqueCountryNames = [...new Set(rows.map((r) => r.countryName.trim()).filter(Boolean))];
     const countryMap = await this.resolveCountries(manager, uniqueCountryNames);
     const statePairs = this.getUniqueStatePairs(rows, countryMap);
@@ -52,7 +55,7 @@ export class LocationResolverService {
   }
 
   private getUniqueStatePairs(
-    rows: UniversityCsvRow[],
+    rows: ValidatedUniversityCsvRow[],
     countryMap: Map<string, string>,
   ): { stateName: string; sysCountryId: string }[] {
     const seen = new Set<string>();
@@ -92,7 +95,7 @@ export class LocationResolverService {
   }
 
   private getUniqueCityPairs(
-    rows: UniversityCsvRow[],
+    rows: ValidatedUniversityCsvRow[],
     countryMap: Map<string, string>,
     stateMap: Map<string, string>,
   ): { cityName: string; sysStateId: string }[] {
