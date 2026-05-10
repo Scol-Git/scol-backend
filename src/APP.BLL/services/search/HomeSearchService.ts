@@ -7,6 +7,7 @@ import { HomeRequestDto } from '@shared/dtos/search/HomeRequestDto';
 import { SearchResponseDto } from '@shared/dtos/search/SearchResponseDto';
 import { UserSearchContextResolver } from './shared/UserSearchContextResolver';
 import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor';
+import { WishlistMarker } from '@bll/services/wishlist/WishlistMarker';
 
 /**
  * Home Page Search Service
@@ -23,6 +24,11 @@ import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor
  * - Redis caching with 5-minute TTL
  * - 60%+ reduction in data transfer vs loading all courses
  *
+ * **Wishlist:** `WishlistMarker` runs **after** `SearchPipelineExecutor` (i.e. after any
+ * Redis-backed course list cache). Cache keys are per search **context**, not per user, so
+ * `isWishlisted` must be layered in memory without mutating the cached array (see step 3 in
+ * `getHomeCourses`).
+ *
  * @see SearchPipelineExecutor for implementation details
  */
 @Injectable()
@@ -30,11 +36,17 @@ export class HomeSearchService {
   constructor(
     private readonly contextResolver: UserSearchContextResolver,
     private readonly pipelineExecutor: SearchPipelineExecutor,
+    private readonly wishlistMarker: WishlistMarker,
     @Inject(ILoggerToken) private readonly logger: ILogger,
   ) {}
 
   /**
    * Get home page courses
+   *
+   * 1. Resolve search context (short-lived cache).
+   * 2. Run pipeline (may return a **shared** cached course list — not keyed by user).
+   * 3. Call `WishlistMarker` on that list so `isWishlisted` is per-request without
+   *    writing user state into the cache.
    *
    * @param request - Home request with pagination and listType
    * @param user - Current user (optional, affects ranking mode)
@@ -62,7 +74,7 @@ export class HomeSearchService {
     // 2. Execute optimized search pipeline
     // - No filters for home page (all active courses)
     // - Ranking: DB-level for anonymous, in-memory for logged-in
-    // - Results cached in Redis
+    // - Results cached in Redis (cache key is per-context, NOT per-user)
     const result = await this.pipelineExecutor.execute({
       // No search text or filters for home page
       listType: request.listType ?? ListType.ELIGIBLE_ONLY,
@@ -71,12 +83,22 @@ export class HomeSearchService {
       context,
     });
 
+    // 3. Layer per-user `isWishlisted` on top of the cached payload.
+    //    Returns the same `result.courses` reference when nothing matches
+    //    so the cached object is never mutated.
+    const enrichedCourses = await this.wishlistMarker.markCourseDtos(
+      user?.userId,
+      result.courses,
+    );
+
     this.logger.debug?.('Home search completed', {
       context: 'HomeSearchService.getHomeCourses',
       resultCount: result.courses.length,
       hasNext: result.pagination.hasNext,
     });
 
-    return result;
+    return enrichedCourses === result.courses
+      ? result
+      : { ...result, courses: enrichedCourses };
   }
 }

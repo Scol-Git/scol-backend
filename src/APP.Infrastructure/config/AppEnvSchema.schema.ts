@@ -40,6 +40,9 @@ export const AppEnvSchema = Joi.object({
   PAGINATION_DEFAULT_PAGE_SIZE: Joi.number().default(10),
   PAGINATION_MAX_PAGE_SIZE: Joi.number().default(100),
 
+  // Wishlist (favourite courses) configuration
+  WISHLIST_PER_USER_LIMIT: Joi.number().integer().min(1).default(5),
+
   // API Configuration
   CORS_ENABLED: Joi.string().valid('true', 'false').default('true'),
   CORS_ORIGINS: Joi.string().default('*'),
