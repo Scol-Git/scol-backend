@@ -52,6 +52,7 @@ import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocu
 import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
+import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -111,6 +112,7 @@ import { AppDbContext } from './AppDbContext';
             ApplicationActivities,
             LeadDocuments,
             LeadDocumentVersions,
+            LeadFavouriteCourses,
           ],
           synchronize: false,
           logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
@@ -168,6 +170,7 @@ import { AppDbContext } from './AppDbContext';
       ApplicationActivities,
       LeadDocuments,
       LeadDocumentVersions,
+      LeadFavouriteCourses,
     ]),
   ],
   providers: [AppDbContext],

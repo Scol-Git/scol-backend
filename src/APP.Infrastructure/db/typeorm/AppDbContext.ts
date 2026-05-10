@@ -53,6 +53,7 @@ import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocu
 import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
+import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
 
 /**
  * AppDbContext - EF Core-style DbContext for TypeORM
@@ -202,6 +203,9 @@ export class AppDbContext {
 
     @InjectRepository(LeadDocumentVersions)
     public readonly leadDocumentVersions: Repository<LeadDocumentVersions>,
+
+    @InjectRepository(LeadFavouriteCourses)
+    public readonly leadFavouriteCourses: Repository<LeadFavouriteCourses>,
   ) {}
 
   /**

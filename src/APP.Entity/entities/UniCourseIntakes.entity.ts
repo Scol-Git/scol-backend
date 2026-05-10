@@ -13,6 +13,7 @@ import { BaseEntity } from './BaseEntity.template';
 import { UniCourses } from './UniCourses.entity';
 import { CourseIntakeScholarships } from './CourseIntakeScholarships.entity';
 import { Applications } from './Applications.entity';
+import { LeadFavouriteCourses } from './LeadFavouriteCourses.entity';
 
 /**
  * @class UniCourseIntakes
@@ -193,4 +194,10 @@ feesMetaData?: MetaDataItem[];
    */
   @OneToMany(() => Applications, (app) => app.UniCourseIntake)
   Applications!: Applications[];
+
+  /**
+   * One-to-Many: Favourites (wishlist) pointing to this intake
+   */
+  @OneToMany(() => LeadFavouriteCourses, (fav) => fav.UniCourseIntake)
+  LeadFavouriteCourse!: LeadFavouriteCourses[];
 }

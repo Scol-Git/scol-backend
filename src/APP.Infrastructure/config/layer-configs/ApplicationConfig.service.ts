@@ -37,6 +37,10 @@ export class ApplicationConfig implements IApplicationConfig {
     maxPageSize: this._config.get<number>('PAGINATION_MAX_PAGE_SIZE', 100),
   };
 
+  wishlist = {
+    perUserLimit: this._config.get<number>('WISHLIST_PER_USER_LIMIT', 5),
+  };
+
   constructor(private readonly _config: ConfigService) {}
 }
 

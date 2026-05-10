@@ -95,6 +95,7 @@ import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocu
 import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
+import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
 
 /**
  * AppDataSource - TypeORM DataSource for migrations and CLI operations
@@ -154,6 +155,7 @@ const AppDataSource = new DataSource({
     ApplicationActivities,
     LeadDocuments,
     LeadDocumentVersions,
+    LeadFavouriteCourses,
   ],
 
   migrations: [migrationPath],

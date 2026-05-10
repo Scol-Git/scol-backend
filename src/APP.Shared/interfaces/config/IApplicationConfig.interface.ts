@@ -36,5 +36,13 @@ export interface IApplicationConfig {
     /** Maximum allowed page size */
     maxPageSize: number;
   };
+
+  /**
+   * Wishlist (favourite courses) configuration
+   */
+  wishlist: {
+    /** Maximum number of wishlisted course intakes per LEAD user */
+    perUserLimit: number;
+  };
 }
 
