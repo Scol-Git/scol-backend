@@ -17,6 +17,7 @@ import {
   CampusLifeMediaDto,
 } from '@shared/dtos/course-details/CourseDetailsDto';
 import { MetaItemDto } from '@shared/dtos/course-details/MetaItemDto';
+import type { CourseDetailsLeadFlags } from '@bll/services/CourseService/CourseDetailsLeadFlagsResolver';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -102,11 +103,12 @@ export class CourseDetailsMapper {
   toCourseDetailsResponse(
     intake: UniCourseIntakes,
     currentYearIntakes: UniCourseIntakes[],
+    leadFlags: CourseDetailsLeadFlags,
   ): CourseDetailsResponseDto {
     const sections = this.buildSections(intake, currentYearIntakes);
     return {
+      courseDetails: this.buildCourseDetails(intake, sections, leadFlags),
       meta: this.buildMeta(intake, sections),
-      courseDetails: this.buildCourseDetails(intake, sections),
     };
   }
 
@@ -128,12 +130,15 @@ export class CourseDetailsMapper {
   private buildCourseDetails(
     intake: UniCourseIntakes,
     sections: CourseDetailSections,
+    leadFlags: CourseDetailsLeadFlags,
   ): CourseDetailsDto {
     const uni = intake.UniCourse?.SysUniversity;
 
     return {
       courseId: intake.uniCourseId,
       courseName: intake.UniCourse?.courseName ?? '',
+      canApply: leadFlags.canApply,
+      alreadyApplied: leadFlags.alreadyApplied,
       ranking: sections.ranking,
       university: this.buildUniversity(uni),
       tags: this.buildTags(uni),

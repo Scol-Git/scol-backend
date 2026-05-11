@@ -117,6 +117,18 @@ export class CourseDetailsDto {
   @ApiProperty() courseId!: string;
   @ApiProperty() courseName!: string;
 
+  @ApiProperty({
+    description:
+      'True when the authenticated lead is eligible and has not already applied for this intake',
+  })
+  canApply!: boolean;
+
+  @ApiProperty({
+    description:
+      'True when the authenticated lead already has an application for this intake',
+  })
+  alreadyApplied!: boolean;
+
   @ApiProperty({ type: RankingDto })
   ranking!: RankingDto;
 
