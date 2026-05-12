@@ -56,20 +56,15 @@ export class HomeSearchService {
     request: HomeRequestDto,
     user?: ICurrentUser,
   ): Promise<SearchResponseDto> {
-    this.logger.LogDebug('Home Search Started : ', {
+    const started = Date.now();
+    this.logger.debug?.('Home search started', {
       context: 'HomeSearchService.getHomeCourses',
+      userId: user?.userId,
       listType: request.listType,
-      cursor: request.pagination?.cursor ? 'provided' : 'none',
-      userInfo: user,
+      hasCursor: !!request.pagination?.cursor,
     });
 
-    // 1. Resolve user context (cached for 2 minutes)
     const context = await this.contextResolver.resolve(user);
-
-    this.logger.debug?.('Search context resolved :', {
-      context: 'HomeSearchService.getHomeCourses',
-      userContext: context,
-    });
 
     // 2. Execute optimized search pipeline
     // - No filters for home page (all active courses)
@@ -93,8 +88,9 @@ export class HomeSearchService {
 
     this.logger.debug?.('Home search completed', {
       context: 'HomeSearchService.getHomeCourses',
-      resultCount: result.courses.length,
+      resultCount: enrichedCourses.length,
       hasNext: result.pagination.hasNext,
+      elapsedMs: Date.now() - started,
     });
 
     return enrichedCourses === result.courses

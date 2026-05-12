@@ -11,6 +11,11 @@ import { LeadEnglishTestSectionResults } from './LeadEnglishTestSectionResults.e
  */
 @Entity('LeadEnglishTestResults')
 @Index('IX_LeadEnglishTestResults_leadId_sysEngTestId', ['leadId', 'sysEngTestId'])
+@Index('IX_LeadEnglishTestResults_leadId_sysEngTestId_overallScore', [
+  'leadId',
+  'sysEngTestId',
+  'overallScore',
+])
 export class LeadEnglishTestResults extends BaseEntity {
   @Column({
     name: 'leadId',

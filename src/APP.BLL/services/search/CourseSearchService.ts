@@ -1,5 +1,4 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { IsNull } from 'typeorm';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import { ICurrentUser } from '@shared/interfaces/domain';
@@ -10,7 +9,7 @@ import { SearchResponseDto } from '@shared/dtos/search/SearchResponseDto';
 import { AdvancedFiltersResponseDto } from '@shared/dtos/search/AdvancedFiltersResponseDto';
 import { UserSearchContextResolver } from './shared/UserSearchContextResolver';
 import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor';
-import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
+import { SearchFilterOptionsService } from './shared/filters/SearchFilterOptionsService';
 
 /**
  * Course Search Service
@@ -41,7 +40,7 @@ export class CourseSearchService {
   constructor(
     private readonly contextResolver: UserSearchContextResolver,
     private readonly pipelineExecutor: SearchPipelineExecutor,
-    private readonly db: AppDbContext,
+    private readonly filterOptionsService: SearchFilterOptionsService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
   ) {}
 
@@ -56,11 +55,13 @@ export class CourseSearchService {
     request: SearchRequestDto,
     user?: ICurrentUser,
   ): Promise<SearchResponseDto> {
+    const started = Date.now();
     this.logger.debug?.('Normal search started', {
       context: 'CourseSearchService.search',
       userId: user?.userId,
-      searchText: request.searchText,
+      hasSearchText: !!request.searchText?.trim(),
       listType: request.listType,
+      hasCursor: !!request.pagination?.cursor,
     });
 
     // 1. Resolve user context (cached for 2 minutes)
@@ -79,6 +80,7 @@ export class CourseSearchService {
       context: 'CourseSearchService.search',
       resultCount: result.courses.length,
       hasNext: result.pagination.hasNext,
+      elapsedMs: Date.now() - started,
     });
 
     return result;
@@ -97,6 +99,7 @@ export class CourseSearchService {
     request: AdvancedSearchRequestDto,
     user?: ICurrentUser,
   ): Promise<SearchResponseDto> {
+    const started = Date.now();
     this.logger.debug?.('Advanced search started', {
       context: 'CourseSearchService.advancedSearch',
       userId: user?.userId,
@@ -104,6 +107,7 @@ export class CourseSearchService {
       hasRanges: !!request.ranges,
       hasFlags: !!request.flags,
       listType: request.listType,
+      hasCursor: !!request.pagination?.cursor,
     });
 
     // 1. Resolve user context (cached for 2 minutes)
@@ -124,6 +128,7 @@ export class CourseSearchService {
       context: 'CourseSearchService.advancedSearch',
       resultCount: result.courses.length,
       hasNext: result.pagination.hasNext,
+      elapsedMs: Date.now() - started,
     });
 
     return result;
@@ -135,34 +140,6 @@ export class CourseSearchService {
    * @returns Filter groups with available countries and programmes
    */
   async getAdvancedFilters(): Promise<AdvancedFiltersResponseDto> {
-    this.logger.debug?.('Fetching advanced filter options', {
-      context: 'CourseSearchService.getAdvancedFilters',
-    });
-
-    const [countries, programmes] = await Promise.all([
-      this.db.countries.find({
-        select: ['id', 'countryName'],
-        where: { deletedAt: IsNull() },
-        order: { countryName: 'ASC' },
-      }),
-      this.db.programmes.find({
-        select: ['id', 'name'],
-        where: { deletedAt: IsNull() },
-        order: { name: 'ASC' },
-      }),
-    ]);
-
-    return {
-      filters: [
-        {
-          name: 'country',
-          values: countries.map((c) => ({ id: c.id, name: c.countryName })),
-        },
-        {
-          name: 'programme',
-          values: programmes.map((p) => ({ id: p.id, name: p.name })),
-        },
-      ],
-    };
+    return this.filterOptionsService.getAdvancedFilters();
   }
 }
