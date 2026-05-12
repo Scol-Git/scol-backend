@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { LeadsModule } from '@bll/services/leads/LeadsModule.module';
+import { WishlistStateModule } from '@bll/services/shared/wishlist/WishlistStateModule.module';
 
 // Orchestrators
 import { HomeSearchService } from './HomeSearchService';
@@ -40,7 +41,7 @@ import { CourseSearchHydrator } from './shared/pipeline/hydration/CourseSearchHy
  * - Database indexes optimize Phase 1 candidate selection
  */
 @Module({
-  imports: [LeadsModule],
+  imports: [LeadsModule, WishlistStateModule],
   providers: [
     HomeSearchService,
     CourseSearchService,
