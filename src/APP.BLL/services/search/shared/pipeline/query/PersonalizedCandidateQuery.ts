@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Brackets, DataSource } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { ListType } from '@shared/enums/ListType.enum';
 import { ILogger } from '@shared/interfaces/logging';
@@ -62,8 +62,7 @@ export class PersonalizedCandidateQuery {
       englishExpr,
     );
 
-    const needsDedup =
-      this.baseQueryBuilder.shouldApplyNextIntakeRule(params);
+    const needsDedup = this.baseQueryBuilder.shouldApplyNextIntakeRule(params);
 
     const baseQb = this.baseQueryBuilder.buildBaseQuery(params, intakeWindow);
 
@@ -123,11 +122,14 @@ export class PersonalizedCandidateQuery {
 
     if (cursorRank !== null && cursorCourseIntakeId !== null) {
       pagingQb = pagingQb.andWhere(
-        '(s1."rankScore", s1."courseIntakeId") < (:cursorRank, :cursorCourseIntakeId)',
-        {
-          cursorRank: Math.floor(cursorRank),
-          cursorCourseIntakeId,
-        },
+        new Brackets((qb) => {
+          qb.where('s1."rankScore" < :cursorRank', {
+            cursorRank: Math.floor(cursorRank),
+          }).orWhere(
+            's1."rankScore" = :cursorRank AND s1."courseIntakeId" > :cursorCourseIntakeId',
+            { cursorRank: Math.floor(cursorRank), cursorCourseIntakeId },
+          );
+        }),
       );
     }
 
@@ -163,9 +165,12 @@ export class PersonalizedCandidateQuery {
     if (process.env.SEARCH_SQL_DEBUG !== 'true') return;
     const sqlFormatted = this.formatSqlForLog(qb.getQuery());
     const paramsJson = JSON.stringify(qb.getParameters(), null, 2);
-    this.logger.LogDebug(`${label}\n\n${sqlFormatted}\n\nParams:\n${paramsJson}`, {
-      context: logContext,
-    });
+    this.logger.LogDebug(
+      `${label}\n\n${sqlFormatted}\n\nParams:\n${paramsJson}`,
+      {
+        context: logContext,
+      },
+    );
   }
 
   private formatSqlForLog(sql: string): string {

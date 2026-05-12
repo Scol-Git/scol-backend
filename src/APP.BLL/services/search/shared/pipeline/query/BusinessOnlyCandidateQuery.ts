@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Brackets, DataSource } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { ListType } from '@shared/enums/ListType.enum';
 import { RankingMode } from '@shared/enums/RankingMode.enum';
@@ -46,13 +46,9 @@ export class BusinessOnlyCandidateQuery {
     const cursorCourseIntakeId = cursorData?.courseIntakeId ?? null;
 
     const commissionExpr = this.rankingSqlBuilder.commissionScoreExpr();
-    const needsDedup =
-      this.baseQueryBuilder.shouldApplyNextIntakeRule(params);
+    const needsDedup = this.baseQueryBuilder.shouldApplyNextIntakeRule(params);
 
-    const innerQb = this.baseQueryBuilder.buildBaseQuery(
-      params,
-      intakeWindow,
-    );
+    const innerQb = this.baseQueryBuilder.buildBaseQuery(params, intakeWindow);
     innerQb.select('ci.id', 'id').addSelect(commissionExpr, 'commissionScore');
 
     if (needsDedup) {
@@ -74,11 +70,14 @@ export class BusinessOnlyCandidateQuery {
 
     if (cursorRank !== null && cursorCourseIntakeId !== null) {
       rankQb = rankQb.andWhere(
-        '(sub."commissionScore", sub.id) < (:cursorRank, :cursorCourseIntakeId)',
-        {
-          cursorRank: Math.floor(cursorRank),
-          cursorCourseIntakeId,
-        },
+        new Brackets((qb) => {
+          qb.where('sub."commissionScore" < :cursorRank', {
+            cursorRank: Math.floor(cursorRank),
+          }).orWhere(
+            'sub."commissionScore" = :cursorRank AND sub.id > :cursorCourseIntakeId',
+            { cursorRank: Math.floor(cursorRank), cursorCourseIntakeId },
+          );
+        }),
       );
     }
 
@@ -113,9 +112,12 @@ export class BusinessOnlyCandidateQuery {
     if (process.env.SEARCH_SQL_DEBUG !== 'true') return;
     const sqlFormatted = this.formatSqlForLog(qb.getQuery());
     const paramsJson = JSON.stringify(qb.getParameters(), null, 2);
-    this.logger.LogDebug(`${label}\n\n${sqlFormatted}\n\nParams:\n${paramsJson}`, {
-      context: logContext,
-    });
+    this.logger.LogDebug(
+      `${label}\n\n${sqlFormatted}\n\nParams:\n${paramsJson}`,
+      {
+        context: logContext,
+      },
+    );
   }
 
   private formatSqlForLog(sql: string): string {
