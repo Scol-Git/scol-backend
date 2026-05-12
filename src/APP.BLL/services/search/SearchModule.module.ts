@@ -10,9 +10,17 @@ import { CourseSearchService } from './CourseSearchService';
 import { UserSearchContextResolver } from './shared/UserSearchContextResolver';
 import { CourseCursorPaginationService } from './shared/CourseCursorPaginationService';
 import { CourseResponseMapper } from '../../mappings/search/CourseResponseMapper';
+import { SearchFilterOptionsService } from './shared/filters/SearchFilterOptionsService';
+import { SearchResultCacheService } from './shared/cache/SearchResultCacheService';
 
 // Pipeline executor (3-phase optimized search)
 import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor';
+import { SearchBaseQueryBuilder } from './shared/pipeline/query/SearchBaseQueryBuilder';
+import { BusinessOnlyCandidateQuery } from './shared/pipeline/query/BusinessOnlyCandidateQuery';
+import { PersonalizedCandidateQuery } from './shared/pipeline/query/PersonalizedCandidateQuery';
+import { SearchRankingSqlBuilder } from './shared/pipeline/query/SearchRankingSqlBuilder';
+import { SearchEligibilitySqlBuilder } from './shared/pipeline/query/SearchEligibilitySqlBuilder';
+import { CourseSearchHydrator } from './shared/pipeline/hydration/CourseSearchHydrator';
 
 /**
  * Search Module (BLL)
@@ -34,14 +42,19 @@ import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor
 @Module({
   imports: [LeadsModule],
   providers: [
-    // Orchestrators (public services)
     HomeSearchService,
     CourseSearchService,
+    SearchFilterOptionsService,
 
-    // Pipeline executor (core optimization)
     SearchPipelineExecutor,
+    SearchResultCacheService,
+    SearchBaseQueryBuilder,
+    BusinessOnlyCandidateQuery,
+    PersonalizedCandidateQuery,
+    SearchRankingSqlBuilder,
+    SearchEligibilitySqlBuilder,
+    CourseSearchHydrator,
 
-    // Shared services (internal)
     UserSearchContextResolver,
     CourseCursorPaginationService,
     CourseResponseMapper,

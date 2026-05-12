@@ -13,6 +13,10 @@ import { SysEnglishTests } from './SysEnglishTests.entity';
  */
 @Entity('CourseEngReq')
 @Index('IX_CourseEngReq_uniCourseId', ['uniCourseId'])
+@Index('IX_CourseEngReq_uniCourseId_sysEngTestId', [
+  'uniCourseId',
+  'sysEngTestId',
+])
 export class CourseEngReq extends BaseEntity {
   @Column({
     name: 'uniCourseId',
