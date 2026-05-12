@@ -13,14 +13,6 @@ import { UniversityImportProcessorService } from './UniversityImportProcessorSer
 import type { UniversityImportConfig } from './UniversityImportConfig';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
-import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
-import { createHash } from 'crypto';
-import type { QueryRunner } from 'typeorm';
-import {
-  formatImportError,
-  ImportErrorCode,
-} from '../common/abstractions/ImportErrorCode';
-import { ADVISORY_LOCK_BULK_IMPORT_UNIVERSITY } from '../common/infrastructure/advisoryLockKeys';
 
 const LOG_CONTEXT = '[BulkImport:University:Service]';
 
@@ -33,27 +25,9 @@ export class UniversityImportService {
     @Inject(ILoggerToken) private readonly logger: ILogger,
     @Inject(UniversityImportConfigToken)
     private readonly config: UniversityImportConfig,
-    private readonly db: AppDbContext,
   ) {}
 
   async execute(): Promise<ImportResult> {
-    const lockRunner = await this.acquireLockRunner();
-    if (!lockRunner) {
-      throw new BadRequestException(
-        formatImportError(
-          ImportErrorCode.LOCK_NOT_ACQUIRED,
-          'University CSV import is already in progress.',
-        ),
-      );
-    }
-    try {
-      return await this.runImport();
-    } finally {
-      await this.releaseLockRunner(lockRunner);
-    }
-  }
-
-  private async runImport(): Promise<ImportResult> {
     const { folders, readinessSeconds, allowMultipleFiles } = this.config;
     const stagingFileEntries = await this.fileStore.listFiles(folders.staging);
 
@@ -81,18 +55,7 @@ export class UniversityImportService {
 
     this.logger.info(`${LOG_CONTEXT} Starting import: ${stagingFile.name}`);
     const csvText = await this.fileStore.readFile(stagingFile.path);
-    const importKey = this.computeImportKey(csvText, stagingFile.name);
-    const markerDir = `${folders.archive}/idempotency`;
-    await this.fileStore.ensureDir(markerDir);
-    const alreadyImported = (await this.fileStore.listFiles(markerDir)).some(
-      (f) => f.name === `${importKey}.done`,
-    );
-    if (alreadyImported) {
-      this.logger.info(
-        `${LOG_CONTEXT} Skipping duplicate import for ${stagingFile.name} (${importKey}).`,
-      );
-      return this.emptyResult();
-    }
+
     const result = await this.pipeline.execute(
       csvText,
       UniversityImportSchema,
@@ -113,7 +76,6 @@ export class UniversityImportService {
 
     const archivePath = `${folders.archive}/${importTimestamp}_${stagingFile.name}`;
     await this.fileStore.ensureDir(folders.archive);
-    await this.fileStore.writeFile(`${markerDir}/${importKey}.done`, archivePath);
     await this.fileStore.moveFile(stagingFile.path, archivePath);
     this.logger.info(
       `${LOG_CONTEXT} Archived ${stagingFile.name} to ${archivePath}`,
@@ -137,36 +99,5 @@ export class UniversityImportService {
       .replace(/[-:]/g, '')
       .replace(/\..+/, '')
       .slice(0, 15);
-  }
-
-  private computeImportKey(csvText: string, fileName: string): string {
-    return createHash('sha256')
-      .update(`${fileName}\n${csvText}`)
-      .digest('hex');
-  }
-
-  private async acquireLockRunner(): Promise<QueryRunner | null> {
-    const runner = this.db.manager.connection.createQueryRunner();
-    await runner.connect();
-    const rows = await runner.query(
-      'SELECT pg_try_advisory_lock($1::bigint) AS "locked"',
-      [ADVISORY_LOCK_BULK_IMPORT_UNIVERSITY.toString()],
-    );
-    const locked = Boolean(rows?.[0]?.locked);
-    if (!locked) {
-      await runner.release();
-      return null;
-    }
-    return runner;
-  }
-
-  private async releaseLockRunner(runner: QueryRunner): Promise<void> {
-    try {
-      await runner.query('SELECT pg_advisory_unlock($1::bigint)', [
-        ADVISORY_LOCK_BULK_IMPORT_UNIVERSITY.toString(),
-      ]);
-    } finally {
-      await runner.release();
-    }
   }
 }

@@ -8,7 +8,6 @@ export enum ImportErrorCode {
   UNEXPECTED_ERROR = 'UNEXPECTED_ERROR',
   RESOLUTION_FAILED = 'RESOLUTION_FAILED',
   DUPLICATE_ROW = 'DUPLICATE_ROW',
-  LOCK_NOT_ACQUIRED = 'LOCK_NOT_ACQUIRED',
 }
 
 export function formatImportError(
