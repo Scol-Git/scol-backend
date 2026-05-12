@@ -89,6 +89,13 @@
       "ts"
     ],
     "rootDir": "src",
+    "moduleNameMapper": {
+      "^@shared/(.*)$": "<rootDir>/APP.Shared/$1",
+      "^@entity/(.*)$": "<rootDir>/APP.Entity/$1",
+      "^@bll/(.*)$": "<rootDir>/APP.BLL/$1",
+      "^@infra/(.*)$": "<rootDir>/APP.Infrastructure/$1",
+      "^@api/(.*)$": "<rootDir>/APP.API/$1"
+    },
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"

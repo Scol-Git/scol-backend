@@ -132,7 +132,33 @@ export class UserSearchContextResolver {
    * Returns raw LeadProfileData (JSON-serializable) instead of normalized Maps/Sets
    */
   private async resolveFromDatabase(userId: string): Promise<CacheableContext> {
-    // Load lead profile with all academic data
+    const minimal = await this.db.leadProfiles.findOne({
+      where: { userId },
+      select: ['id', 'userId'],
+    });
+
+    if (!minimal) {
+      return {
+        userState: UserState.LOGGED_IN,
+        academicFormStatus: AcademicFormStatus.INCOMPLETE,
+        rankingMode: RankingMode.BUSINESS_ONLY,
+        leadProfileData: undefined,
+      };
+    }
+
+    const formStatus =
+      await this.leadProfileService.determinedAcademicFormStatus(userId);
+    const rankingMode = this.determineRankingMode(formStatus);
+
+    if (formStatus === AcademicFormStatus.INCOMPLETE) {
+      return {
+        userState: UserState.LOGGED_IN,
+        academicFormStatus: formStatus,
+        rankingMode,
+        leadProfileData: undefined,
+      };
+    }
+
     const leadProfile = await this.db.leadProfiles.findOne({
       where: { userId },
       relations: {
@@ -146,32 +172,15 @@ export class UserSearchContextResolver {
       },
     });
 
-    // No profile = treat as anonymous (BUSINESS_ONLY mode)
     if (!leadProfile) {
       return {
         userState: UserState.LOGGED_IN,
-        academicFormStatus: AcademicFormStatus.INCOMPLETE,
+        academicFormStatus: formStatus,
         rankingMode: RankingMode.BUSINESS_ONLY,
         leadProfileData: undefined,
       };
     }
 
-    // Use same section-aware rule as auth/leads (single source of truth)
-    const formStatus =
-      await this.leadProfileService.determinedAcademicFormStatus(userId);
-    const rankingMode = this.determineRankingMode(formStatus);
-
-    // If form is incomplete (no data), treat same as "no profile"
-    if (formStatus === AcademicFormStatus.INCOMPLETE) {
-      return {
-        userState: UserState.LOGGED_IN,
-        academicFormStatus: formStatus,
-        rankingMode,
-        leadProfileData: undefined,
-      };
-    }
-
-    // Map to profile data (raw, JSON-serializable)
     const leadProfileData = this.mapToLeadProfileData(leadProfile);
 
     this.logger.LogDebug('Lead profile data (cacheable)', {
@@ -194,10 +203,7 @@ export class UserSearchContextResolver {
    * Determine ranking mode based on form status
    */
   private determineRankingMode(formStatus: AcademicFormStatus): RankingMode {
-    if (
-      formStatus === AcademicFormStatus.COMPLETED ||
-      formStatus === AcademicFormStatus.PARTIALLY_COMPLETED
-    ) {
+    if (formStatus === AcademicFormStatus.COMPLETED) {
       return RankingMode.ELIGIBILITY_PLUS_BUSINESS;
     }
     return RankingMode.BUSINESS_ONLY;

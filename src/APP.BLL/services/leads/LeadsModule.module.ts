@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { LeadProfileService } from './LeadProfileService';
 import { AcademicFormValidator } from './AcademicFormValidator';
 import { AcademicFormMapper } from './AcademicFormMapper';
+import { SearchCacheSupportModule } from '@bll/services/search/shared/cache/SearchCacheSupportModule.module';
 
 /**
  * Leads Module (BLL)
@@ -12,6 +13,7 @@ import { AcademicFormMapper } from './AcademicFormMapper';
  * - AcademicFormMapper
  */
 @Module({
+  imports: [SearchCacheSupportModule],
   providers: [LeadProfileService, AcademicFormValidator, AcademicFormMapper],
   exports: [LeadProfileService],
 })

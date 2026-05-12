@@ -10,6 +10,11 @@ import { SysAcademicDegrees } from './SysAcademicDegrees.entity';
  */
 @Entity('LeadAcademicResults')
 @Index('IX_LeadAcademicResults_lead_id_degree_id', ['leadId', 'degreeId'])
+@Index('IX_LeadAcademicResults_leadId_degreeId_gpa', [
+  'leadId',
+  'degreeId',
+  'gpa',
+])
 export class LeadAcademicResults extends BaseEntity {
   @Column({
     name: 'lead_id',
