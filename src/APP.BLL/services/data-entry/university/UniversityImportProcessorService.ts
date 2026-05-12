@@ -1,10 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
-import type {
-  CsvImportProcessor,
-  CsvRow,
-  CsvProcessingResult,
-} from '../common/abstractions/CsvImportProcessor';
+import type { CsvRow, CsvProcessingResult } from '../common/abstractions/CsvImportProcessor';
 import { normalizeCsvRow, type ValidatedUniversityCsvRow } from './dto/UniversityCsvRow';
 import { UniversityRowValidator } from './validators/UniversityRowValidator';
 import { LocationResolverService } from './resolvers/LocationResolverService';
@@ -16,7 +12,7 @@ import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 const LOG_CONTEXT = '[BulkImport:University:Processor]';
 
 @Injectable()
-export class UniversityImportProcessorService implements CsvImportProcessor {
+export class UniversityImportProcessorService {
   constructor(
     private readonly validator: UniversityRowValidator,
     private readonly locationResolver: LocationResolverService,

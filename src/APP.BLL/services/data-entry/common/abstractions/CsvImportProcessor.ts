@@ -1,4 +1,4 @@
-import { EntityManager } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 
 /**
  * Single row as parsed from CSV (string values keyed by column name).
@@ -15,9 +15,11 @@ export interface CsvProcessingResult {
 }
 
 /**
- * Processor that performs DB resolution and persistence for a specific CSV import type.
- * Runs inside a transaction; receives raw CSV rows and returns reviewed + error rows.
+ * Object with {@link processRows} — used by {@link CsvImportPipeline} without a nominal interface.
  */
-export interface CsvImportProcessor {
-  processRows(manager: EntityManager, rows: CsvRow[]): Promise<CsvProcessingResult>;
-}
+export type CsvImportRowProcessor = {
+  processRows(
+    manager: EntityManager,
+    rows: CsvRow[],
+  ): Promise<CsvProcessingResult>;
+};

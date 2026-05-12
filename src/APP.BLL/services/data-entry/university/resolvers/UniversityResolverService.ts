@@ -38,18 +38,18 @@ export class UniversityResolverService {
     rows: ValidatedUniversityCsvRow[],
     locationMaps: LocationMaps,
   ): Promise<Map<string, string>> {
-    const resolved = this.getUniqueResolvedRows(rows, locationMaps);
+    const resolved = this.buildDedupedResolvedRowsForUpsert(rows, locationMaps);
     this.logger.info(
       `${LOG_CONTEXT} Upserting ${resolved.length} unique universities`,
     );
-    return this.upsertUniversitiesInternal(manager, resolved);
+    return this.persistResolvedUniversities(manager, resolved);
   }
 
   /**
    * Rows that cannot resolve country/state/city are omitted here; user-facing reasons use the same
    * rules in {@link resolveUniversityRowLocations} via {@link UniversityRowResultBuilder}.
    */
-  private getUniqueResolvedRows(
+  private buildDedupedResolvedRowsForUpsert(
     rows: ValidatedUniversityCsvRow[],
     locationMaps: LocationMaps,
   ): ResolvedUniversityRow[] {
@@ -101,7 +101,7 @@ export class UniversityResolverService {
     return result;
   }
 
-  private async upsertUniversitiesInternal(
+  private async persistResolvedUniversities(
     manager: EntityManager,
     resolved: ResolvedUniversityRow[],
   ): Promise<Map<string, string>> {

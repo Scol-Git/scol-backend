@@ -1,10 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
-import type {
-  CsvImportProcessor,
-  CsvRow,
-  CsvProcessingResult,
-} from '../common/abstractions/CsvImportProcessor';
+import type { CsvRow, CsvProcessingResult } from '../common/abstractions/CsvImportProcessor';
 import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
@@ -16,12 +12,13 @@ import {
   CourseImportConfig as CourseImportConfigToken,
 } from '@shared/tokens/injection.tokens';
 import {
-  CourseRowValidator,
+  type CourseCsvRow,
+  normalizeCourseCsvRow,
   type ErrorCourseRow,
-} from './validators/CourseRowValidator';
+} from './dto/CourseImportRowTypes';
+import { CourseRowValidator } from './validators/CourseRowValidator';
 import { CourseUniversityResolverService } from './resolvers/CourseUniversityResolverService';
 import { ProgrammeDegreeResolverService } from './resolvers/ProgrammeDegreeResolverService';
-import type { CourseBatchCache } from './resolvers/CourseBatchCache';
 import { CourseRowResultBuilder } from './builders/CourseRowResultBuilder';
 import { parseIntakeInfo } from './parsers/courseIntakeInfoParser';
 import {
@@ -39,8 +36,15 @@ import { parseMetaDataItems } from '../common/engine/MetaDataParser';
 
 const LOG_CONTEXT = '[BulkImport:Course:Processor]';
 
+type CourseResolutionCaches = {
+  universityCache: Map<string, string[]>;
+  programmeCache: Map<string, string>;
+  degreeCache: Map<string, string>;
+  engTestCache: Map<string, string>;
+};
+
 @Injectable()
-export class CourseImportProcessorService implements CsvImportProcessor {
+export class CourseImportProcessorService {
   constructor(
     private readonly validator: CourseRowValidator,
     private readonly universityResolver: CourseUniversityResolverService,
@@ -54,24 +58,53 @@ export class CourseImportProcessorService implements CsvImportProcessor {
     manager: EntityManager,
     rows: CsvRow[],
   ): Promise<CsvProcessingResult> {
+    const courseRows = rows.map(normalizeCourseCsvRow);
+    const { valid, invalid: validationErrors } =
+      this.partitionValidatedRows(courseRows);
+    const caches = await this.prefetchResolutionCaches(manager, valid);
+    const { reviewedRows, resolutionErrors } =
+      await this.processValidRowsInBatches(manager, valid, caches);
+
+    const errTotal = validationErrors.length + resolutionErrors.length;
+    this.logger.info(
+      `${LOG_CONTEXT} Processed: ${reviewedRows.length} reviewed, ${errTotal} errors` +
+        (errTotal > 0
+          ? ` (${validationErrors.length} validation, ${resolutionErrors.length} resolution)`
+          : ''),
+    );
+
+    return {
+      reviewedRows:
+        reviewedRows as unknown as CsvProcessingResult['reviewedRows'],
+      errorRows: [
+        ...validationErrors,
+        ...resolutionErrors,
+      ] as unknown as CsvProcessingResult['errorRows'],
+    };
+  }
+
+  private partitionValidatedRows(rows: CourseCsvRow[]): {
+    valid: CourseCsvRow[];
+    invalid: ErrorCourseRow[];
+  } {
     const { valid, invalid: validationErrors } = this.validator.validateRows(rows);
     if (validationErrors.length > 0) {
       this.logger.info(
         `${LOG_CONTEXT} Validation: ${validationErrors.length} row(s) failed (required fields or format)`,
       );
     }
+    return { valid, invalid: validationErrors };
+  }
 
-    const reviewedRows: Array<Record<string, string>> = [];
-    const resolutionErrors: ErrorCourseRow[] = [];
-
-    const batchSize = Math.max(1, this.importConfig.batchSize);
-    this.logger.info(
-      `${LOG_CONTEXT} Processing ${valid.length} valid row(s) in batch(es) of ${batchSize}`,
-    );
-
-    // One-shot prefetch on the outer manager (committed snapshot). Same Map instances are passed
-    // into every batch so findOrCreate* / new SysEnglishTests rows keep caches warm across batches
-    // without re-querying inside each transaction (avoids isolation visibility surprises).
+  /**
+   * One-shot prefetch on the outer manager (committed snapshot). Same Map instances are passed
+   * into every batch so findOrCreate* / new SysEnglishTests rows keep caches warm across batches
+   * without re-querying inside each transaction (avoids isolation visibility surprises).
+   */
+  private async prefetchResolutionCaches(
+    manager: EntityManager,
+    valid: CourseCsvRow[],
+  ): Promise<CourseResolutionCaches> {
     const universityCache = await this.universityResolver.buildCache(
       manager,
       valid.map((r) => r.uniName),
@@ -89,6 +122,25 @@ export class CourseImportProcessorService implements CsvImportProcessor {
       ]),
     );
     const engTestCache = await this.buildEngTestCache(manager);
+    return { universityCache, programmeCache, degreeCache, engTestCache };
+  }
+
+  private async processValidRowsInBatches(
+    manager: EntityManager,
+    valid: CourseCsvRow[],
+    caches: CourseResolutionCaches,
+  ): Promise<{
+    reviewedRows: Array<Record<string, string>>;
+    resolutionErrors: ErrorCourseRow[];
+  }> {
+    const reviewedRows: Array<Record<string, string>> = [];
+    const resolutionErrors: ErrorCourseRow[] = [];
+    const batchSize = Math.max(1, this.importConfig.batchSize);
+    this.logger.info(
+      `${LOG_CONTEXT} Processing ${valid.length} valid row(s) in batch(es) of ${batchSize}`,
+    );
+
+    const { universityCache, programmeCache, degreeCache, engTestCache } = caches;
 
     for (let i = 0; i < valid.length; i += batchSize) {
       const chunk = valid.slice(i, i + batchSize);
@@ -134,27 +186,12 @@ export class CourseImportProcessorService implements CsvImportProcessor {
       });
     }
 
-    const errTotal = validationErrors.length + resolutionErrors.length;
-    this.logger.info(
-      `${LOG_CONTEXT} Processed: ${reviewedRows.length} reviewed, ${errTotal} errors` +
-        (errTotal > 0
-          ? ` (${validationErrors.length} validation, ${resolutionErrors.length} resolution)`
-          : ''),
-    );
-
-    return {
-      reviewedRows:
-        reviewedRows as unknown as CsvProcessingResult['reviewedRows'],
-      errorRows: [
-        ...validationErrors,
-        ...resolutionErrors,
-      ] as unknown as CsvProcessingResult['errorRows'],
-    };
+    return { reviewedRows, resolutionErrors };
   }
 
   private async processOneRow(
     tm: EntityManager,
-    row: CsvRow,
+    row: CourseCsvRow,
     universityCache: Map<string, string[]>,
     programmeCache: Map<string, string>,
     degreeCache: Map<string, string>,
@@ -463,7 +500,7 @@ export class CourseImportProcessorService implements CsvImportProcessor {
 
   private async buildBatchCache(
     tm: EntityManager,
-    chunk: CsvRow[],
+    chunk: CourseCsvRow[],
     universityCache: Map<string, string[]>,
     programmeCache: Map<string, string>,
     degreeCache: Map<string, string>,
@@ -589,4 +626,15 @@ export class CourseImportProcessorService implements CsvImportProcessor {
   private makeScholarshipKey(courseIntakeId: string, scholarshipName: string): string {
     return `${courseIntakeId}::${scholarshipName.trim().toLowerCase()}`;
   }
+}
+
+interface CourseBatchCache {
+  // key: `${uniId}::${sysProgrammeId}::${sysDegreeId}::${courseName.toLowerCase()}`
+  courseByKey: Map<string, UniCourses>;
+  // key: `${uniCourseId}::${intakeMonth}::${intakeYear}`
+  intakeByKey: Map<string, UniCourseIntakes>;
+  // key: uniCourseId -> all CourseEngReq rows for that course
+  engReqByCourseId: Map<string, CourseEngReq[]>;
+  // key: `${courseIntakeId}::${name.toLowerCase()}`
+  scholarshipByKey: Map<string, CourseIntakeScholarships>;
 }

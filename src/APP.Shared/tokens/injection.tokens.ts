@@ -167,12 +167,6 @@ export const IApiConfig = Symbol('IApiConfig');
 export const IFileStore = Symbol('IFileStore');
 
 /**
- * Token for ICsvImportProcessor
- * Processes import rows in a transaction (e.g. university resolution)
- */
-export const ICsvImportProcessor = Symbol('ICsvImportProcessor');
-
-/**
  * Token for UniversityImportConfig
  * Folder names and behaviour for university CSV import
  */

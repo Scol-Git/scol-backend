@@ -28,7 +28,7 @@ export class UniversityRowResultBuilder {
     const seenUniKeys = new Set<string>();
 
     for (const row of rows) {
-      const outcome = this.classifyUniversityImportRow(
+      const outcome = this.resolveAndValidateForOutput(
         row,
         locationMaps,
         universityIdByKey,
@@ -48,7 +48,7 @@ export class UniversityRowResultBuilder {
   /**
    * Location + upsert map + duplicate checks. Location messages match {@link resolveUniversityRowLocations}.
    */
-  private classifyUniversityImportRow(
+  private resolveAndValidateForOutput(
     row: ValidatedUniversityCsvRow,
     locationMaps: LocationMaps,
     universityIdByKey: Map<string, string>,

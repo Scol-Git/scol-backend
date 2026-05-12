@@ -6,7 +6,6 @@ import {
 import type { FileStore } from '../common/abstractions/FileStore';
 import type { ImportResult } from '../common/abstractions/ImportResult';
 import { CsvImportPipeline } from '../common/engine/CsvImportPipeline';
-import { buildCsvBuffer } from '../common/engine/CsvWriter';
 import { CourseImportSchema } from './CourseImportSchema';
 import { CourseImportProcessorService } from './CourseImportProcessorService';
 import type { CourseImportConfig } from './CourseImportConfig';
@@ -16,9 +15,13 @@ import {
   formatImportError,
   ImportErrorCode,
 } from '../common/abstractions/ImportErrorCode';
+import {
+  emptyImportResult,
+  formatImportTimestamp,
+  MAX_CSV_IMPORT_BYTES,
+} from '../common/importUtils';
 
 const LOG_CONTEXT = '[BulkImport:Course:Service]';
-const MAX_CSV_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB
 
 @Injectable()
 export class CourseImportService {
@@ -37,7 +40,7 @@ export class CourseImportService {
 
     if (stagingFileEntries.length === 0) {
       this.logger.info(`${LOG_CONTEXT} No file in Staging; skipping import.`);
-      return this.emptyResult();
+      return emptyImportResult(CourseImportSchema);
     }
 
     if (!allowMultipleFiles && stagingFileEntries.length > 1) {
@@ -54,11 +57,11 @@ export class CourseImportService {
       this.logger.info(
         `${LOG_CONTEXT} File ${stagingFile.name} not ready (${fileAgeSeconds.toFixed(1)}s < ${readinessSeconds}s). Skipping.`,
       );
-      return this.emptyResult();
+      return emptyImportResult(CourseImportSchema);
     }
-    if (stagingFile.sizeBytes > MAX_CSV_SIZE_BYTES) {
+    if (stagingFile.sizeBytes > MAX_CSV_IMPORT_BYTES) {
       const sizeMb = (stagingFile.sizeBytes / (1024 * 1024)).toFixed(1);
-      const maxMb = (MAX_CSV_SIZE_BYTES / (1024 * 1024)).toFixed(0);
+      const maxMb = (MAX_CSV_IMPORT_BYTES / (1024 * 1024)).toFixed(0);
       throw new BadRequestException(
         formatImportError(
           ImportErrorCode.INVALID_FORMAT,
@@ -74,10 +77,9 @@ export class CourseImportService {
       csvText,
       CourseImportSchema,
       this.processor,
-      { wrapInTransaction: false },
     );
 
-    const importTimestamp = this.formatImportTimestamp();
+    const importTimestamp = formatImportTimestamp();
     await this.fileStore.ensureDir(folders.reviewed);
     await this.fileStore.ensureDir(folders.errors);
     await this.fileStore.writeFile(
@@ -100,22 +102,5 @@ export class CourseImportService {
     );
 
     return result;
-  }
-
-  private emptyResult(): ImportResult {
-    return {
-      reviewedCsv: buildCsvBuffer([], CourseImportSchema.reviewedHeaders),
-      errorsCsv: buildCsvBuffer([], CourseImportSchema.errorHeaders),
-      reviewedCount: 0,
-      errorsCount: 0,
-    };
-  }
-
-  private formatImportTimestamp(): string {
-    return new Date()
-      .toISOString()
-      .replace(/[-:]/g, '')
-      .replace(/\..+/, '')
-      .slice(0, 15);
   }
 }

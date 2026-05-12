@@ -1,5 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException } from '@nestjs/common';
 import {
   IFileStore as IFileStoreToken,
   UniversityImportConfig as UniversityImportConfigToken,
@@ -7,12 +6,20 @@ import {
 import type { FileStore } from '../common/abstractions/FileStore';
 import type { ImportResult } from '../common/abstractions/ImportResult';
 import { CsvImportPipeline } from '../common/engine/CsvImportPipeline';
-import { buildCsvBuffer } from '../common/engine/CsvWriter';
 import { UniversityImportSchema } from './UniversityImportSchema';
 import { UniversityImportProcessorService } from './UniversityImportProcessorService';
 import type { UniversityImportConfig } from './UniversityImportConfig';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
+import {
+  formatImportError,
+  ImportErrorCode,
+} from '../common/abstractions/ImportErrorCode';
+import {
+  emptyImportResult,
+  formatImportTimestamp,
+  MAX_CSV_IMPORT_BYTES,
+} from '../common/importUtils';
 
 const LOG_CONTEXT = '[BulkImport:University:Service]';
 
@@ -33,7 +40,7 @@ export class UniversityImportService {
 
     if (stagingFileEntries.length === 0) {
       this.logger.info(`${LOG_CONTEXT} No file in Staging; skipping import.`);
-      return this.emptyResult();
+      return emptyImportResult(UniversityImportSchema);
     }
 
     if (!allowMultipleFiles && stagingFileEntries.length > 1) {
@@ -50,19 +57,29 @@ export class UniversityImportService {
       this.logger.info(
         `${LOG_CONTEXT} File ${stagingFile.name} not ready (${fileAgeSeconds.toFixed(1)}s < ${readinessSeconds}s). Skipping.`,
       );
-      return this.emptyResult();
+      return emptyImportResult(UniversityImportSchema);
+    }
+    if (stagingFile.sizeBytes > MAX_CSV_IMPORT_BYTES) {
+      const sizeMb = (stagingFile.sizeBytes / (1024 * 1024)).toFixed(1);
+      const maxMb = (MAX_CSV_IMPORT_BYTES / (1024 * 1024)).toFixed(0);
+      throw new BadRequestException(
+        formatImportError(
+          ImportErrorCode.INVALID_FORMAT,
+          `CSV too large (${sizeMb} MB). Maximum allowed is ${maxMb} MB.`,
+        ),
+      );
     }
 
     this.logger.info(`${LOG_CONTEXT} Starting import: ${stagingFile.name}`);
     const csvText = await this.fileStore.readFile(stagingFile.path);
 
-    const result = await this.pipeline.execute(
+    const result = await this.pipeline.executeInTransaction(
       csvText,
       UniversityImportSchema,
       this.processor,
     );
 
-    const importTimestamp = this.formatImportTimestamp();
+    const importTimestamp = formatImportTimestamp();
     await this.fileStore.ensureDir(folders.reviewed);
     await this.fileStore.ensureDir(folders.errors);
     await this.fileStore.writeFile(
@@ -82,22 +99,5 @@ export class UniversityImportService {
     );
 
     return result;
-  }
-
-  private emptyResult(): ImportResult {
-    return {
-      reviewedCsv: buildCsvBuffer([], UniversityImportSchema.reviewedHeaders),
-      errorsCsv: buildCsvBuffer([], UniversityImportSchema.errorHeaders),
-      reviewedCount: 0,
-      errorsCount: 0,
-    };
-  }
-
-  private formatImportTimestamp(): string {
-    return new Date()
-      .toISOString()
-      .replace(/[-:]/g, '')
-      .replace(/\..+/, '')
-      .slice(0, 15);
   }
 }
