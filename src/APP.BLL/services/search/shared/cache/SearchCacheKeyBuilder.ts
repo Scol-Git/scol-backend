@@ -40,8 +40,8 @@ export class SearchCacheKeyBuilder {
 
   /** TTL values in seconds */
   static readonly TTL = {
-    /** Search results cache: 5 minutes */
-    SEARCH_RESULTS: 300,
+    /** Search results cache: 10 minutes */
+    SEARCH_RESULTS: 600,
     /** User context cache: 2 minutes */
     USER_CONTEXT: 120,
     /** Filter options cache: 30 minutes */
