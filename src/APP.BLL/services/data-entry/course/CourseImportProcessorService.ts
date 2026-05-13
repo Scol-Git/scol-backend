@@ -97,9 +97,8 @@ export class CourseImportProcessorService {
   }
 
   /**
-   * One-shot prefetch on the outer manager (committed snapshot). Same Map instances are passed
-   * into every batch so findOrCreate* / new SysEnglishTests rows keep caches warm across batches
-   * without re-querying inside each transaction (avoids isolation visibility surprises).
+   * One-shot prefetch on the transaction manager. Same Map instances are passed through all
+   * chunks so findOrCreate* / new SysEnglishTests rows keep caches warm for the whole import.
    */
   private async prefetchResolutionCaches(
     manager: EntityManager,
@@ -144,46 +143,44 @@ export class CourseImportProcessorService {
 
     for (let i = 0; i < valid.length; i += batchSize) {
       const chunk = valid.slice(i, i + batchSize);
-      await manager.connection.transaction(async (tm) => {
-        const batchCache = await this.buildBatchCache(
-          tm,
-          chunk,
-          universityCache,
-          programmeCache,
-          degreeCache,
-        );
-        for (const row of chunk) {
-          const base = this.resultBuilder.flattenInputRow(row);
-          try {
-            const result = await this.processOneRow(
-              tm,
-              row,
-              universityCache,
-              programmeCache,
-              degreeCache,
-              engTestCache,
-              batchCache,
-            );
-            if (result.error) {
-              resolutionErrors.push(result.error);
-            } else if (result.reviewed) {
-              reviewedRows.push(result.reviewed);
-            }
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : 'Unhandled row processing error';
-            this.logger.error(
-              `${LOG_CONTEXT} Unexpected row failure for course "${(row.courseName ?? '').trim()}": ${message}`,
-            );
-            resolutionErrors.push(
-              this.resultBuilder.resolutionError(
-                base,
-                formatImportError(ImportErrorCode.UNEXPECTED_ERROR, message),
-              ),
-            );
+      const batchCache = await this.buildBatchCache(
+        manager,
+        chunk,
+        universityCache,
+        programmeCache,
+        degreeCache,
+      );
+      for (const row of chunk) {
+        const base = this.resultBuilder.flattenInputRow(row);
+        try {
+          const result = await this.processOneRow(
+            manager,
+            row,
+            universityCache,
+            programmeCache,
+            degreeCache,
+            engTestCache,
+            batchCache,
+          );
+          if (result.error) {
+            resolutionErrors.push(result.error);
+          } else if (result.reviewed) {
+            reviewedRows.push(result.reviewed);
           }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Unhandled row processing error';
+          this.logger.error(
+            `${LOG_CONTEXT} Unexpected row failure for course "${(row.courseName ?? '').trim()}": ${message}`,
+          );
+          resolutionErrors.push(
+            this.resultBuilder.resolutionError(
+              base,
+              formatImportError(ImportErrorCode.UNEXPECTED_ERROR, message),
+            ),
+          );
         }
-      });
+      }
     }
 
     return { reviewedRows, resolutionErrors };

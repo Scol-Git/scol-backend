@@ -85,3 +85,7 @@ docs/
 # Local helper files
 merge-folder_cmd.txt
 merge_folder_to_txt.py
+
+# Data-entry code dump chunks + splitter (local / LLM helpers)
+/data-entry-chunks/
+/scripts/

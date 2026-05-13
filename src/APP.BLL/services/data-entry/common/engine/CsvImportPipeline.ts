@@ -15,7 +15,7 @@ export class CsvImportPipeline {
   constructor(private readonly db: AppDbContext) {}
 
   /**
-   * Full import inside one outer transaction (e.g. university import).
+   * Full import inside one outer transaction (university and course bulk import).
    */
   async executeInTransaction(
     csvText: string,
@@ -41,8 +41,8 @@ export class CsvImportPipeline {
   }
 
   /**
-   * Parse and validate only; processor runs on the root manager with no outer transaction
-   * (e.g. course import uses per-batch inner transactions).
+   * Parse and validate headers; processor runs on the root manager with no outer transaction.
+   * Use when the processor opens its own transactions; bulk imports use {@link executeInTransaction}.
    */
   async execute(
     csvText: string,

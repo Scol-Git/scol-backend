@@ -73,7 +73,7 @@ export class CourseImportService {
     this.logger.info(`${LOG_CONTEXT} Starting import: ${stagingFile.name}`);
     const csvText = await this.fileStore.readFile(stagingFile.path);
 
-    const result = await this.pipeline.execute(
+    const result = await this.pipeline.executeInTransaction(
       csvText,
       CourseImportSchema,
       this.processor,

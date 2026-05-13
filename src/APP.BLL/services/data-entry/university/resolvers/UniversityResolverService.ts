@@ -42,7 +42,7 @@ export class UniversityResolverService {
     this.logger.info(
       `${LOG_CONTEXT} Upserting ${resolved.length} unique universities`,
     );
-    return this.persistResolvedUniversities(manager, resolved);
+    return this.bulkUpsertResolvedUniversityRows(manager, resolved);
   }
 
   /**
@@ -101,23 +101,47 @@ export class UniversityResolverService {
     return result;
   }
 
-  private async persistResolvedUniversities(
+  /**
+   * Loads existing rows in chunked SELECTs (OR of natural keys), then persists with a batched
+   * batched `save`. Avoids O(N) round-trips from per-row `findOne` + `save`.
+   * True DB `upsert()` would need a unique constraint on (uniName, sysCountryId, sysCityId).
+   */
+  private async bulkUpsertResolvedUniversityRows(
     manager: EntityManager,
     resolved: ResolvedUniversityRow[],
   ): Promise<Map<string, string>> {
     const repo = manager.getRepository(SysUniversities);
-    const map = new Map<string, string>();
-    let inserted = 0;
-    let updated = 0;
-    for (const row of resolved) {
-      const key = universityKey(row.uniName, row.sysCountryId, row.sysCityId);
-      const existing = await repo.findOne({
-        where: {
+    const keyToExisting = new Map<string, SysUniversities>();
+    const whereChunkSize = 400;
+
+    for (let i = 0; i < resolved.length; i += whereChunkSize) {
+      const chunk = resolved.slice(i, i + whereChunkSize);
+      const found = await repo.find({
+        where: chunk.map((row) => ({
           uniName: row.uniName,
           sysCountryId: row.sysCountryId,
           sysCityId: row.sysCityId,
-        },
+        })),
       });
+      for (const entity of found) {
+        keyToExisting.set(
+          universityKey(
+            entity.uniName,
+            entity.sysCountryId,
+            entity.sysCityId ?? '',
+          ),
+          entity,
+        );
+      }
+    }
+
+    const map = new Map<string, string>();
+    let inserted = 0;
+    let updated = 0;
+    const toPersist: SysUniversities[] = [];
+
+    for (const row of resolved) {
+      const key = universityKey(row.uniName, row.sysCountryId, row.sysCityId);
       const campusLifeLinksArr = splitCampusLifeLinksCell(row.campusLifeLinks);
       const commissionType =
         row.commissionType === 'AMOUNT'
@@ -142,24 +166,36 @@ export class UniversityResolverService {
         universityType: row.universityType,
         currRanking: row.currRanking,
       };
+
+      const existing = keyToExisting.get(key);
       if (existing) {
         Object.assign(existing, payload);
-        const saved = await repo.save(existing);
+        toPersist.push(existing);
         updated++;
-        map.set(key, saved.id);
       } else {
-        const entity = repo.create({
-          uniName: row.uniName,
-          sysCountryId: row.sysCountryId,
-          sysStateId: row.sysStateId,
-          sysCityId: row.sysCityId,
-          ...payload,
-        });
-        const saved = await repo.save(entity);
+        toPersist.push(
+          repo.create({
+            uniName: row.uniName,
+            sysCountryId: row.sysCountryId,
+            sysStateId: row.sysStateId,
+            sysCityId: row.sysCityId,
+            ...payload,
+          }),
+        );
         inserted++;
-        map.set(key, saved.id);
       }
     }
+
+    const saved =
+      toPersist.length > 0 ? await repo.save(toPersist) : ([] as SysUniversities[]);
+    for (let i = 0; i < resolved.length; i++) {
+      const row = resolved[i];
+      map.set(
+        universityKey(row.uniName, row.sysCountryId, row.sysCityId),
+        saved[i]!.id,
+      );
+    }
+
     this.logger.info(
       `${LOG_CONTEXT} Universities: ${resolved.length} total (inserted: ${inserted}, updated: ${updated})`,
     );

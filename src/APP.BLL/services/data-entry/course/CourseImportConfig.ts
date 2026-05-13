@@ -7,7 +7,7 @@ export interface CourseImportConfig {
   };
   readinessSeconds: number;
   allowMultipleFiles: boolean;
-  /** Rows per DB transaction when processing course CSV (see CourseImportProcessorService). */
+  /** Chunk size for prefetch / per-chunk in-memory caches within one import transaction. */
   batchSize: number;
 }
 
