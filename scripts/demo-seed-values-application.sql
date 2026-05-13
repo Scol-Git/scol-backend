@@ -68,25 +68,25 @@ INSERT INTO "sys_DocumentTypes"
 ("id","documentTypeCode","documentTypeName","documentScope","isMultipleAllowed","allowedMimeTypes","maxFileSizeBytes","isActive","createdAt","updatedAt")
 VALUES
 -- Common / Early-stage
-(gen_random_uuid(),'PASSPORT','Passport','LEAD',false,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
+(gen_random_uuid(),'PASSPORT','Passport','LEAD',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
 (gen_random_uuid(),'TRANSCRIPT','Transcript','LEAD',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
 (gen_random_uuid(),'CERTIFICATE','Certificate','LEAD',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
-(gen_random_uuid(),'ENGLISH_TEST','English Test','LEAD',false,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
-(gen_random_uuid(),'CV','CV','APPLICATION',false,'application/pdf',2097152,true,now(),now()),
-(gen_random_uuid(),'SOP','SOP','APPLICATION',false,'application/pdf',2097152,true,now(),now()),
+(gen_random_uuid(),'ENGLISH_TEST','English Test','LEAD',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
+(gen_random_uuid(),'CV','CV','APPLICATION',true,'application/pdf',2097152,true,now(),now()),
+(gen_random_uuid(),'SOP','SOP','APPLICATION',true,'application/pdf',2097152,true,now(),now()),
 (gen_random_uuid(),'REFERENCE_LETTER','Reference Letter','APPLICATION',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
 
 -- Post-submission / later-stage
-(gen_random_uuid(),'CONDITIONAL_OFFER_LETTER','Conditional Offer Letter','APPLICATION',false,'application/pdf',5242880,true,now(),now()),
-(gen_random_uuid(),'UNCONDITIONAL_OFFER_LETTER','Unconditional Offer Letter','APPLICATION',false,'application/pdf',5242880,true,now(),now()),
-(gen_random_uuid(),'PAYMENT_RECEIPT','Payment Receipt','APPLICATION',false,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
+(gen_random_uuid(),'CONDITIONAL_OFFER_LETTER','Conditional Offer Letter','APPLICATION',true,'application/pdf',5242880,true,now(),now()),
+(gen_random_uuid(),'UNCONDITIONAL_OFFER_LETTER','Unconditional Offer Letter','APPLICATION',true,'application/pdf',5242880,true,now(),now()),
+(gen_random_uuid(),'PAYMENT_RECEIPT','Payment Receipt','APPLICATION',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
 (gen_random_uuid(),'GS_DOCUMENTS','GS Documents','APPLICATION',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
 (gen_random_uuid(),'CAS_DOCUMENTS','CAS Documents','APPLICATION',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
-(gen_random_uuid(),'CAS_LETTER','CAS Letter','APPLICATION',false,'application/pdf',5242880,true,now(),now()),
-(gen_random_uuid(),'COE_LETTER','COE Letter','APPLICATION',false,'application/pdf',5242880,true,now(),now()),
-(gen_random_uuid(),'VISA_APPLICATION','Visa Application','APPLICATION',false,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
-(gen_random_uuid(),'VISA_DECISION','Visa Decision','APPLICATION',false,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
-(gen_random_uuid(),'ENROLLMENT_CONFIRMATION','Enrollment Confirmation','APPLICATION',false,'application/pdf',5242880,true,now(),now()),
+(gen_random_uuid(),'CAS_LETTER','CAS Letter','APPLICATION',true,'application/pdf',5242880,true,now(),now()),
+(gen_random_uuid(),'COE_LETTER','COE Letter','APPLICATION',true,'application/pdf',5242880,true,now(),now()),
+(gen_random_uuid(),'VISA_APPLICATION','Visa Application','APPLICATION',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
+(gen_random_uuid(),'VISA_DECISION','Visa Decision','APPLICATION',true,'application/pdf,image/jpeg,image/png',5242880,true,now(),now()),
+(gen_random_uuid(),'ENROLLMENT_CONFIRMATION','Enrollment Confirmation','APPLICATION',true,'application/pdf',5242880,true,now(),now()),
 
 -- Always available
 (gen_random_uuid(),'OTHERS','Other Documents','APPLICATION',true,'application/pdf,image/jpeg,image/png',10485760,true,now(),now())
@@ -132,20 +132,10 @@ SELECT
     ELSE false
   END,
 
-  -- MIN COUNT
-  CASE
-    WHEN d."documentTypeCode"='OTHERS' THEN 0
-    WHEN d."documentTypeCode" IN ('GS_DOCUMENTS','CAS_DOCUMENTS') THEN 0
-    ELSE 1
-  END,
-
-  -- MAX COUNT
-  CASE
-    WHEN d."documentTypeCode" IN ('TRANSCRIPT','CERTIFICATE','REFERENCE_LETTER') THEN 2
-    WHEN d."documentTypeCode" IN ('GS_DOCUMENTS','CAS_DOCUMENTS') THEN 10
-    WHEN d."documentTypeCode"='OTHERS' THEN 10
-    ELSE 1
-  END,
+  -- MIN COUNT (all 0)
+  0,
+  -- MAX COUNT (all 10)
+  10,
 
   -- DISPLAY ORDER
   CASE d."documentTypeCode"

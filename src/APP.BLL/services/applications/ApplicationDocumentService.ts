@@ -244,7 +244,7 @@ export class ApplicationDocumentService {
         await this.confirmLeadScopedUpload(manager, actedByUserId, pending);
       }
 
-      await this.markRequirementInProgressIfNeeded(manager, requirement.id);
+      //await this.markRequirementInProgressIfNeeded(manager, requirement.id);
 
       await this.activity.logDocumentUploaded(manager, {
         applicationId: application.id,
