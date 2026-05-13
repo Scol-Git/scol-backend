@@ -90,16 +90,20 @@ export class LeadsProfileController {
     return this.leadProfileService.updateAcademicForm(user.userId, dto);
   }
 
-  @Get('/leads/documents/:documentId/download')
-async downloadLeadDocument(
-  @CurrentUser() user: ICurrentUser,
-  @Param('documentId', ParseUUIDPipe) documentId: string,
-): Promise<GenerateApplicationDocumentDownloadResponseDto> {
-  return this.leadProfileService.generateLeadDocumentDownloadUrl(
-    user.userId,
-    documentId,
-  );
-}
-
-
+  /**
+   * GET /leads/profile/leads/documents/:documentId/download
+   * Signed URL for the authenticated lead to download their document.
+   */
+  @Get('leads/documents/:documentId/download')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  async downloadLeadDocument(
+    @CurrentUser() user: ICurrentUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ): Promise<GenerateApplicationDocumentDownloadResponseDto> {
+    return this.leadProfileService.generateLeadDocumentDownloadUrl(
+      user.userId,
+      documentId,
+    );
+  }
 }
