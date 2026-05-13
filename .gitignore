@@ -3,6 +3,15 @@
 /node_modules
 /build
 
+# Data entry output (downloaded + generated CSVs)
+/data
+
+# Bulk import staging / archive / errors / reviewed (runtime output)
+BulkImport/
+
+# Local documentation (optional; remove if you want to track docs)
+docs/
+
 # Logs
 logs
 *.log
@@ -72,3 +81,11 @@ BulkImport/
 docs/
 
 # Note: package-lock.json is NOT ignored - it ensures reproducible builds
+
+# Local helper files
+merge-folder_cmd.txt
+merge_folder_to_txt.py
+
+# Data-entry code dump chunks + splitter (local / LLM helpers)
+/data-entry-chunks/
+/scripts/

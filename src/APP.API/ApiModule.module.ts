@@ -4,13 +4,13 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { GuardsModule } from './common/guards/GuardsModule.module';
 import { HttpExceptionFilter } from './common/filters/HttpExceptionFilter.filter';
 import { RequestLoggingMiddleware } from './common/middleware/RequestLoggingMiddleware';
-
 // Feature modules
 import { AuthModule } from './feature-controllers/auth/AuthModule.module';
 import { LeadsModule } from './feature-controllers/leads/LeadsModule.module';
 import { HomeModule } from './feature-controllers/home/HomeModule.module';
 import { SearchModule } from './feature-controllers/search/SearchModule.module';
 import { CategoriesModule } from './feature-controllers/categories/CategoriesModule.module';
+import { DataEntryModule } from './feature-controllers/data-entry/DataEntryModule.module';
 import { CoursesModule } from './feature-controllers/courses/CoursesModule.module';
 import { ApplicationsModule } from './feature-controllers/applications/ApplicationsModule.module';
 import { CrmControllersModule } from './crm-controllers/CrmControllersModule.module';
@@ -43,6 +43,7 @@ import { HealthCheckModule } from '@bll/services/health/HealthCheckModule.module
     HomeModule, // Home page endpoint
     SearchModule, // Search endpoints
     CategoriesModule, // Category endpoints (cities, etc.)
+    DataEntryModule, // CSV data entry import
     CoursesModule, // GET /courses/:id (course details by intake id)
     ApplicationsModule, // POST /applications
     CrmControllersModule,
