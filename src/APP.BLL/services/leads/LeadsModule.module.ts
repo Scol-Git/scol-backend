@@ -3,6 +3,7 @@ import { LeadProfileService } from './LeadProfileService';
 import { AcademicFormValidator } from './AcademicFormValidator';
 import { AcademicFormMapper } from './AcademicFormMapper';
 import { SearchCacheSupportModule } from '@bll/services/search/shared/cache/SearchCacheSupportModule.module';
+import { StorageModule } from '@infra/storage/StorageModule.module';
 
 /**
  * Leads Module (BLL)
@@ -13,7 +14,7 @@ import { SearchCacheSupportModule } from '@bll/services/search/shared/cache/Sear
  * - AcademicFormMapper
  */
 @Module({
-  imports: [SearchCacheSupportModule],
+  imports: [SearchCacheSupportModule, StorageModule],
   providers: [LeadProfileService, AcademicFormValidator, AcademicFormMapper],
   exports: [LeadProfileService],
 })
