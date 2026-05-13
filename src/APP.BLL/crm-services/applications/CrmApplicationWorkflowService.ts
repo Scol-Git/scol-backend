@@ -90,6 +90,8 @@ export class CrmApplicationWorkflowService {
       });
 
       application.currentSysApplicationStatusId = targetStatus.id;
+      application.CurrentSysApplicationStatus = targetStatus;
+      application.updatedAt = new Date();
       await manager.getRepository(Applications).save(application);
 
       await this.applicationActivityService.logApplicationStatusChanged(
@@ -176,7 +178,10 @@ export class CrmApplicationWorkflowService {
       );
 
       application.currentSysApplicationStageId = targetStage.id;
+      application.CurrentSysApplicationStage = targetStage;
       application.currentSysApplicationStatusId = targetStatus.id;
+      application.CurrentSysApplicationStatus = targetStatus;
+      application.updatedAt = new Date();
 
       if (
         this.isSameCode(targetStage.stageCode, ApplicationStage.Submitted) &&

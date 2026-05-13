@@ -37,6 +37,7 @@ export class AuthResponseMapper {
       joinedAt: profile?.createdAt
         ? new Date(profile.createdAt).getFullYear()
         : null,
+      imgUrl: profile?.imgUrl ?? null,
     };
     authResponse.accessToken = tokens.accessToken;
     authResponse.refreshToken = tokens.refreshToken;

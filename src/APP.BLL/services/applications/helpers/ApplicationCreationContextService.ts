@@ -57,6 +57,7 @@ export class ApplicationCreationContextService {
     );
 
     this.ensureEligibleForSelectedCourseOrThrow(courseIntake, profile);
+    await this.ensureApplicationDoesNotExistOrThrow(leadId, courseIntake);
 
     const countryId = this.resolveCountryIdOrThrow(courseIntake);
 
@@ -94,6 +95,21 @@ export class ApplicationCreationContextService {
       throw new ValidationException(
         'Lead is not eligible for the selected course',
         { eligibility: result.reasons },
+      );
+    }
+  }
+
+  private async ensureApplicationDoesNotExistOrThrow(
+    leadId: string,
+    courseIntake: UniCourseIntakes,
+  ): Promise<void> {
+    const application = await this.db.applications.findOne({
+      where: { leadId, courseIntakeId: courseIntake.id },
+    });
+
+    if (application) {
+      throw new ValidationException(
+        'Lead has already applied for this course intake',
       );
     }
   }

@@ -4,6 +4,7 @@ import { PermissionGuard } from './PermissionGuard.guard';
 import { RoleGuard } from './RoleGuard.guard';
 import { RateLimitGuard } from './RateLimitGuard.guard';
 import { OtpJwtGuard } from './OtpJwtGuard.guard';
+import { OptionalJwtAuthGuard } from './OptionalJwtAuthGuard.guard';
 import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModule.module';
 
 /**
@@ -18,6 +19,7 @@ import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModul
  * - PermissionGuard: Checks user permissions
  * - RoleGuard: Checks user roles
  * - RateLimitGuard: Limits the number of requests
+ * - OptionalJwtAuthGuard: Optional JWT; populates user when valid, allows anonymous otherwise
  */
 @Global()
 @Module({
@@ -25,6 +27,7 @@ import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModul
   providers: [
     JwtAuthGuard,
     OtpJwtGuard,
+    OptionalJwtAuthGuard,
     PermissionGuard,
     RoleGuard,
     RateLimitGuard,
@@ -32,6 +35,7 @@ import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModul
   exports: [
     JwtAuthGuard,
     OtpJwtGuard,
+    OptionalJwtAuthGuard,
     PermissionGuard,
     RoleGuard,
     RateLimitGuard,

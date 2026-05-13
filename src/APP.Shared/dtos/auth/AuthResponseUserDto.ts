@@ -30,4 +30,10 @@ export class AuthResponseUserDto {
     example: 2023,
   })
   joinedAt?: number | null;
+
+  @ApiProperty({
+    description: 'User image URL',
+    example: 'https://example.com/image.jpg',
+  })
+  imgUrl?: string | null;
 }
