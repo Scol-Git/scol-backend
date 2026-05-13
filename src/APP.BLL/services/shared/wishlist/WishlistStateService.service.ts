@@ -54,6 +54,10 @@ export class WishlistStateService {
 
     const intakeIds = result.courses.map((x) => x.courseId);
 
+    if (!intakeIds.length) {
+      return;
+    }
+
     const wishlistRows = await this.dbContext.leadFavouriteCourses.find({
       where: {
         leadId: leadProfile.id,

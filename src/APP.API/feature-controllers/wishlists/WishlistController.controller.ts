@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   ParseUUIDPipe,
   Put,
@@ -24,7 +23,6 @@ import { CurrentUser } from '@api/common/decorators/CurrentUser.decorator';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 import { Role } from '@shared/enums/Role.enum';
 
-import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { WishlistService } from '@bll/services/wishlist/WishlistService';
 
 import { AddWishlistDto } from '@shared/dtos/wishlists/AddWishlistDto';
@@ -56,7 +54,6 @@ import { WishlistResponseDto } from '@shared/dtos/wishlists/WishlistResponseDto'
 export class WishlistController {
   constructor(
     private readonly wishlistService: WishlistService,
-    private readonly db: AppDbContext,
   ) {}
 
   @Get()
@@ -64,8 +61,7 @@ export class WishlistController {
   async getWishlists(
     @CurrentUser() user: ICurrentUser,
   ): Promise<WishlistListResponseDto> {
-    const leadId = await this.resolveLeadIdOrThrow(user.userId);
-    return this.wishlistService.getWishlists(leadId);
+    return this.wishlistService.getWishlists(user.userId);
   }
 
   @Put()
@@ -74,8 +70,7 @@ export class WishlistController {
     @CurrentUser() user: ICurrentUser,
     @Body() dto: AddWishlistDto,
   ): Promise<WishlistActionResponseDto> {
-    const leadId = await this.resolveLeadIdOrThrow(user.userId);
-    return this.wishlistService.addToWishlist(leadId, dto);
+    return this.wishlistService.addToWishlist(user.userId, dto);
   }
 
   @Delete(':courseId')
@@ -84,20 +79,7 @@ export class WishlistController {
     @CurrentUser() user: ICurrentUser,
     @Param('courseId', ParseUUIDPipe) courseId: string,
   ): Promise<WishlistActionResponseDto> {
-    const leadId = await this.resolveLeadIdOrThrow(user.userId);
-    return this.wishlistService.removeFromWishlist(leadId, courseId);
-  }
-
-  /**
-   * `LeadFavouriteCourses.leadId` FK points at `SysLeadProfiles.id`, but
-   * `ICurrentUser` only carries the auth `userId`. Resolve here so the service
-   * stays simple and takes `leadId` directly.
-   */
-  private async resolveLeadIdOrThrow(userId: string): Promise<string> {
-    const lead = await this.db.leadProfiles.findOne({ where: { userId } });
-    if (!lead) {
-      throw new NotFoundException('Lead profile not found');
-    }
-    return lead.id;
+    return this.wishlistService.removeFromWishlist(user.userId, courseId);
   }
 }
+

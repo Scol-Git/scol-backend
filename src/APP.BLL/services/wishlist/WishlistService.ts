@@ -14,12 +14,43 @@ import { WishlistActionResponseDto } from '@shared/dtos/wishlists/WishlistAction
 export class WishlistService {
   constructor(private readonly dbContext: AppDbContext) {}
 
+  private async resolveLeadIdOrThrow(userId: string): Promise<string> {
+    const lead = await this.dbContext.leadProfiles.findOne({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead profile not found');
+    }
+
+    return lead.id;
+  }
+
   async addToWishlist(
-    leadId: string,
+    userId: string,
     dto: AddWishlistDto,
   ): Promise<WishlistActionResponseDto> {
+    const leadId = await this.resolveLeadIdOrThrow(userId);
+
+    const intake = await this.dbContext.courseIntakes.findOne({
+      where: {
+        id: dto.courseId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!intake) {
+      throw new NotFoundException('Course intake not found');
+    }
+
     const existing = await this.dbContext.leadFavouriteCourses.findOne({
-      where: { leadId, courseIntakeId: dto.courseId },
+      where: {
+        leadId,
+        courseIntakeId: intake.id,
+      },
     });
 
     if (existing) {
@@ -28,7 +59,7 @@ export class WishlistService {
 
     const wishlist = this.dbContext.leadFavouriteCourses.create({
       leadId,
-      courseIntakeId: dto.courseId,
+      courseIntakeId: intake.id,
     });
 
     await this.dbContext.leadFavouriteCourses.save(wishlist);
@@ -40,9 +71,11 @@ export class WishlistService {
   }
 
   async removeFromWishlist(
-    leadId: string,
+    userId: string,
     courseId: string,
   ): Promise<WishlistActionResponseDto> {
+    const leadId = await this.resolveLeadIdOrThrow(userId);
+
     const existing = await this.dbContext.leadFavouriteCourses.findOne({
       where: { leadId, courseIntakeId: courseId },
     });
@@ -59,7 +92,9 @@ export class WishlistService {
     };
   }
 
-  async getWishlists(leadId: string): Promise<WishlistListResponseDto> {
+  async getWishlists(userId: string): Promise<WishlistListResponseDto> {
+    const leadId = await this.resolveLeadIdOrThrow(userId);
+
     const wishlists = await this.dbContext.leadFavouriteCourses
       .createQueryBuilder('wishlist')
       .leftJoinAndSelect('wishlist.UniCourseIntake', 'intake')
@@ -70,7 +105,6 @@ export class WishlistService {
       .leftJoinAndSelect('university.SysCity', 'city')
       .leftJoinAndSelect('course.CourseEngReq', 'engRequirements')
       .leftJoinAndSelect('engRequirements.SysEnglishTest', 'engTest')
-      .leftJoinAndSelect('intake.CourseIntakeScholarship', 'scholarships')
       .where('wishlist.leadId = :leadId', { leadId })
       .orderBy('wishlist.createdAt', 'DESC')
       .getMany();
@@ -111,7 +145,7 @@ export class WishlistService {
           applicationFee: Number(intake?.applicationFee ?? 0),
 
           isScholarshipAvailable:
-            intake?.CourseIntakeScholarship?.some((s) => s.isActive) ?? false,
+          (intake?.scholarshipMetaData?.length ?? 0) > 0,
 
           engRequirements:
             course?.CourseEngReq?.map((req) => ({
