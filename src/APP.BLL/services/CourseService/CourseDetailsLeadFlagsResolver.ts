@@ -7,12 +7,12 @@ import { EligibilityProfileBuilder } from '@bll/services/shared/eligibility/Elig
 import { CourseEligibilityService } from '@bll/services/shared/eligibility/CourseEligibilityService';
 
 export interface CourseDetailsLeadFlags {
-  canApply: boolean;
+  isEligible: boolean;
   alreadyApplied: boolean;
 }
 
 const DEFAULT_FLAGS: CourseDetailsLeadFlags = {
-  canApply: false,
+  isEligible: false,
   alreadyApplied: false,
 };
 
@@ -58,7 +58,7 @@ export class CourseDetailsLeadFlagsResolver {
 
     return {
       alreadyApplied,
-      canApply: eligibilityResult.isEligible && !alreadyApplied,
+      isEligible: eligibilityResult.isEligible,
     };
   }
 

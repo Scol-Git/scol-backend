@@ -137,7 +137,7 @@ export class CourseDetailsMapper {
     return {
       courseId: intake.uniCourseId,
       courseName: intake.UniCourse?.courseName ?? '',
-      canApply: leadFlags.canApply,
+      isEligible: leadFlags.isEligible,
       alreadyApplied: leadFlags.alreadyApplied,
       ranking: sections.ranking,
       university: this.buildUniversity(uni),

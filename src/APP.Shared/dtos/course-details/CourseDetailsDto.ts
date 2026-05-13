@@ -118,10 +118,9 @@ export class CourseDetailsDto {
   @ApiProperty() courseName!: string;
 
   @ApiProperty({
-    description:
-      'True when the authenticated lead is eligible and has not already applied for this intake',
+    description: 'True when the authenticated lead is eligible',
   })
-  canApply!: boolean;
+  isEligible!: boolean;
 
   @ApiProperty({
     description:
