@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Body, UseGuards, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
 
 // Guards
@@ -21,6 +21,7 @@ import { EnglishTestResultItemDto } from '@shared/dtos/leads/EnglishTestResultIt
 import { EnglishTestSectionItemDto } from '@shared/dtos/leads/EnglishTestSectionItemDto';
 import { PreferredCountryItemDto } from '@shared/dtos/leads/PreferredCountryItemDto';
 import { PreferredProgrammeItemDto } from '@shared/dtos/leads/PreferredProgrammeItemDto';
+import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentDownloadResponseDto';
 
 /**
  * Leads Profile Controller
@@ -87,5 +88,22 @@ export class LeadsProfileController {
     @Body() dto: AcademicFormRequestDto,
   ): Promise<AcademicFormResponseDto> {
     return this.leadProfileService.updateAcademicForm(user.userId, dto);
+  }
+
+  /**
+   * GET /leads/profile/leads/documents/:documentId/download
+   * Signed URL for the authenticated lead to download their document.
+   */
+  @Get('leads/documents/:documentId/download')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  async downloadLeadDocument(
+    @CurrentUser() user: ICurrentUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ): Promise<GenerateApplicationDocumentDownloadResponseDto> {
+    return this.leadProfileService.generateLeadDocumentDownloadUrl(
+      user.userId,
+      documentId,
+    );
   }
 }

@@ -78,4 +78,14 @@ export const AppEnvSchema = Joi.object({
   B2_BUCKET_NAME: Joi.string().optional(),
   B2_ENDPOINT: Joi.string().uri().optional(),
   B2_REGION: Joi.string().optional(),
+
+  // Presigned S3/B2 URL TTLs (seconds)
+  STORAGE_UPLOAD_URL_EXPIRES_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .default(900),
+  STORAGE_DOWNLOAD_URL_EXPIRES_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .default(3600),
 });

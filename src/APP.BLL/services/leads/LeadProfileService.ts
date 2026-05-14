@@ -1,4 +1,5 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EntityManager, In, Repository } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ILogger } from '@shared/interfaces/logging';
@@ -18,7 +19,12 @@ import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { SearchCacheInvalidationService } from '../search/shared/cache/SearchCacheInvalidationService';
 import { LeadProfileMapper } from './LeadProfileMapper';
 import { LeadProfileResponseDto } from '@shared/dtos/leads/LeadProfileResponseDto';
+import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentDownloadResponseDto';
+import { UploadStatus } from '@shared/enums/UploadStatus.enum';
+import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
 import { ValidationException } from '@shared/exceptions/ValidationException';
+import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
+import { IStorageService as IStorageServiceToken } from '@shared/tokens/injection.tokens';
 
 const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
 
@@ -38,19 +44,50 @@ const ACADEMIC_FORM_LEAD_PROFILE_RELATIONS = {
  */
 @Injectable()
 export class LeadProfileService {
+  private readonly downloadUrlExpiresSeconds: number;
+
   constructor(
     private readonly db: AppDbContext,
     private readonly validator: AcademicFormValidator,
     private readonly mapper: AcademicFormMapper,
     private readonly searchCacheInvalidation: SearchCacheInvalidationService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
-  ) {}
+    @Inject(IStorageServiceToken)
+    private readonly storage: IStorageService,
+    private readonly config: ConfigService,
+  ) {
+    this.downloadUrlExpiresSeconds =
+      this.config.get<number>('STORAGE_DOWNLOAD_URL_EXPIRES_SECONDS') ?? 3600;
+  }
 
   /**
    * GET Academic Form - Returns all form data with validation rules.
    * Loads system degrees (levelOrder 1-4), English tests, countries, programmes for full-list response.
    * leadProfile may be null when the user has no profile yet.
    */
+
+  async getLeadProfile(userId: string): Promise<LeadProfileResponseDto> {
+    const profile = await this.db.leadProfiles.findOne({
+      where: { userId },
+      relations: {
+        SysUser: true,
+        LeadAcademicResult: { SysAcademicDegree: true },
+        LeadEnglishTestResult: {
+          SysEnglishTest: true,
+        },
+        LeadDocuments: {
+          SysDocumentType: true,
+        },
+      },
+    });
+
+    //TODO use ValidationException
+    if (!profile) {
+      throw new ValidationException('Lead profile not found');
+    }
+
+    return LeadProfileMapper.toResponse(profile);
+  }
   async getAcademicForm(userId: string): Promise<AcademicFormResponseDto> {
     this.logger.info('Getting academic form', {
       context: 'LeadProfileService.getAcademicForm',
@@ -601,26 +638,64 @@ export class LeadProfileService {
     return AcademicFormStatus.PARTIALLY_COMPLETED;
   }
 
-  async getLeadProfile(userId: string): Promise<LeadProfileResponseDto> {
-    const profile = await this.db.leadProfiles.findOne({
-      where: { userId },
-      relations: {
-        SysUser: true,
-        LeadAcademicResult: { SysAcademicDegree: true },
-        LeadEnglishTestResult: {
-          SysEnglishTest: true,
-        },
-        LeadDocuments: {
-          SysDocumentType: true,
-        },
+  
+
+  async generateLeadDocumentDownloadUrl(
+    currentUserId: string,
+    documentId: string,
+  ): Promise<GenerateApplicationDocumentDownloadResponseDto> {
+    const leadProfile = await this.db.leadProfiles.findOne({
+      where: { userId: currentUserId },
+    });
+  
+    if (!leadProfile) {
+      throw new NotFoundException('Lead profile not found');
+    }
+  
+    const document = await this.db.leadDocuments.findOne({
+      where: {
+        id: documentId,
+        leadId: leadProfile.id,
+        overallStatus: In([
+          ApplicationDocumentStatus.InProgress,
+          ApplicationDocumentStatus.Verified,
+        ]),
       },
     });
-
-    //TODO use ValidationException
-    if (!profile) {
-      throw new ValidationException('Lead profile not found');
+  
+    if (!document) {
+      throw new NotFoundException('Lead document not found');
     }
-
-    return LeadProfileMapper.toResponse(profile);
+  
+    if (!document.currentLeadDocumentVersionId) {
+      throw new ValidationException('No active document version available');
+    }
+  
+    const version = await this.db.leadDocumentVersions.findOne({
+      where: {
+        id: document.currentLeadDocumentVersionId,
+        leadDocumentId: document.id,
+        uploadStatus: UploadStatus.UPLOADED,
+      },
+    });
+  
+    if (!version) {
+      throw new NotFoundException('Uploaded lead document version not found');
+    }
+  
+    if (!version.storageKey) {
+      throw new ValidationException('Invalid storage key');
+    }
+  
+    const url = await this.storage.generateDownloadUrl(version.storageKey);
+  
+    return {
+      url,
+      expiresInSeconds: this.downloadUrlExpiresSeconds ?? 3600,
+      fileName: version.originalFileName,
+    };
   }
+
+
+
 }
