@@ -147,14 +147,18 @@ export class PersonalizedCandidateQuery {
     const rows = await pagingQb.getRawMany<{
       courseIntakeId: string;
       rankScore: string;
-      eligible: boolean;
+      eligible: unknown;
     }>();
 
     return rows.map((r) => ({
       courseIntakeId: r.courseIntakeId,
-      rankScore: parseInt(r.rankScore, 10) || 0,
-      isEligible: r.eligible,
+      rankScore: Number(r.rankScore) || 0,
+      isEligible: this.toBoolean(r.eligible),
     }));
+  }
+
+  private toBoolean(value: unknown): boolean {
+    return value === true || value === 'true' || value === 1 || value === '1';
   }
 
   private logCandidateSqlIfDebug(

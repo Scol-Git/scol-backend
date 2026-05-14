@@ -7,6 +7,7 @@ import { RankingMode } from '@shared/enums/RankingMode.enum';
 import { UserState } from '@shared/enums/UserState.enum';
 import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
 import type { SearchContext } from '@shared/search/SearchTypes';
+import { normalizeSearchPageLimit } from '@shared/search/SearchPaginationLimit';
 
 /**
  * Search-specific cache key builder
@@ -134,9 +135,15 @@ export class SearchCacheKeyBuilder {
       // Filters (sorted for determinism)
       f: params.filters
         ? {
-            c: params.filters.countryIds?.sort() || null,
-            ci: params.filters.cityIds?.sort() || null,
-            p: params.filters.programmeIds?.sort() || null,
+            c: params.filters.countryIds
+              ? [...params.filters.countryIds].sort()
+              : null,
+            ci: params.filters.cityIds
+              ? [...params.filters.cityIds].sort()
+              : null,
+            p: params.filters.programmeIds
+              ? [...params.filters.programmeIds].sort()
+              : null,
             intake: params.filters.intake
               ? {
                   y: params.filters.intake.year ?? null,
@@ -163,8 +170,8 @@ export class SearchCacheKeyBuilder {
       lt: params.listType,
       // Pagination cursor (each page has different cache entry)
       cur: params.cursor || null,
-      // Limit
-      lim: params.limit ?? 15,
+      // Limit (effective, matches pagination)
+      lim: normalizeSearchPageLimit(params.limit),
     };
 
     const json = JSON.stringify(normalized);

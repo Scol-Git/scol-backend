@@ -74,6 +74,7 @@ export class CourseSearchService {
       cursor: request.pagination?.cursor,
       limit: request.pagination?.limit,
       context,
+      source: 'NORMAL_SEARCH',
     });
 
     this.logger.debug?.('Normal search completed', {
@@ -122,6 +123,7 @@ export class CourseSearchService {
       cursor: request.pagination?.cursor,
       limit: request.pagination?.limit,
       context,
+      source: 'ADVANCED_SEARCH',
     });
 
     this.logger.debug?.('Advanced search completed', {

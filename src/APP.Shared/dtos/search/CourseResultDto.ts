@@ -103,4 +103,11 @@ export class CourseResultDto {
 
   @ApiProperty({ description: 'Whether course is wishlisted by user' })
   isWishlisted!: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether the current user is eligible for this course. Null when eligibility is not computed (e.g. anonymous or incomplete academic profile).',
+    nullable: true,
+  })
+  isEligible?: boolean | null;
 }

@@ -12,11 +12,14 @@ export class SearchRankingSqlBuilder {
   commissionScoreExpr(uniAlias = 'uni'): string {
     return `(CASE
       WHEN COALESCE(${uniAlias}."commissionType", '${CommissionType.AMOUNT}') = '${CommissionType.AMOUNT}'
-      THEN LEAST(COALESCE(CAST(${uniAlias}."commission" AS DECIMAL), 0), ${this.COMMISSION_MAX_WEIGHT})
-      ELSE LEAST(
-        COALESCE(CAST(${uniAlias}."commission" AS DECIMAL), 0) * ${this.COMMISSION_MULTIPLIER},
+      THEN LEAST(
+        FLOOR(COALESCE(CAST(${uniAlias}."commission" AS DECIMAL), 0)),
         ${this.COMMISSION_MAX_WEIGHT}
-      )
+      )::BIGINT
+      ELSE LEAST(
+        FLOOR(COALESCE(CAST(${uniAlias}."commission" AS DECIMAL), 0) * ${this.COMMISSION_MULTIPLIER}),
+        ${this.COMMISSION_MAX_WEIGHT}
+      )::BIGINT
     END)`;
   }
 
