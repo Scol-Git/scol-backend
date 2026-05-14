@@ -21,7 +21,7 @@ import { LeadProfileMapper } from './LeadProfileMapper';
 import { LeadProfileResponseDto } from '@shared/dtos/leads/LeadProfileResponseDto';
 import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentDownloadResponseDto';
 import { UploadStatus } from '@shared/enums/UploadStatus.enum';
-import { LeadDocumentStatus } from '@shared/enums/LeadDocumentStatus.enum';
+import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
 import { IStorageService as IStorageServiceToken } from '@shared/tokens/injection.tokens';
@@ -657,8 +657,8 @@ export class LeadProfileService {
         id: documentId,
         leadId: leadProfile.id,
         overallStatus: In([
-          LeadDocumentStatus.IN_PROGRESS,
-          LeadDocumentStatus.VERIFIED,
+          ApplicationDocumentStatus.InProgress,
+          ApplicationDocumentStatus.Verified,
         ]),
       },
     });
