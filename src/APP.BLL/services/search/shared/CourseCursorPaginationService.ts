@@ -4,6 +4,11 @@ import {
   CursorData,
   PaginatedResult,
 } from '@shared/search/SearchTypes';
+import {
+  SEARCH_DEFAULT_PAGE_LIMIT,
+  SEARCH_MAX_PAGE_LIMIT,
+  normalizeSearchPageLimit,
+} from '@shared/search/SearchPaginationLimit';
 
 /**
  * Handles cursor-based pagination for course search
@@ -13,8 +18,8 @@ import {
  */
 @Injectable()
 export class CourseCursorPaginationService {
-  private readonly DEFAULT_LIMIT = 15;
-  private readonly MAX_LIMIT = 50;
+  private readonly DEFAULT_LIMIT = SEARCH_DEFAULT_PAGE_LIMIT;
+  private readonly MAX_LIMIT = SEARCH_MAX_PAGE_LIMIT;
 
   /**
    * Encode cursor from ranked course
@@ -77,6 +82,6 @@ export class CourseCursorPaginationService {
    * Get effective limit (with bounds)
    */
   getEffectiveLimit(limit?: number): number {
-    return Math.min(limit ?? this.DEFAULT_LIMIT, this.MAX_LIMIT);
+    return normalizeSearchPageLimit(limit);
   }
 }

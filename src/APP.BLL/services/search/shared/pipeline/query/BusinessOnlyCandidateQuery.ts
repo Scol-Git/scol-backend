@@ -99,8 +99,8 @@ export class BusinessOnlyCandidateQuery {
 
     return results.map((r) => ({
       courseIntakeId: r.id,
-      rankScore: parseInt(r.commissionScore, 10) || 0,
-      isEligible: true,
+      rankScore: Number(r.commissionScore) || 0,
+      isEligible: null,
     }));
   }
 

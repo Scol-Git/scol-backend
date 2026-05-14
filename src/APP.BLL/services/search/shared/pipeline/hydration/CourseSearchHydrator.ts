@@ -9,9 +9,7 @@ import { CourseEngReq } from '@entity/entities/CourseEngReq.entity';
 export class CourseSearchHydrator {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
-  async hydrateSummaryPage(
-    orderedIds: string[],
-  ): Promise<UniCourseIntakes[]> {
+  async hydrateSummaryPage(orderedIds: string[]): Promise<UniCourseIntakes[]> {
     return this.hydrateByIdsPreservingOrder(orderedIds);
   }
 
@@ -38,14 +36,9 @@ export class CourseSearchHydrator {
       ...new Set(baseIntakes.map((ci) => ci.UniCourse?.id).filter(Boolean)),
     ] as string[];
 
-    const [scholarshipsMap, engReqsMap] = await Promise.all([
-      this.loadScholarships(candidateIds),
-      this.loadEngRequirements(courseIds),
-    ]);
+    const engReqsMap = await this.loadEngRequirements(courseIds);
 
     for (const intake of baseIntakes) {
-      intake.CourseIntakeScholarship = scholarshipsMap.get(intake.id) || [];
-
       if (intake.UniCourse) {
         intake.UniCourse.CourseEngReq =
           engReqsMap.get(intake.UniCourse.id) || [];
@@ -53,29 +46,6 @@ export class CourseSearchHydrator {
     }
 
     return baseIntakes;
-  }
-
-  private async loadScholarships(
-    courseIntakeIds: string[],
-  ): Promise<Map<string, CourseIntakeScholarships[]>> {
-    if (courseIntakeIds.length === 0) return new Map();
-
-    const scholarships = (await this.dataSource
-      .createQueryBuilder()
-      .select('s')
-      .from('CourseIntakeScholarships', 's')
-      .where('s.courseIntakeId IN (:...courseIntakeIds)', { courseIntakeIds })
-      .andWhere('s.isActive = true')
-      .getMany()) as CourseIntakeScholarships[];
-
-    const map = new Map<string, CourseIntakeScholarships[]>();
-    for (const scholarship of scholarships) {
-      const key = scholarship.courseIntakeId;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(scholarship);
-    }
-
-    return map;
   }
 
   private async loadEngRequirements(

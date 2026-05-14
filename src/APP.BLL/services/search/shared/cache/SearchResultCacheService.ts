@@ -11,10 +11,7 @@ import type { PipelineParams } from '../pipeline/SearchPipelineTypes';
 export class SearchResultCacheService {
   constructor(@Inject(ICacheToken) private readonly cache: ICacheService) {}
 
-  getOrSet<T>(
-    params: PipelineParams,
-    factory: () => Promise<T>,
-  ): Promise<T> {
+  getOrSet<T>(params: PipelineParams, factory: () => Promise<T>): Promise<T> {
     const cacheKeyParams: SearchResultsKeyParams = {
       userContext: SearchCacheKeyBuilder.fromSearchContext(params.context),
       searchText: params.searchText,

@@ -28,7 +28,7 @@ export interface IntakeWindow {
 export interface SearchCandidate {
   courseIntakeId: string;
   rankScore: number;
-  isEligible: boolean;
+  isEligible: boolean | null;
 }
 
 export interface SearchCandidateQuery {

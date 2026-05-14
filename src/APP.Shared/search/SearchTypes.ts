@@ -147,7 +147,7 @@ export class LeadProfileNormalizer {
 export interface RankedCourse {
   readonly courseIntake: UniCourseIntakes;
   rankScore: number;
-  isEligible: boolean;
+  isEligible: boolean | null;
   eligibilityDetails?: EligibilityDetails;
 }
 

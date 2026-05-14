@@ -248,7 +248,10 @@ export class CourseDetailsMapper {
   private buildFeesSection(
     intake: UniCourseIntakes,
   ): FeesAndScholarshipsSectionDto {
-    const hasScholarship = intake.scholarshipMetaData != null;
+    const hasScholarship =
+      Array.isArray(intake.scholarshipMetaData) &&
+      intake.scholarshipMetaData.length > 0;
+
     const hasInfo = intake.feesMetaData != null || hasScholarship;
 
     return {

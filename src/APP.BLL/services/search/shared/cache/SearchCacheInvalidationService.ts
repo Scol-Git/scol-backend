@@ -22,9 +22,6 @@ export class SearchCacheInvalidationService {
   }
 
   async invalidateAfterAcademicFormChanged(userId: string): Promise<void> {
-    await Promise.all([
-      this.invalidateUserSearchContext(userId),
-      this.invalidateAllSearchResults(),
-    ]);
+    await this.invalidateUserSearchContext(userId);
   }
 }

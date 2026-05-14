@@ -76,7 +76,6 @@ export class CourseResponseMapper {
     const courseIntake = rankedCourse.courseIntake;
     const course = courseIntake.UniCourse;
     const university = course?.SysUniversity;
-    const scholarships = courseIntake.CourseIntakeScholarship ?? [];
     const engReqs = course?.CourseEngReq ?? [];
 
     return {
@@ -84,7 +83,10 @@ export class CourseResponseMapper {
       courseName: course?.courseName ?? '',
       university: this.toUniversityDto(university),
       imgUrl: university?.coverImageUrl ?? null,
-      intake: this.toIntakeDto(courseIntake.intakeMonth, courseIntake.intakeYear),
+      intake: this.toIntakeDto(
+        courseIntake.intakeMonth,
+        courseIntake.intakeYear,
+      ),
       tuitionFee:
         courseIntake.tuitionFee != null
           ? parseFloat(courseIntake.tuitionFee)
@@ -99,9 +101,12 @@ export class CourseResponseMapper {
         courseIntake.applicationFee != null
           ? parseFloat(courseIntake.applicationFee)
           : null,
-      isScholarshipAvailable: scholarships.length > 0,
+      isScholarshipAvailable:
+        Array.isArray(courseIntake.scholarshipMetaData) &&
+        courseIntake.scholarshipMetaData.length > 0,
       engRequirements: this.toEnglishRequirements(engReqs),
       isWishlisted: false, // TODO: Implement wishlist check
+      isEligible: rankedCourse.isEligible,
     };
   }
 
