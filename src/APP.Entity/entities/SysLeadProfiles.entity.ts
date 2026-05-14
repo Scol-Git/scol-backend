@@ -17,6 +17,7 @@ import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
 import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
 import { Applications } from './Applications.entity';
 import { LeadDocuments } from './LeadDocuments.entity';
+import { LeadFavouriteCourses } from './LeadFavouriteCourses.entity';
 
 /**
  * @class SysLeadProfiles
@@ -168,6 +169,12 @@ export class SysLeadProfiles extends BaseEntity {
    */
   @OneToMany(() => LeadDocuments, (doc) => doc.SysLeadProfile)
   LeadDocuments!: LeadDocuments[];
+
+  /**
+   * One-to-Many: Favourite (wishlisted) course intakes
+   */
+  @OneToMany(() => LeadFavouriteCourses, (fav) => fav.SysLeadProfile)
+  LeadFavouriteCourse!: LeadFavouriteCourses[];
 
   /**
    * Many-to-One: Assigned CRM user

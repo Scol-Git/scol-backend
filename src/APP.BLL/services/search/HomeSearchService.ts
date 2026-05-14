@@ -7,6 +7,7 @@ import { HomeRequestDto } from '@shared/dtos/search/HomeRequestDto';
 import { SearchResponseDto } from '@shared/dtos/search/SearchResponseDto';
 import { UserSearchContextResolver } from './shared/UserSearchContextResolver';
 import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor';
+import { WishlistStateService } from '@bll/services/shared/wishlist/WishlistStateService.service';
 
 /**
  * Home Page Search Service
@@ -30,6 +31,7 @@ export class HomeSearchService {
   constructor(
     private readonly contextResolver: UserSearchContextResolver,
     private readonly pipelineExecutor: SearchPipelineExecutor,
+    private readonly wishlistStateService: WishlistStateService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
   ) {}
 
@@ -67,7 +69,9 @@ export class HomeSearchService {
       source: 'HOME',
     });
 
-    this.logger.LogDebug('Home search completed', {
+    await this.wishlistStateService.attachWishlistState(user, result);
+
+    this.logger.LogInfo('Home search completed', {
       context: 'HomeSearchService.getHomeCourses',
       resultCount: result.courses.length,
       hasNext: result.pagination.hasNext,

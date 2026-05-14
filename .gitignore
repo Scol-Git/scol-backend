@@ -72,3 +72,9 @@ BulkImport/
 docs/
 
 # Note: package-lock.json is NOT ignored - it ensures reproducible builds
+
+# Data-entry chunk merge/split (local tooling output)
+data-entry-chunks/
+merge_folder_to_txt.py
+merge-manifest.example.spec.txt
+scripts/split-data-entry.mjs

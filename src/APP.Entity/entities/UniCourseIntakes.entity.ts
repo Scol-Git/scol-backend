@@ -13,6 +13,7 @@ import { BaseEntity } from './BaseEntity.template';
 import { UniCourses } from './UniCourses.entity';
 import { CourseIntakeScholarships } from './CourseIntakeScholarships.entity';
 import { Applications } from './Applications.entity';
+import { LeadFavouriteCourses } from './LeadFavouriteCourses.entity';
 
 /**
  * @class UniCourseIntakes
@@ -137,15 +138,14 @@ export class UniCourseIntakes extends BaseEntity {
   @AutoMap()
   intakeMetaData?: MetaDataItem[];
 
-// AFTER
-@Column({ name: 'feesMetaData', type: 'jsonb', nullable: true })
-@AutoMap()
-feesMetaData?: MetaDataItem[];
+  @Column({ name: 'feesMetaData', type: 'jsonb', nullable: true })
+  @AutoMap()
+  feesMetaData?: MetaDataItem[];
 
-@Column({ name: 'scholarshipMetaData', type: 'jsonb', nullable: true })
+  @Column({ name: 'scholarshipMetaData', type: 'jsonb', nullable: true })
   @AutoMap()
   scholarshipMetaData?: MetaDataItem[];
-  
+
   @Column({
     name: 'applicationFee',
     type: 'decimal',
@@ -193,4 +193,10 @@ feesMetaData?: MetaDataItem[];
    */
   @OneToMany(() => Applications, (app) => app.UniCourseIntake)
   Applications!: Applications[];
+
+  /**
+   * One-to-Many: Favourites (wishlist) pointing to this intake
+   */
+  @OneToMany(() => LeadFavouriteCourses, (fav) => fav.UniCourseIntake)
+  LeadFavouriteCourse!: LeadFavouriteCourses[];
 }
