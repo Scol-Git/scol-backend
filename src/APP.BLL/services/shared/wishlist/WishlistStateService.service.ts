@@ -62,7 +62,7 @@ export class WishlistStateService {
       select: { courseIntakeId: true },
     });
 
-    if (!wishlistRows.length) {
+    if (wishlistRows.length === 0) {
       return;
     }
 
