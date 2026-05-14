@@ -54,9 +54,7 @@ export class WishlistStateService {
 
     const intakeIds = result.courses.map((x) => x.courseId);
 
-    if (!intakeIds.length) {
-      return;
-    }
+   
 
     const wishlistRows = await this.dbContext.leadFavouriteCourses.find({
       where: {
@@ -65,6 +63,10 @@ export class WishlistStateService {
       },
       select: { courseIntakeId: true },
     });
+     
+    if (!intakeIds.length) {
+      return;
+    }
 
     const wishlistSet = new Set(wishlistRows.map((x) => x.courseIntakeId));
 
