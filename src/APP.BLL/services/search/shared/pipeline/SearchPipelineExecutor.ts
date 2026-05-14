@@ -3,7 +3,6 @@ import { Injectable, Inject } from '@nestjs/common';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 
-import { ListType } from '@shared/enums/ListType.enum';
 import { RankingMode } from '@shared/enums/RankingMode.enum';
 
 import { SearchResponseDto } from '@shared/dtos/search/SearchResponseDto';

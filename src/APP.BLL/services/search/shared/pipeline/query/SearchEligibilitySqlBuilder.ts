@@ -38,16 +38,22 @@ export class SearchEligibilitySqlBuilder {
         )
         AND (
           cer0."minSectionReq" IS NULL
-          OR NOT EXISTS (
-            SELECT 1 FROM "sys_EnglishTestSections" ets
-            WHERE ets."testId" = cer0."sysEngTestId"
+          OR (
+            EXISTS (
+              SELECT 1 FROM "sys_EnglishTestSections" ets0
+              WHERE ets0."testId" = cer0."sysEngTestId"
+            )
             AND NOT EXISTS (
-              SELECT 1 FROM "LeadEnglishTestSectionResults" lets0
-              INNER JOIN "LeadEnglishTestResults" letr1 ON lets0."resultId" = letr1.id
-              WHERE letr1."leadId" = :leadId
-                AND letr1."sysEngTestId" = cer0."sysEngTestId"
-                AND lets0."sysEngTestSectionId" = ets.id
-                AND CAST(lets0."sectionScore" AS DECIMAL) >= CAST(cer0."minSectionReq" AS DECIMAL)
+              SELECT 1 FROM "sys_EnglishTestSections" ets
+              WHERE ets."testId" = cer0."sysEngTestId"
+              AND NOT EXISTS (
+                SELECT 1 FROM "LeadEnglishTestSectionResults" lets0
+                INNER JOIN "LeadEnglishTestResults" letr1 ON lets0."resultId" = letr1.id
+                WHERE letr1."leadId" = :leadId
+                  AND letr1."sysEngTestId" = cer0."sysEngTestId"
+                  AND lets0."sysEngTestSectionId" = ets.id
+                  AND CAST(lets0."sectionScore" AS DECIMAL) >= CAST(cer0."minSectionReq" AS DECIMAL)
+              )
             )
           )
         )

@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EntityManager, In } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
@@ -31,9 +32,6 @@ import { ApplicationDocumentVersionSequencer } from './helpers/ApplicationDocume
 import { ApplicationDocumentStorageKeyBuilder } from './helpers/ApplicationDocumentStorageKeyBuilder';
 import type { PendingUploadInitializationResult } from './helpers/application-upload.types';
 
-const UPLOAD_URL_EXPIRES_SECONDS = 900;
-const DOWNLOAD_URL_EXPIRES_SECONDS = 3600;
-
 type PendingUploadForConfirmation = {
   documentScope: 'APPLICATION' | 'LEAD';
   documentId: string;
@@ -53,6 +51,9 @@ type DownloadableDocument = {
 
 @Injectable()
 export class ApplicationDocumentService {
+  private readonly uploadUrlExpiresSeconds: number;
+  private readonly downloadUrlExpiresSeconds: number;
+
   constructor(
     private readonly db: AppDbContext,
     private readonly validator: ApplicationValidator,
@@ -64,7 +65,13 @@ export class ApplicationDocumentService {
     private readonly versionSequencer: ApplicationDocumentVersionSequencer,
     private readonly storageKeyBuilder: ApplicationDocumentStorageKeyBuilder,
     @Inject(IStorageServiceToken) private readonly storage: IStorageService,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    this.uploadUrlExpiresSeconds =
+      this.config.get<number>('STORAGE_UPLOAD_URL_EXPIRES_SECONDS') ?? 900;
+    this.downloadUrlExpiresSeconds =
+      this.config.get<number>('STORAGE_DOWNLOAD_URL_EXPIRES_SECONDS') ?? 3600;
+  }
 
   async generateUploadUrl(
     currentUserId: string,
@@ -152,7 +159,7 @@ export class ApplicationDocumentService {
     const uploadUrl = await this.storage.generateUploadUrl(
       pending.storageKey,
       pending.mimeType,
-      UPLOAD_URL_EXPIRES_SECONDS,
+      this.uploadUrlExpiresSeconds,
     );
 
     return this.mapper.toGenerateUploadUrlResponse({
@@ -160,7 +167,7 @@ export class ApplicationDocumentService {
       documentVersionId: pending.documentVersionId,
       uploadUrl,
       mimeType: pending.mimeType,
-      expiresInSeconds: UPLOAD_URL_EXPIRES_SECONDS,
+      expiresInSeconds: this.uploadUrlExpiresSeconds,
     });
   }
 
@@ -244,7 +251,7 @@ export class ApplicationDocumentService {
         await this.confirmLeadScopedUpload(manager, actedByUserId, pending);
       }
 
-      await this.markRequirementInProgressIfNeeded(manager, requirement.id);
+      //await this.markRequirementInProgressIfNeeded(manager, requirement.id);
 
       await this.activity.logDocumentUploaded(manager, {
         applicationId: application.id,
@@ -308,7 +315,7 @@ export class ApplicationDocumentService {
 
     return this.mapper.toDownloadResponse({
       url,
-      expiresInSeconds: DOWNLOAD_URL_EXPIRES_SECONDS,
+      expiresInSeconds: this.downloadUrlExpiresSeconds,
       fileName: downloadable.fileName,
     });
   }

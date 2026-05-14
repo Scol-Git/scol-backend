@@ -66,11 +66,14 @@ export class HomeSearchService {
       cursor: request.pagination?.cursor,
       limit: request.pagination?.limit,
       context,
+      source: 'HOME',
     });
 
     await this.wishlistStateService.attachWishlistState(user, result);
 
-    this.logger.LogInfo('Home search completed', {
+    await this.wishlistStateService.attachWishlistState(user, result);
+
+    this.logger.LogDebug('Home search completed', {
       context: 'HomeSearchService.getHomeCourses',
       resultCount: result.courses.length,
       hasNext: result.pagination.hasNext,

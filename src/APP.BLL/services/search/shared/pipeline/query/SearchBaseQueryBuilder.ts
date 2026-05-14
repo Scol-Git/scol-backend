@@ -46,6 +46,7 @@ export class SearchBaseQueryBuilder {
     qb = this.applyLocationFilters(qb, params);
     qb = this.applyProgrammeFilter(qb, params);
     qb = this.applyIntakeFilters(qb, params);
+    qb = this.applyRangeFilters(qb, params);
     qb = this.applyScholarshipFlag(qb, params);
 
     if (this.shouldApplyNextIntakeRule(params)) {
@@ -146,19 +147,49 @@ export class SearchBaseQueryBuilder {
     return qb;
   }
 
+  applyRangeFilters(
+    qb: SelectQueryBuilder<UniCourseIntakes>,
+    params: PipelineParams,
+  ): SelectQueryBuilder<UniCourseIntakes> {
+    const ranges = params.ranges;
+    if (!ranges) {
+      return qb;
+    }
+
+    if (ranges.tuitionFee?.min != null) {
+      qb.andWhere('CAST(ci."tuitionFee" AS DECIMAL) >= :minTuitionFee', {
+        minTuitionFee: ranges.tuitionFee.min,
+      });
+    }
+    if (ranges.tuitionFee?.max != null) {
+      qb.andWhere('CAST(ci."tuitionFee" AS DECIMAL) <= :maxTuitionFee', {
+        maxTuitionFee: ranges.tuitionFee.max,
+      });
+    }
+    if (ranges.durationMonths?.min != null) {
+      qb.andWhere('ci."courseDuration" >= :minDurationMonths', {
+        minDurationMonths: ranges.durationMonths.min,
+      });
+    }
+    if (ranges.durationMonths?.max != null) {
+      qb.andWhere('ci."courseDuration" <= :maxDurationMonths', {
+        maxDurationMonths: ranges.durationMonths.max,
+      });
+    }
+
+    return qb;
+  }
+
   applyScholarshipFlag(
     qb: SelectQueryBuilder<UniCourseIntakes>,
     params: PipelineParams,
   ): SelectQueryBuilder<UniCourseIntakes> {
     if (params.flags?.hasScholarship !== true) return qb;
 
-    qb.andWhere(
-      `EXISTS (
-        SELECT 1 FROM "CourseIntakeScholarships" sch
-        WHERE sch."courseIntakeId" = ci.id
-          AND sch."isActive" = true
-      )`,
-    );
+    qb.andWhere(`
+      jsonb_typeof(ci."scholarshipMetaData") = 'array'
+      AND jsonb_array_length(ci."scholarshipMetaData") > 0
+    `);
 
     return qb;
   }

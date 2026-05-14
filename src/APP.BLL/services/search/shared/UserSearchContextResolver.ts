@@ -150,7 +150,7 @@ export class UserSearchContextResolver {
       await this.leadProfileService.determinedAcademicFormStatus(userId);
     const rankingMode = this.determineRankingMode(formStatus);
 
-    if (formStatus === AcademicFormStatus.INCOMPLETE) {
+    if (rankingMode === RankingMode.BUSINESS_ONLY) {
       return {
         userState: UserState.LOGGED_IN,
         academicFormStatus: formStatus,

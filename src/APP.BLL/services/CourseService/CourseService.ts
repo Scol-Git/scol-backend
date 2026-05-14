@@ -3,10 +3,12 @@ import { IsNull } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
+import type { ICurrentUser } from '@shared/interfaces/domain';
 import { CourseDetailsResponseDto } from '@shared/dtos/course-details/CourseDetailsResponseDto';
 import { CourseDetailsMapper } from '@bll/mappings/course-details/CourseDetailsMapper';
+import { CourseDetailsLeadFlagsResolver } from './CourseDetailsLeadFlagsResolver';
 
-/** Relations needed to build course details + meta from intake. */
+/** Relations needed to build course details + meta + eligibility from intake. */
 const COURSE_DETAILS_RELATIONS = {
   UniCourse: {
     SysUniversity: {
@@ -14,13 +16,16 @@ const COURSE_DETAILS_RELATIONS = {
       SysState: true,
       SysCity: true,
     },
-    CourseEngReq: { SysEnglishTest: true },
+    CourseEngReq: {
+      SysEnglishTest: {
+        SysEnglishTestSection: true,
+      },
+    },
     SysProgramme: true,
     SysAcademicDegree: true,
     minSysAcademicDegree: true,
     higherSysAcademicDegree: true,
   },
- 
 };
 
 @Injectable()
@@ -28,6 +33,7 @@ export class CourseService {
   constructor(
     private readonly db: AppDbContext,
     private readonly courseDetailsMapper: CourseDetailsMapper,
+    private readonly leadFlagsResolver: CourseDetailsLeadFlagsResolver,
     @Inject(ILoggerToken) private readonly logger: ILogger,
   ) {}
 
@@ -37,6 +43,7 @@ export class CourseService {
    */
   async getCourseDetails(
     intakeId: string,
+    user?: ICurrentUser,
   ): Promise<CourseDetailsResponseDto | null> {
     const intake = await this.db.courseIntakes.findOne({
       where: {
@@ -56,19 +63,23 @@ export class CourseService {
 
     const currentYear = new Date().getFullYear();
 
-    const currentYearIntakes = await this.db.courseIntakes.find({
-      where: {
-        uniCourseId: intake.uniCourseId,
-        isActive: true,
-        deletedAt: IsNull(),
-        intakeYear: currentYear,
-      },
-      order: { intakeMonth: 'ASC' },
-    });
+    const [currentYearIntakes, leadFlags] = await Promise.all([
+      this.db.courseIntakes.find({
+        where: {
+          uniCourseId: intake.uniCourseId,
+          isActive: true,
+          deletedAt: IsNull(),
+          intakeYear: currentYear,
+        },
+        order: { intakeMonth: 'ASC' },
+      }),
+      this.leadFlagsResolver.resolve(intake, user),
+    ]);
 
     return this.courseDetailsMapper.toCourseDetailsResponse(
       intake,
       currentYearIntakes,
+      leadFlags,
     );
   }
 }
