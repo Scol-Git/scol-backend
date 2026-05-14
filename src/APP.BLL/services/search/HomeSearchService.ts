@@ -71,9 +71,7 @@ export class HomeSearchService {
 
     await this.wishlistStateService.attachWishlistState(user, result);
 
-    await this.wishlistStateService.attachWishlistState(user, result);
-
-    this.logger.LogDebug('Home search completed', {
+    this.logger.LogInfo('Home search completed', {
       context: 'HomeSearchService.getHomeCourses',
       resultCount: result.courses.length,
       hasNext: result.pagination.hasNext,
