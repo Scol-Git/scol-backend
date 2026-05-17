@@ -1,7 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EntityManager, In } from 'typeorm';
+import { EntityManager, In, Not } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
+import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
 import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.entity';
 import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
 import { ApplicationRequiredDocuments } from '@entity/entities/ApplicationRequiredDocuments.entity';
@@ -47,6 +48,16 @@ type DownloadableDocument = {
   documentVersionId: string;
   storageKey: string;
   fileName: string;
+};
+
+type ResolvedLeadDocument = {
+  document: LeadDocuments;
+  version: LeadDocumentVersions;
+};
+
+type ResolvedApplicationDocument = {
+  document: ApplicationDocuments;
+  version: ApplicationDocumentVersions;
 };
 
 @Injectable()
@@ -295,6 +306,182 @@ export class ApplicationDocumentService {
       documentId,
     );
   }
+
+// ==============================
+// MAIN DELETE ENTRY
+// ==============================
+async deleteApplicationDocument(
+  currentUserId: string,
+  applicationId: string,
+  documentId: string,
+): Promise<{ success: true }> {
+  const application = await this.access.ensureLeadCanAccessApplicationOrThrow(
+    currentUserId,
+    applicationId,
+  );
+
+  return this.deleteDocumentForAuthorizedApplication(application, documentId);
+}
+
+
+// ==============================
+// ORCHESTRATOR (APPLICATION + LEAD)
+// ==============================
+async deleteDocumentForAuthorizedApplication(
+  application: Applications,
+  documentId: string,
+): Promise<{ success: true }> {
+
+  // 1. APPLICATION scoped delete first
+  const applicationResolved = await this.resolveApplicationScopedOrNull(
+    application.id,
+    documentId,
+  );
+
+  if (applicationResolved) {
+    await this.deleteApplicationScopedDocument(applicationResolved);
+    return { success: true };
+  }
+
+  // 2. LEAD scoped delete
+  if (!application.leadId) {
+    throw new NotFoundException('Document cannot be deleted');
+  }
+
+  const leadResolved = await this.resolveLeadScopedOrNull(
+    application,
+    application.leadId,
+    documentId,
+  );
+
+  if (leadResolved) {
+    await this.deleteLeadScopedDocument(leadResolved);
+    return { success: true };
+  }
+
+  throw new NotFoundException('Document cannot be deleted');
+}
+
+
+// ==============================
+// RESOLVE LEAD (DELETE RULES)
+// ==============================
+private async resolveLeadScopedOrNull(
+  application: Applications | null,
+  leadId: string,
+  documentId: string,
+): Promise<ResolvedLeadDocument | null> {
+
+  const document = await this.db.leadDocuments.findOne({
+    where: {
+      id: documentId,
+      leadId,
+      overallStatus: Not(ApplicationDocumentStatus.Verified),
+    },
+  });
+
+  if (!document?.currentLeadDocumentVersionId) {
+    return null;
+  }
+
+
+
+  // 2. Resolve version
+
+  const version = await this.db.leadDocumentVersions.findOne({
+    where: {
+      id: document.currentLeadDocumentVersionId,
+      leadDocumentId: document.id,
+      uploadStatus: UploadStatus.UPLOADED,
+    },
+  });
+
+  if (!version) {
+    return null;
+  }
+
+  return { document, version };
+}
+
+
+// ==============================
+// RESOLVE APPLICATION DOC
+// ==============================
+private async resolveApplicationScopedOrNull(
+  applicationId: string,
+  documentId: string,
+): Promise<ResolvedApplicationDocument | null> {
+
+  const document = await this.db.applicationDocuments.findOne({
+    where: {
+      id: documentId,
+      applicationId,
+      overallStatus: Not(ApplicationDocumentStatus.Verified),
+    },
+  });
+
+  if (!document?.currentVersionId) {
+    return null;
+  }
+
+  const version = await this.db.applicationDocumentVersions.findOne({
+    where: {
+      id: document.currentVersionId,
+      applicationDocumentId: document.id,
+      uploadStatus: UploadStatus.UPLOADED,
+    },
+  });
+
+  if (!version) {
+    return null;
+  }
+
+  return { document, version };
+}
+
+
+// ==============================
+// DELETE OPERATIONS
+// ==============================
+private async deleteApplicationScopedDocument(
+  resolved: ResolvedApplicationDocument,
+): Promise<void> {
+  await this.db.manager.transaction(async (manager) => {
+    await manager
+      .getRepository(ApplicationActivities)
+      .createQueryBuilder()
+      .delete()
+      .where('applicationDocumentId = :documentId', {
+        documentId: resolved.document.id,
+      })
+      .orWhere('documentVersionId = :versionId', {
+        versionId: resolved.version.id,
+      })
+      .execute();
+
+    await manager
+      .getRepository(ApplicationDocumentVersions)
+      .delete(resolved.version.id);
+
+    await manager
+      .getRepository(ApplicationDocuments)
+      .delete(resolved.document.id);
+  });
+}
+
+private async deleteLeadScopedDocument(
+  resolved: ResolvedLeadDocument,
+): Promise<void> {
+  await this.db.manager.transaction(async (manager) => {
+    await manager.getRepository(LeadDocumentVersions)
+      .delete(resolved.version.id);
+
+    await manager.getRepository(LeadDocuments)
+      .delete(resolved.document.id);
+  });
+}
+
+
 
   async generateDownloadUrlForAuthorizedApplication(
     application: Applications,

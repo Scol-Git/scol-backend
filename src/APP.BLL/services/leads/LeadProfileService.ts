@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, In, Not, Repository } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
@@ -25,6 +25,7 @@ import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStat
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
 import { IStorageService as IStorageServiceToken } from '@shared/tokens/injection.tokens';
+
 
 const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
 
@@ -692,5 +693,52 @@ export class LeadProfileService {
       expiresInSeconds: this.downloadUrlExpiresSeconds ?? 3600,
       fileName: version.originalFileName,
     };
+  }
+
+  async deleteLeadDocument(
+    currentUserId: string,
+    documentId: string,
+  ): Promise<{ success: true }> {
+    const leadProfile = await this.db.leadProfiles.findOne({
+      where: { userId: currentUserId },
+    });
+  
+    if (!leadProfile) {
+      throw new NotFoundException('Lead profile not found');
+    }
+  
+    // 1. Resolve document
+    const document = await this.db.leadDocuments.findOne({
+      where: {
+        id: documentId,
+        leadId: leadProfile.id,
+        overallStatus: Not(ApplicationDocumentStatus.Verified),
+      },
+    });
+  
+    if (!document?.currentLeadDocumentVersionId) {
+      throw new NotFoundException('Document cannot be deleted');
+    }
+  
+    // 2. Resolve version
+    const version = await this.db.leadDocumentVersions.findOne({
+      where: {
+        id: document.currentLeadDocumentVersionId,
+        leadDocumentId: document.id,
+        uploadStatus: UploadStatus.UPLOADED,
+      },
+    });
+  
+    if (!version) {
+      throw new NotFoundException('Document version not found');
+    }
+  
+    // 3. Delete version first
+    await this.db.leadDocumentVersions.delete(version.id);
+  
+    // 4. Delete document
+    await this.db.leadDocuments.delete(document.id);
+  
+    return { success: true };
   }
 }
