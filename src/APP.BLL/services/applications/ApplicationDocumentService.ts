@@ -339,7 +339,12 @@ async deleteDocumentForAuthorizedApplication(
   );
 
   if (applicationResolved) {
-    await this.deleteApplicationScopedDocument(applicationResolved);
+   
+   // 3. Delete version first
+   await this.db.applicationDocumentVersions.delete(applicationResolved.version.id);
+  
+   // 4. Delete document
+   await this.db.applicationDocuments.delete(applicationResolved.document.id);
     return { success: true };
   }
 
@@ -355,7 +360,13 @@ async deleteDocumentForAuthorizedApplication(
   );
 
   if (leadResolved) {
-    await this.deleteLeadScopedDocument(leadResolved);
+    
+
+    // 3. Delete version first
+    await this.db.leadDocumentVersions.delete(leadResolved.version.id);
+  
+    // 4. Delete document
+    await this.db.leadDocuments.delete(leadResolved.document.id);
     return { success: true };
   }
 
@@ -438,50 +449,6 @@ private async resolveApplicationScopedOrNull(
 
   return { document, version };
 }
-
-
-// ==============================
-// DELETE OPERATIONS
-// ==============================
-private async deleteApplicationScopedDocument(
-  resolved: ResolvedApplicationDocument,
-): Promise<void> {
-  await this.db.manager.transaction(async (manager) => {
-    await manager
-      .getRepository(ApplicationActivities)
-      .createQueryBuilder()
-      .delete()
-      .where('applicationDocumentId = :documentId', {
-        documentId: resolved.document.id,
-      })
-      .orWhere('documentVersionId = :versionId', {
-        versionId: resolved.version.id,
-      })
-      .execute();
-
-    await manager
-      .getRepository(ApplicationDocumentVersions)
-      .delete(resolved.version.id);
-
-    await manager
-      .getRepository(ApplicationDocuments)
-      .delete(resolved.document.id);
-  });
-}
-
-private async deleteLeadScopedDocument(
-  resolved: ResolvedLeadDocument,
-): Promise<void> {
-  await this.db.manager.transaction(async (manager) => {
-    await manager.getRepository(LeadDocumentVersions)
-      .delete(resolved.version.id);
-
-    await manager.getRepository(LeadDocuments)
-      .delete(resolved.document.id);
-  });
-}
-
-
 
   async generateDownloadUrlForAuthorizedApplication(
     application: Applications,
