@@ -47,7 +47,7 @@ export class SmsService implements ISmsService {
 
     if (this.provider === 'console') {
       // Console mode: log OTP
-      this.logger.info(
+      this.logger.LogInfo(
         `[DEV MODE] OTP for ${PhoneNumberUtil.mask(phone)}: ${otp}`,
         {
           context: 'SmsService.sendOtp',
@@ -62,7 +62,7 @@ export class SmsService implements ISmsService {
     // API mode: send SMS via external provider
     try {
       await this.sendSms(phone, message);
-      this.logger.info('OTP SMS sent successfully', {
+      this.logger.LogInfo('OTP SMS sent successfully', {
         context: 'SmsService.sendOtp',
         phone: PhoneNumberUtil.mask(phone),
         action: 'OTP_SMS_SENT',

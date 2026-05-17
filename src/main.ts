@@ -1,4 +1,3 @@
-// src/main.ts
 import { networkInterfaces } from 'os';
 import { createNestApp } from './bootstrap';
 

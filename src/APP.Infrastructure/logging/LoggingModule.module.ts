@@ -14,55 +14,39 @@ const CORRELATION_HEADER = 'x-correlation-id';
   imports: [
     LoggerModule.forRootAsync({
       useFactory: (): { pinoHttp: PinoHttpOptions } => {
-        const isDev = getAppStage() === 'dev';
+        const stage = getAppStage();
+        const isDev = stage === 'dev';
 
         const pinoHttp: PinoHttpOptions = {
-          // Base logger level (controls which logs are shown)
           level: isDev ? 'debug' : 'info',
-
-          // HTTP request log level (what level to log requests at)
           useLevel: isDev ? 'debug' : 'info',
-
-          // 🚫 disable automatic access logs
           autoLogging: false,
 
-          /**
-           * ✅ One correlationId per request
-           *
-           * - If client sends x-correlation-id or x-request-id, reuse it
-           * - Otherwise generate a new UUID
-           * - pino-http will put the id on req.id and in every log
-           */
+          base: {
+            service: 'scol-backend',
+            version: process.env.APP_VERSION ?? 'unknown',
+            env: stage,
+            server:
+              process.env.SERVER_NAME ?? process.env.HOSTNAME ?? 'unknown',
+          },
+
           genReqId: (req) => {
             const headerId =
               (req.headers[CORRELATION_HEADER] as string) ||
               (req.headers['x-request-id'] as string);
-
             return headerId ?? randomUUID();
           },
 
-          /**
-           * ✅ Attach correlationId to every log line
-           *
-           * nestjs-pino binds a request-scoped logger which has access
-           * to req.id (populated by genReqId above).
-           */
-          customProps: (req) => {
-            return {
-              correlationId: (req as any).id,
-            };
-          },
+          customProps: (req) => ({
+            correlationId: (req as any).id,
+          }),
 
-          // 🚫 strip req/res from bound logger so your app logs don't include them
           serializers: {
-            // keep error serializer default behavior
             err: ((e: unknown) => e) as StdSerializers['err'],
-            // hide req/res in outputs
             req: (() => undefined) as unknown as StdSerializers['req'],
             res: (() => undefined) as unknown as StdSerializers['res'],
           },
 
-          // redact secrets
           redact: [
             'req.headers.authorization',
             'authorization',
@@ -72,11 +56,27 @@ const CORRELATION_HEADER = 'x-correlation-id';
         };
 
         if (isDev) {
-          // pretty print in dev
+          // Local: pretty print, NR not active
           (pinoHttp as any).transport = {
             target: 'pino-pretty',
             options: { colorize: true, singleLine: false },
           };
+        } else {
+          // QA/Prod: attach NR trace enricher so logs link to APM traces
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const nrEnricher =
+              require('@newrelic/pino-enricher') as () => unknown;
+            const mixin = nrEnricher();
+            if (typeof mixin === 'function') {
+              pinoHttp.mixin = mixin as (
+                mergeObject: object,
+                level: number,
+              ) => object;
+            }
+          } catch {
+            // NR agent not available, continue without enricher
+          }
         }
 
         return { pinoHttp };
@@ -84,7 +84,6 @@ const CORRELATION_HEADER = 'x-correlation-id';
     }),
   ],
   providers: [
-    // Register Logger with interface token (following .NET DI pattern)
     {
       provide: ILogger,
       useClass: Logger,

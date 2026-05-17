@@ -88,7 +88,7 @@ export class AuthService {
   async registerLead(
     dto: RegisterLeadRequestDto,
   ): Promise<RegisterLeadResponseDto> {
-    this.logger.info('Lead registration started', {
+    this.logger.LogInfo('Lead registration started', {
       context: 'AuthService.registerLead',
       phone: PhoneNumberUtil.mask(dto.phone),
       action: 'REGISTER_LEAD_START',
@@ -146,7 +146,7 @@ export class AuthService {
       purpose: 'phone_verify',
     });
 
-    this.logger.info('Pending registration created/updated successfully', {
+    this.logger.LogInfo('Pending registration created/updated successfully', {
       context: 'AuthService.registerLead',
       purposeId,
       phone: PhoneNumberUtil.mask(dto.phone),
@@ -172,7 +172,7 @@ export class AuthService {
     ip?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
-    this.logger.info('OTP verification started', {
+    this.logger.LogInfo('OTP verification started', {
       context: 'AuthService.verifyOtp',
       pendingId: otpUserPayload.pendingId,
       userId: otpUserPayload.userId,
@@ -290,7 +290,7 @@ export class AuthService {
         purposeId,
       );
 
-      this.logger.info('Password reset completed via OTP verify', {
+      this.logger.LogInfo('Password reset completed via OTP verify', {
         context: 'AuthService.verifyOtp',
         userId: user.id,
         phone: PhoneNumberUtil.mask(user.phone),
@@ -451,7 +451,7 @@ export class AuthService {
       const tokens = await this.token.issueTokenPair(user, ip, userAgent);
       //session?id is created here
 
-      this.logger.info('OTP verified successfully, user created', {
+      this.logger.LogInfo('OTP verified successfully, user created', {
         context: 'AuthService.verifyOtp',
         userId: user.id,
         phone: PhoneNumberUtil.mask(user.phone),
@@ -482,7 +482,7 @@ export class AuthService {
   async resendOtp(
     otpUserPayload: OtpUserPayload,
   ): Promise<ResendOtpResponseDto> {
-    this.logger.info('OTP resend requested', {
+    this.logger.LogInfo('OTP resend requested', {
       context: 'AuthService.resendOtp',
       purpose: otpUserPayload.purpose,
       phone: PhoneNumberUtil.mask(otpUserPayload.phone),
@@ -554,7 +554,7 @@ export class AuthService {
     // 7. Send OTP via SMS
     await this.sms.sendOtp(otpUserPayload.phone, plainOtp);
 
-    this.logger.info('OTP resent successfully', {
+    this.logger.LogInfo('OTP resent successfully', {
       context: 'AuthService.resendOtp',
       purpose: otpUserPayload.purpose,
       purposeId,
@@ -581,7 +581,7 @@ export class AuthService {
     this.validation.validateLoginRequest(dto);
 
     const identifier = dto.phone || dto.email!;
-    this.logger.info('Login attempt', {
+    this.logger.LogInfo('Login attempt', {
       context: 'AuthService.login',
       identifier: PhoneNumberUtil.maskIdentifier(identifier),
       ip,
@@ -652,7 +652,7 @@ export class AuthService {
         })) ?? undefined;
     }
 
-    this.logger.info('Login successful', {
+    this.logger.LogInfo('Login successful', {
       context: 'AuthService.login',
       userId: user.id,
       userType: user.userType,
@@ -676,7 +676,7 @@ export class AuthService {
     refreshToken: string,
     ip?: string,
   ): Promise<TokenRefreshResponseDto> {
-    this.logger.info('Token refresh requested', {
+    this.logger.LogInfo('Token refresh requested', {
       context: 'AuthService.refreshAccessToken',
       ip,
       action: 'REFRESH_TOKEN_START',
@@ -735,7 +735,7 @@ export class AuthService {
       isSuperAdmin: false,
     });
 
-    this.logger.info('Token refreshed successfully', {
+    this.logger.LogInfo('Token refreshed successfully', {
       context: 'AuthService.refreshAccessToken',
       userId: session.SysUser.id,
       sessionId: session.id,
@@ -761,7 +761,7 @@ export class AuthService {
   async logout(ip?: string, userAgent?: string): Promise<void> {
     const user = UserContextAccessor.userContext;
 
-    this.logger.info('Logout requested', {
+    this.logger.LogInfo('Logout requested', {
       context: 'AuthService.logout',
       userId: user.userId,
       ip,
@@ -781,7 +781,7 @@ export class AuthService {
       );
     }
 
-    this.logger.info('Logout successful', {
+    this.logger.LogInfo('Logout successful', {
       context: 'AuthService.logout',
       userId: user.userId,
       ip,
@@ -794,7 +794,7 @@ export class AuthService {
    * Logout all sessions
    */
   async logoutAll(userId: string): Promise<void> {
-    this.logger.info('Logout all sessions requested', {
+    this.logger.LogInfo('Logout all sessions requested', {
       context: 'AuthService.logoutAll',
       userId,
       action: 'LOGOUT_ALL_START',
@@ -805,7 +805,7 @@ export class AuthService {
       { revokedAt: new Date() },
     );
 
-    this.logger.info('All sessions logged out', {
+    this.logger.LogInfo('All sessions logged out', {
       context: 'AuthService.logoutAll',
       userId,
       action: 'LOGOUT_ALL_SUCCESS',
@@ -821,7 +821,7 @@ export class AuthService {
     dto: ForgotPasswordRequestDto,
     ip: string,
   ): Promise<RegisterLeadResponseDto> {
-    this.logger.info('Forgot password requested', {
+    this.logger.LogInfo('Forgot password requested', {
       context: 'AuthService.forgotPassword',
       phone: PhoneNumberUtil.mask(dto.phone),
       ip,
@@ -907,7 +907,7 @@ export class AuthService {
       newPasswordHash,
     });
 
-    this.logger.info('Password reset OTP sent successfully', {
+    this.logger.LogInfo('Password reset OTP sent successfully', {
       context: 'AuthService.forgotPassword',
       userId: user.id,
       phone: PhoneNumberUtil.mask(dto.phone),
