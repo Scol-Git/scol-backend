@@ -203,7 +203,10 @@ export class UserSearchContextResolver {
    * Determine ranking mode based on form status
    */
   private determineRankingMode(formStatus: AcademicFormStatus): RankingMode {
-    if (formStatus === AcademicFormStatus.COMPLETED) {
+    if (
+      formStatus === AcademicFormStatus.COMPLETED ||
+      formStatus === AcademicFormStatus.PARTIALLY_COMPLETED
+    ) {
       return RankingMode.ELIGIBILITY_PLUS_BUSINESS;
     }
     return RankingMode.BUSINESS_ONLY;
