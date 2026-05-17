@@ -89,7 +89,7 @@ export class LeadProfileService {
     return LeadProfileMapper.toResponse(profile);
   }
   async getAcademicForm(userId: string): Promise<AcademicFormResponseDto> {
-    this.logger.info('Getting academic form', {
+    this.logger.LogInfo('Getting academic form', {
       context: 'LeadProfileService.getAcademicForm',
       userId,
     });
@@ -136,7 +136,7 @@ export class LeadProfileService {
     userId: string,
     dto: AcademicFormRequestDto,
   ): Promise<AcademicFormResponseDto> {
-    this.logger.info('Updating academic form', {
+    this.logger.LogInfo('Updating academic form', {
       context: 'LeadProfileService.updateAcademicForm',
       userId,
     });
@@ -162,7 +162,7 @@ export class LeadProfileService {
       userId,
     );
 
-    this.logger.info('Academic form updated successfully', {
+    this.logger.LogInfo('Academic form updated successfully', {
       context: 'LeadProfileService.updateAcademicForm',
       userId,
       leadId: leadProfile.id,
@@ -638,8 +638,6 @@ export class LeadProfileService {
     return AcademicFormStatus.PARTIALLY_COMPLETED;
   }
 
-  
-
   async generateLeadDocumentDownloadUrl(
     currentUserId: string,
     documentId: string,
@@ -647,11 +645,11 @@ export class LeadProfileService {
     const leadProfile = await this.db.leadProfiles.findOne({
       where: { userId: currentUserId },
     });
-  
+
     if (!leadProfile) {
       throw new NotFoundException('Lead profile not found');
     }
-  
+
     const document = await this.db.leadDocuments.findOne({
       where: {
         id: documentId,
@@ -662,15 +660,15 @@ export class LeadProfileService {
         ]),
       },
     });
-  
+
     if (!document) {
       throw new NotFoundException('Lead document not found');
     }
-  
+
     if (!document.currentLeadDocumentVersionId) {
       throw new ValidationException('No active document version available');
     }
-  
+
     const version = await this.db.leadDocumentVersions.findOne({
       where: {
         id: document.currentLeadDocumentVersionId,
@@ -678,24 +676,21 @@ export class LeadProfileService {
         uploadStatus: UploadStatus.UPLOADED,
       },
     });
-  
+
     if (!version) {
       throw new NotFoundException('Uploaded lead document version not found');
     }
-  
+
     if (!version.storageKey) {
       throw new ValidationException('Invalid storage key');
     }
-  
+
     const url = await this.storage.generateDownloadUrl(version.storageKey);
-  
+
     return {
       url,
       expiresInSeconds: this.downloadUrlExpiresSeconds ?? 3600,
       fileName: version.originalFileName,
     };
   }
-
-
-
 }

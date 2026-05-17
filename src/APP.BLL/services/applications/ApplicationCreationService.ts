@@ -80,7 +80,7 @@ export class ApplicationCreationService {
       ),
     );
 
-    this.logger.info('Application created successfully', {
+    this.logger.LogInfo('Application created successfully', {
       context: 'ApplicationCreationService.createApplication',
       applicationId: application.id,
       userId: actedByUserId,

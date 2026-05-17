@@ -2,29 +2,27 @@ import { Injectable, LoggerService } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { ILogger } from '@shared/interfaces/logging';
 
-/**
- * Logger service implementing structured logging.
- *
- * Implements ILogger interface following .NET's ILogger<T> pattern.
- * Uses Pino for high-performance JSON logging.
- */
 @Injectable()
 export class Logger implements ILogger, LoggerService {
+  private _context: string = Logger.name;
+
   constructor(private readonly pino: PinoLogger) {
     this.pino.setContext(Logger.name);
   }
 
-  // --- .NET-style methods ---
-  LogInfo(message: string, meta?: Record<string, unknown>): void {
-    this.pino.info(meta ?? {}, message);
+  setContext(context: string): void {
+    this._context = context;
+    this.pino.setContext(context);
   }
 
-  info(message: string, meta?: Record<string, unknown>): void {
-    this.pino.info(meta ?? {}, message);
+  // ─── Your app code uses these ─────────────────────────────────────────────
+
+  LogInfo(message: string, meta?: Record<string, unknown>): void {
+    this.pino.info({ context: this._context, ...meta }, message);
   }
 
   LogWarning(message: string, meta?: Record<string, unknown>): void {
-    this.pino.warn(meta ?? {}, message);
+    this.pino.warn({ context: this._context, ...meta }, message);
   }
 
   LogError(
@@ -33,31 +31,41 @@ export class Logger implements ILogger, LoggerService {
     meta?: Record<string, unknown>,
   ): void {
     if (error instanceof Error) {
-      this.pino.error({ err: error, ...(meta ?? {}) }, message);
+      this.pino.error(
+        { context: this._context, err: error, ...(meta ?? {}) },
+        message,
+      );
     } else {
-      this.pino.error(meta ?? {}, message);
+      this.pino.error({ context: this._context, ...(meta ?? {}) }, message);
     }
   }
 
   LogDebug(message: string, meta?: Record<string, unknown>): void {
-    this.pino.debug(meta ?? {}, message);
+    this.pino.debug({ context: this._context, ...meta }, message);
   }
 
-  // --- Nest LoggerService compatibility ---
-  log(message: any, ...optionalParams: any[]): any {
-    this.pino.info(optionalParams, message);
+  // ─── NestJS framework uses these (app.useLogger) ─────────────────────────
+
+  log(message: any, context?: string): void {
+    this.pino.info({ context: context ?? this._context }, String(message));
   }
-  error(message: any, ...optionalParams: any[]): any {
-    this.pino.error(optionalParams, message);
+
+  error(message: any, trace?: string, context?: string): void {
+    this.pino.error(
+      { context: context ?? this._context, trace },
+      String(message),
+    );
   }
-  warn(message: any, ...optionalParams: any[]): any {
-    this.pino.warn(optionalParams, message);
+
+  warn(message: any, context?: string): void {
+    this.pino.warn({ context: context ?? this._context }, String(message));
   }
-  debug(message: any, ...optionalParams: any[]): any {
-    this.pino.debug(optionalParams, message);
+
+  debug(message: any, context?: string): void {
+    this.pino.debug({ context: context ?? this._context }, String(message));
   }
-  verbose(message: any, ...optionalParams: any[]): any {
-    // pino doesn’t have "verbose"; map to trace
-    this.pino.trace(optionalParams, message);
+
+  verbose(message: any, context?: string): void {
+    this.pino.trace({ context: context ?? this._context }, String(message));
   }
 }
