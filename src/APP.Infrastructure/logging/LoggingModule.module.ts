@@ -26,6 +26,8 @@ const CORRELATION_HEADER = 'x-correlation-id';
             service: 'scol-backend',
             version: process.env.APP_VERSION ?? 'unknown',
             env: stage,
+            server:
+              process.env.SERVER_NAME ?? process.env.HOSTNAME ?? 'unknown',
           },
 
           genReqId: (req) => {
