@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -67,6 +68,19 @@ export class ApplicationDocumentsController {
     @Param('documentId', ParseUUIDPipe) documentId: string,
   ): Promise<GenerateApplicationDocumentDownloadResponseDto> {
     return await this.applicationDocumentService.generateDownloadUrl(
+      user.userId,
+      applicationId,
+      documentId,
+    );
+  }
+
+  @Delete(':applicationId/documents/:documentId')
+  async deleteApplicationDocument(
+    @CurrentUser() user: ICurrentUser,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ): Promise<{ success: true }> {
+    return this.applicationDocumentService.deleteApplicationDocument(
       user.userId,
       applicationId,
       documentId,

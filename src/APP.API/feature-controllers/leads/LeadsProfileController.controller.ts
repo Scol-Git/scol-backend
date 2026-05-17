@@ -1,4 +1,13 @@
-import { Controller, Get, Put, Body, UseGuards, Param, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Delete,
+  Body,
+  UseGuards,
+  Param,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
 
 // Guards
@@ -91,10 +100,10 @@ export class LeadsProfileController {
   }
 
   /**
-   * GET /leads/profile/leads/documents/:documentId/download
+   * GET /leads/profile/documents/:documentId
    * Signed URL for the authenticated lead to download their document.
    */
-  @Get('leads/documents/:documentId/download')
+  @Get('documents/:documentId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   async downloadLeadDocument(
@@ -105,5 +114,19 @@ export class LeadsProfileController {
       user.userId,
       documentId,
     );
+  }
+
+  /**
+   * DELETE /leads/profile/documents/:documentId
+   * Deletes a lead document when it is not verified and has an uploaded current version.
+   */
+  @Delete('documents/:documentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  async deleteLeadDocument(
+    @CurrentUser() user: ICurrentUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ): Promise<{ success: true }> {
+    return this.leadProfileService.deleteLeadDocument(user.userId, documentId);
   }
 }
