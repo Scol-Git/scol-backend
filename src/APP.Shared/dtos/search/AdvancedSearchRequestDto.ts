@@ -28,7 +28,7 @@ export class AdvancedSearchRequestDto {
   })
   @IsEnum(ListType)
   @IsOptional()
-  listType?: ListType = ListType.ELIGIBLE_ONLY;
+  listType?: ListType | null = null;
 
   @ApiPropertyOptional({
     description: 'Filters',

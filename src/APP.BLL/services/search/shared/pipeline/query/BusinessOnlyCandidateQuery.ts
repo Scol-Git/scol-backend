@@ -27,13 +27,6 @@ export class BusinessOnlyCandidateQuery {
     params: PipelineParams,
     intakeWindow: IntakeWindow,
   ): Promise<SearchCandidate[]> {
-    if (
-      params.listType === ListType.INELIGIBLE_ONLY &&
-      params.context.rankingMode === RankingMode.BUSINESS_ONLY
-    ) {
-      return [];
-    }
-
     const effectiveLimit = this.paginationService.getEffectiveLimit(
       params.limit,
     );

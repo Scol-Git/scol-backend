@@ -61,6 +61,14 @@ export class SmsService implements ISmsService {
 
     // API mode: send SMS via external provider
     try {
+      if (!this.smsApiUrl) {
+        throw new Error('SMS API URL is not configured');
+      }
+
+      if (!this.smsApiKey) {
+        throw new Error('SMS API Key is not configured');
+      }
+
       await this.sendSms(phone, message);
       this.logger.LogInfo('OTP SMS sent successfully', {
         context: 'SmsService.sendOtp',

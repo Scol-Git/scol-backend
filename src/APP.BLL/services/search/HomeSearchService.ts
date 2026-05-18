@@ -8,6 +8,7 @@ import { SearchResponseDto } from '@shared/dtos/search/SearchResponseDto';
 import { UserSearchContextResolver } from './shared/UserSearchContextResolver';
 import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor';
 import { WishlistStateService } from '@bll/services/shared/wishlist/WishlistStateService.service';
+import { SearchExecutionSource } from './shared/pipeline/SearchPipelineTypes';
 
 /**
  * Home Page Search Service
@@ -62,11 +63,11 @@ export class HomeSearchService {
     // - Results cached in Redis
     const result = await this.pipelineExecutor.execute({
       // No search text or filters for home page
-      listType: request.listType ?? ListType.ELIGIBLE_ONLY,
+      listType: request.listType,
       cursor: request.pagination?.cursor,
       limit: request.pagination?.limit,
       context,
-      source: 'HOME',
+      source: SearchExecutionSource.HOME,
     });
 
     await this.wishlistStateService.attachWishlistState(user, result);

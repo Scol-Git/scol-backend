@@ -25,7 +25,7 @@ export class CourseResponseMapper {
   toSearchResponse(
     context: SearchContext,
     paginated: PaginatedResult<RankedCourse>,
-    listType: ListType,
+    listType?: ListType | null,
   ): SearchResponseDto {
     return {
       userState: context.userState,
@@ -41,12 +41,12 @@ export class CourseResponseMapper {
    */
   toEmptyResponse(
     context: SearchContext,
-    listType: ListType,
+    listType?: ListType | null,
   ): SearchResponseDto {
     return {
       userState: context.userState,
       academicFormStatus: context.academicFormStatus,
-      listType,
+      listType: listType,
       pagination: {
         cursor: null,
         limit: 15,

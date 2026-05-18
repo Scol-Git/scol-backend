@@ -10,6 +10,7 @@ import { AdvancedFiltersResponseDto } from '@shared/dtos/search/AdvancedFiltersR
 import { UserSearchContextResolver } from './shared/UserSearchContextResolver';
 import { SearchPipelineExecutor } from './shared/pipeline/SearchPipelineExecutor';
 import { SearchFilterOptionsService } from './shared/filters/SearchFilterOptionsService';
+import { SearchExecutionSource } from './shared/pipeline/SearchPipelineTypes';
 
 /**
  * Course Search Service
@@ -70,11 +71,11 @@ export class CourseSearchService {
     // 2. Execute optimized search pipeline
     const result = await this.pipelineExecutor.execute({
       searchText: request.searchText,
-      listType: request.listType ?? ListType.ELIGIBLE_ONLY,
+      listType: request.listType,
       cursor: request.pagination?.cursor,
       limit: request.pagination?.limit,
       context,
-      source: 'NORMAL_SEARCH',
+      source: SearchExecutionSource.NORMAL_SEARCH,
     });
 
     this.logger.debug?.('Normal search completed', {
@@ -119,11 +120,11 @@ export class CourseSearchService {
       filters: request.filters,
       ranges: request.ranges,
       flags: request.flags,
-      listType: request.listType ?? ListType.ELIGIBLE_ONLY,
+      listType: request.listType,
       cursor: request.pagination?.cursor,
       limit: request.pagination?.limit,
       context,
-      source: 'ADVANCED_SEARCH',
+      source: SearchExecutionSource.ADVANCED_SEARCH,
     });
 
     this.logger.debug?.('Advanced search completed', {

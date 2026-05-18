@@ -25,7 +25,7 @@ export class SearchResponseDto {
     description: 'List type (eligible or ineligible)',
     enum: ListType,
   })
-  listType!: ListType;
+  listType?: ListType | null;
 
   @ApiProperty({
     description: 'Pagination information',
