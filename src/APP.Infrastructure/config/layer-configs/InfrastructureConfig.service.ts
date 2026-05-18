@@ -25,11 +25,9 @@ export class InfrastructureConfig implements IInfrastructureConfig {
   sms = {
     // Use APP_STAGE: console for dev/qa, api for prod
     provider: (this._config.get<string>('SMS_PROVIDER') ||
-      (getAppStage() === 'prod' ? 'api' : 'console')) as 'console' | 'api',
+      (getAppStage() != 'dev' ? 'api' : 'console')) as 'console' | 'api',
     api: {
-      url:
-        this._config.get<string>('SMS_API_URL') ||
-        'https://api.sms.net.bd/sendsms',
+      url: this._config.get<string>('SMS_API_URL') || '',
       apiKey: this._config.get<string>('SMS_API_KEY') || '',
       throwOnFailure:
         this._config.get<string>('SMS_THROW_ON_FAILURE') === 'true',

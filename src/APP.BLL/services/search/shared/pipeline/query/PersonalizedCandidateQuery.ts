@@ -42,25 +42,32 @@ export class PersonalizedCandidateQuery {
     const cursorRank = cursorData?.rankScore ?? null;
     const cursorCourseIntakeId = cursorData?.courseIntakeId ?? null;
 
-    const listTypeEligible =
-      params.listType === ListType.ELIGIBLE_ONLY
+    const includeEligibility = params.listType != null;
+
+    const listTypeEligible = includeEligibility
+      ? params.listType === ListType.ELIGIBLE_ONLY
         ? true
         : params.listType === ListType.INELIGIBLE_ONLY
           ? false
-          : null;
+          : null
+      : null;
 
     const commissionExpr = this.rankingSqlBuilder.commissionScoreExpr();
     const preferenceExpr = this.rankingSqlBuilder.preferenceScoreExpr();
-    const academicExpr = this.eligibilitySqlBuilder.academicEligibleExpr();
-    const englishExpr = this.eligibilitySqlBuilder.englishEligibleExpr();
     const rankScoreExpr = this.rankingSqlBuilder.personalizedRankScoreExpr(
       preferenceExpr,
       commissionExpr,
     );
-    const eligibleExpr = this.eligibilitySqlBuilder.eligibleExpr(
-      academicExpr,
-      englishExpr,
-    );
+
+    let eligibleExpr: string | null = null;
+    if (includeEligibility) {
+      const academicExpr = this.eligibilitySqlBuilder.academicEligibleExpr();
+      const englishExpr = this.eligibilitySqlBuilder.englishEligibleExpr();
+      eligibleExpr = this.eligibilitySqlBuilder.eligibleExpr(
+        academicExpr,
+        englishExpr,
+      );
+    }
 
     const needsDedup = this.baseQueryBuilder.shouldApplyNextIntakeRule(params);
 
@@ -78,23 +85,28 @@ export class PersonalizedCandidateQuery {
         'lpp.lead_id = :leadId AND lpp.programme_id = course."sysProgrammeId"',
       );
 
-    baseQb
-      .leftJoin(
-        'LeadAcademicResults',
-        'larMin',
-        'larMin.lead_id = :leadId AND larMin.degree_id = course."minSysDegreeId" AND (course."minGpa" IS NULL OR CAST(larMin.gpa AS DECIMAL) >= CAST(course."minGpa" AS DECIMAL))',
-      )
-      .leftJoin(
-        'LeadAcademicResults',
-        'larHigher',
-        'larHigher.lead_id = :leadId AND larHigher.degree_id = course."higherSysDegreeId" AND (course."higherGpa" IS NULL OR CAST(larHigher.gpa AS DECIMAL) >= CAST(course."higherGpa" AS DECIMAL))',
-      );
+    if (includeEligibility) {
+      baseQb
+        .leftJoin(
+          'LeadAcademicResults',
+          'larMin',
+          'larMin.lead_id = :leadId AND larMin.degree_id = course."minSysDegreeId" AND (course."minGpa" IS NULL OR CAST(larMin.gpa AS DECIMAL) >= CAST(course."minGpa" AS DECIMAL))',
+        )
+        .leftJoin(
+          'LeadAcademicResults',
+          'larHigher',
+          'larHigher.lead_id = :leadId AND larHigher.degree_id = course."higherSysDegreeId" AND (course."higherGpa" IS NULL OR CAST(larHigher.gpa AS DECIMAL) >= CAST(course."higherGpa" AS DECIMAL))',
+        );
+    }
 
     baseQb
       .select('ci.id', 'courseIntakeId')
       .addSelect(rankScoreExpr, 'rankScore')
-      .addSelect(eligibleExpr, 'eligible')
       .setParameter('leadId', leadId);
+
+    if (includeEligibility && eligibleExpr) {
+      baseQb.addSelect(eligibleExpr, 'eligible');
+    }
 
     if (needsDedup) {
       baseQb
@@ -110,9 +122,12 @@ export class PersonalizedCandidateQuery {
       .createQueryBuilder()
       .select('s1."courseIntakeId"', 'courseIntakeId')
       .addSelect('s1."rankScore"', 'rankScore')
-      .addSelect('s1.eligible', 'eligible')
       .from(`(${baseSql})`, 's1')
       .setParameters(baseParams);
+
+    if (includeEligibility) {
+      pagingQb = pagingQb.addSelect('s1.eligible', 'eligible');
+    }
 
     if (listTypeEligible !== null) {
       pagingQb = pagingQb.andWhere('s1.eligible = :listTypeEligible', {
@@ -147,13 +162,16 @@ export class PersonalizedCandidateQuery {
     const rows = await pagingQb.getRawMany<{
       courseIntakeId: string;
       rankScore: string;
-      eligible: unknown;
+      eligible?: unknown;
     }>();
 
     return rows.map((r) => ({
       courseIntakeId: r.courseIntakeId,
       rankScore: Number(r.rankScore) || 0,
-      isEligible: this.toBoolean(r.eligible),
+      isEligible:
+        includeEligibility && r.eligible !== undefined
+          ? this.toBoolean(r.eligible)
+          : null,
     }));
   }
 

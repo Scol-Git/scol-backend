@@ -33,5 +33,5 @@ export class SearchRequestDto {
   })
   @IsEnum(ListType)
   @IsOptional()
-  listType?: ListType = ListType.ELIGIBLE_ONLY;
+  listType?: ListType | null = null;
 }

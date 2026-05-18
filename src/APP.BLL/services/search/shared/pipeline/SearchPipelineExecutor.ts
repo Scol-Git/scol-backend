@@ -18,7 +18,10 @@ import { BusinessOnlyCandidateQuery } from './query/BusinessOnlyCandidateQuery';
 import { PersonalizedCandidateQuery } from './query/PersonalizedCandidateQuery';
 import { CourseSearchHydrator } from './hydration/CourseSearchHydrator';
 
-import type { PipelineParams } from './SearchPipelineTypes';
+import {
+  SearchExecutionSource,
+  type PipelineParams,
+} from './SearchPipelineTypes';
 
 export type { PipelineParams } from './SearchPipelineTypes';
 

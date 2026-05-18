@@ -25,5 +25,5 @@ export class HomeRequestDto {
   })
   @IsEnum(ListType)
   @IsOptional()
-  listType?: ListType = ListType.ELIGIBLE_ONLY;
+  listType?: ListType | null = null;
 }

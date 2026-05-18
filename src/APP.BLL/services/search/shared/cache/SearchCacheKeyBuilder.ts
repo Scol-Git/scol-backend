@@ -273,7 +273,7 @@ export interface SearchResultsKeyParams {
   /** Boolean flags (optional) */
   flags?: SearchFlagsDto;
   /** List type filter */
-  listType: ListType;
+  listType?: ListType | null;
   /** Ranking mode (affects results even with same params) */
   rankingMode: RankingMode;
   /** Pagination cursor (optional) */
