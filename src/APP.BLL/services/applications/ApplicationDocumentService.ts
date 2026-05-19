@@ -343,8 +343,6 @@ export class ApplicationDocumentService {
 
     if (applicationResolved) {
       await this.db.transaction(async (manager) => {
-        const activitiesRepo = manager.getRepository(ApplicationActivities);
-
         await this.activity.logDocumentDeleted(manager, {
           applicationId: application.id,
           actedByUserId,
@@ -356,25 +354,9 @@ export class ApplicationDocumentService {
           fileName: applicationResolved.version.originalFileName,
         });
 
-        await activitiesRepo
-          .createQueryBuilder()
-          .update(ApplicationActivities)
-          .set({
-            documentVersionId: () => 'NULL',
-            applicationDocumentId: () => 'NULL',
-          })
-          .where(
-            'documentVersionId = :versionId OR applicationDocumentId = :docId',
-            {
-              versionId: applicationResolved.version.id,
-              docId: applicationResolved.document.id,
-            },
-          )
-          .execute();
-
-        await manager
-          .getRepository(ApplicationDocumentVersions)
-          .delete(applicationResolved.version.id);
+        await manager.getRepository(ApplicationDocumentVersions).delete({
+          applicationDocumentId: applicationResolved.document.id,
+        });
 
         await manager
           .getRepository(ApplicationDocuments)
@@ -405,9 +387,9 @@ export class ApplicationDocumentService {
           fileName: leadResolved.version.originalFileName,
         });
 
-        await manager
-          .getRepository(LeadDocumentVersions)
-          .delete(leadResolved.version.id);
+        await manager.getRepository(LeadDocumentVersions).delete({
+          leadDocumentId: leadResolved.document.id,
+        });
 
         await manager.getRepository(LeadDocuments).delete(leadResolved.document.id);
       });

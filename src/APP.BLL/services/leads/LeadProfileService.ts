@@ -802,7 +802,19 @@ export class LeadProfileService {
     }
   
     await this.db.transaction(async (manager) => {
-      await manager.getRepository(LeadDocumentVersions).delete(version.id);
+      this.logger.LogInfo('Deleting lead document', {
+        context: 'LeadProfileService.deleteLeadDocument',
+        actedByUserId: currentUserId,
+        leadId: leadProfile.id,
+        documentId: document.id,
+        documentVersionId: version.id,
+        documentScope: 'LEAD',
+        fileName: version.originalFileName,
+      });
+
+      await manager.getRepository(LeadDocumentVersions).delete({
+        leadDocumentId: document.id,
+      });
       await manager.getRepository(LeadDocuments).delete(document.id);
     });
 
