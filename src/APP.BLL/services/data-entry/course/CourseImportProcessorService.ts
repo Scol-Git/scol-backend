@@ -20,7 +20,7 @@ import { CourseRowValidator } from './validators/CourseRowValidator';
 import { CourseUniversityResolverService } from './resolvers/CourseUniversityResolverService';
 import { ProgrammeDegreeResolverService } from './resolvers/ProgrammeDegreeResolverService';
 import { CourseRowResultBuilder } from './builders/CourseRowResultBuilder';
-import { parseIntakeInfo } from './parsers/courseIntakeInfoParser';
+import { parseIntakeInfoList } from './parsers/courseIntakeInfoParser';
 import {
   parseCourseDurationMonths,
   parseOptionalDecimal,
@@ -293,65 +293,71 @@ export class CourseImportProcessorService {
     const savedCourse = await courseRepo.save(courseEntity);
     batchCache.courseByKey.set(courseCacheKey, savedCourse);
 
-    const intake = parseIntakeInfo(row.intakeInfo);
-    if (!intake) {
+    const intakes = parseIntakeInfoList(row.intakeInfo);
+    if (intakes.length === 0) {
       return {
         error: this.resultBuilder.resolutionError(
           base,
           formatImportError(
             ImportErrorCode.INVALID_FORMAT,
-            'intakeInfo must be parseable (e.g. Sep-26 or Sep 2026)',
+            'intakeInfo must be parseable (e.g. Sep-26, Dec-26 or Sep 2026)',
           ),
         ),
       };
     }
     const intakeRepo = tm.getRepository(UniCourseIntakes);
-    const intakeCacheKey = this.makeIntakeKey(
-      savedCourse.id,
-      intake.month,
-      intake.year,
-    );
-    const existingIntake = batchCache.intakeByKey.get(intakeCacheKey) ?? null;
+    const savedIntakes: UniCourseIntakes[] = [];
+    for (const intake of intakes) {
+      const intakeCacheKey = this.makeIntakeKey(
+        savedCourse.id,
+        intake.month,
+        intake.year,
+      );
+      const existingIntake = batchCache.intakeByKey.get(intakeCacheKey) ?? null;
 
-    const intakeEntity = existingIntake ?? intakeRepo.create();
-    intakeEntity.uniCourseId = savedCourse.id;
-    intakeEntity.intakeMonth = intake.month;
-    intakeEntity.intakeYear = intake.year;
-    const dur = parseCourseDurationMonths(row.courseDuration);
-    if (dur !== null) {
-      intakeEntity.courseDuration = dur;
-    }
-    intakeEntity.applicationDeadline = parseOptionalDate(
-      row.applicationDeadline ?? '',
-    );
-    intakeEntity.tuitionFee = parseOptionalDecimal(row.tuitionFee ?? '');
-    intakeEntity.currency = (row.currency ?? '').trim() || undefined;
-    intakeEntity.initialDeposit = parseOptionalDecimal(row.initialDeposit ?? '');
-    intakeEntity.applicationFee = parseOptionalDecimal(row.applicationFee ?? '');
-    /** Bulk upload does not persist `intakeMetaData` (column ignored; set elsewhere if needed). */
-    const fm = (row.feesMetaData ?? '').trim();
-    if (fm) {
-      const parsed = parseMetaDataItems(fm);
-      if (Array.isArray(parsed)) {
-        intakeEntity.feesMetaData = parsed as MetaDataItem[];
+      const intakeEntity = existingIntake ?? intakeRepo.create();
+      intakeEntity.uniCourseId = savedCourse.id;
+      intakeEntity.intakeMonth = intake.month;
+      intakeEntity.intakeYear = intake.year;
+      const dur = parseCourseDurationMonths(row.courseDuration);
+      if (dur !== null) {
+        intakeEntity.courseDuration = dur;
       }
-    } else {
-      intakeEntity.feesMetaData = undefined;
-    }
-    
-    const sm = (row.scholarshipMetaData ?? '').trim();
-    if (sm) {
-      const parsed = parseMetaDataItems(sm);
-      if (Array.isArray(parsed)) {
-        intakeEntity.scholarshipMetaData = parsed as MetaDataItem[];
+      intakeEntity.applicationDeadline = parseOptionalDate(
+        row.applicationDeadline ?? '',
+      );
+      intakeEntity.tuitionFee = parseOptionalDecimal(row.tuitionFee ?? '');
+      intakeEntity.currency = (row.currency ?? '').trim() || undefined;
+      intakeEntity.initialDeposit = parseOptionalDecimal(row.initialDeposit ?? '');
+      intakeEntity.applicationFee = parseOptionalDecimal(row.applicationFee ?? '');
+      /** Bulk upload does not persist `intakeMetaData` (column ignored; set elsewhere if needed). */
+      const fm = (row.feesMetaData ?? '').trim();
+      if (fm) {
+        const parsed = parseMetaDataItems(fm);
+        if (Array.isArray(parsed)) {
+          intakeEntity.feesMetaData = parsed as MetaDataItem[];
+        }
+      } else {
+        intakeEntity.feesMetaData = undefined;
       }
-    } else {
-      intakeEntity.scholarshipMetaData = undefined;
-    }
-    intakeEntity.isActive = true;
 
-    const savedIntake = await intakeRepo.save(intakeEntity);
-    batchCache.intakeByKey.set(intakeCacheKey, savedIntake);
+      const sm = (row.scholarshipMetaData ?? '').trim();
+      if (sm) {
+        const parsed = parseMetaDataItems(sm);
+        if (Array.isArray(parsed)) {
+          intakeEntity.scholarshipMetaData = parsed as MetaDataItem[];
+        }
+      } else {
+        intakeEntity.scholarshipMetaData = undefined;
+      }
+      intakeEntity.isActive = true;
+
+      const savedIntake = await intakeRepo.save(intakeEntity);
+      batchCache.intakeByKey.set(intakeCacheKey, savedIntake);
+      savedIntakes.push(savedIntake);
+    }
+
+    const primaryIntake = savedIntakes[0]!;
 
     const engRepo = tm.getRepository(CourseEngReq);
     const engTestRepo = tm.getRepository(SysEnglishTests);
@@ -451,21 +457,23 @@ export class CourseImportProcessorService {
     const schName = (row.scholarshipName ?? '').trim();
     const schRepo = tm.getRepository(CourseIntakeScholarships);
     if (schName) {
-      const scholarshipCacheKey = this.makeScholarshipKey(savedIntake.id, schName);
-      const existingSch =
-        batchCache.scholarshipByKey.get(scholarshipCacheKey) ?? null;
-      const sch =
-        existingSch ??
-        schRepo.create({
-          courseIntakeId: savedIntake.id,
-          name: schName,
-        });
-      sch.amount = parseOptionalDecimal(row.scholarshipAmount ?? '');
-      sch.amountType = (row.scholarshipType ?? '').trim() || undefined;
-      sch.isActive = true;
-      const savedSch = await schRepo.save(sch);
-      batchCache.scholarshipByKey.set(scholarshipCacheKey, savedSch);
-      scholarshipId = savedSch.id;
+      for (const savedIntake of savedIntakes) {
+        const scholarshipCacheKey = this.makeScholarshipKey(savedIntake.id, schName);
+        const existingSch =
+          batchCache.scholarshipByKey.get(scholarshipCacheKey) ?? null;
+        const sch =
+          existingSch ??
+          schRepo.create({
+            courseIntakeId: savedIntake.id,
+            name: schName,
+          });
+        sch.amount = parseOptionalDecimal(row.scholarshipAmount ?? '');
+        sch.amountType = (row.scholarshipType ?? '').trim() || undefined;
+        sch.isActive = true;
+        const savedSch = await schRepo.save(sch);
+        batchCache.scholarshipByKey.set(scholarshipCacheKey, savedSch);
+        if (!scholarshipId) scholarshipId = savedSch.id;
+      }
     }
 
     return {
@@ -476,7 +484,7 @@ export class CourseImportProcessorService {
         minSysDegreeId: minDeg.id,
         higherSysDegreeId: higherSysDegreeId ?? '',
         uniCourseId: savedCourse.id,
-        courseIntakeId: savedIntake.id,
+        courseIntakeId: primaryIntake.id,
         sysEngTestIdIelts,
         courseEngReqIdIelts,
         sysEngTestIdToefl,

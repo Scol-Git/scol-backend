@@ -69,14 +69,14 @@ export class UniversityRowResultBuilder {
     }
     const { sysCountryId, sysStateId, sysCityId } = loc;
     const uniName = row.uniName.trim();
-    const key = universityKey(uniName, sysCountryId, sysCityId);
+    const key = universityKey(uniName);
     const uniId = universityIdByKey.get(key);
     if (!uniId) {
       return {
         kind: 'error',
         reason: formatImportError(
           ImportErrorCode.RESOLUTION_FAILED,
-          'university not found at resolved location (no upserted row for this name and country/state/city)',
+          'university not found (no upserted row for this uniName)',
         ),
       };
     }

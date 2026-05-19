@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { CsvRow } from '../../common/abstractions/CsvImportProcessor';
 import type { CourseCsvRow, ErrorCourseRow } from '../dto/CourseImportRowTypes';
-import { parseIntakeInfo } from '../parsers/courseIntakeInfoParser';
+import { parseIntakeInfoList } from '../parsers/courseIntakeInfoParser';
 import {
   parseCourseDurationMonths,
   parseRequiredDecimal,
@@ -82,11 +82,11 @@ export class CourseRowValidator {
       );
     }
 
-    const intake = parseIntakeInfo(row.intakeInfo);
-    if (!intake) {
+    const intakes = parseIntakeInfoList(row.intakeInfo);
+    if (intakes.length === 0) {
       return formatImportError(
         ImportErrorCode.INVALID_FORMAT,
-        'intakeInfo must be parseable (e.g. Sep-26 or Sep 2026)',
+        'intakeInfo must be parseable (e.g. Sep-26, Dec-26 or Sep 2026)',
       );
     }
 

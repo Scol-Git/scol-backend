@@ -9,6 +9,7 @@ export function cityKey(sysStateId: string, cityName: string): string {
   return `${sysStateId}::${cityName.toLowerCase()}`;
 }
 
-export function universityKey(uniName: string, sysCountryId: string, sysCityId: string): string {
-  return `${uniName.toLowerCase()}::${sysCountryId}::${sysCityId}`;
+/** University identity for bulk upsert and result maps (name only, case-insensitive). */
+export function universityKey(uniName: string): string {
+  return uniName.trim().toLowerCase();
 }
