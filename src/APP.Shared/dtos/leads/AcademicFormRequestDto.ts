@@ -12,10 +12,9 @@ import { EnglishTestInputDto } from './EnglishTestInputDto';
 
 /**
  * Request DTO for PUT /api/leads/profile/academic-form.
- * All fields are optional. When sent, academic/English entries must be valid (update/add only; no delete).
- * Academic: degreeId must exist (levelOrder 1–4), gpa required, > 0, within degree gpaScale.
- * English: testId must exist; overall + all section scores required when test has sections; scores > 0, within maxScore.
- * Preferred: when provided, max 3; omit to leave existing selection unchanged.
+ * academicResults and lastAcademicInstitute (non-empty) must be provided together when either is sent.
+ * lastAcademicInstitute is stored on the highest levelOrder degree row in the DB, not the highest degree in the request.
+ * English/preferred sections are optional; omit to leave unchanged.
  */
 export class AcademicFormRequestDto {
   @ApiPropertyOptional({
@@ -31,7 +30,7 @@ export class AcademicFormRequestDto {
 
   @ApiPropertyOptional({
     description:
-      "Last institute name; when provided, mapped to highest levelOrder degree's institute.",
+      'Last institute name; required together with academicResults. Stored on the highest levelOrder degree row in the database.',
     example: 'Daffodil University',
     nullable: true,
   })

@@ -26,6 +26,7 @@ export class AcademicFormValidator {
   async validateAcademicForm(dto: AcademicFormRequestDto): Promise<void> {
     const errors: string[] = [];
 
+    this.validateGpaInstitutePair(dto, errors);
     await this.validateAcademicResults(dto, errors);
     await this.validateEnglishTestResults(dto, errors);
     await this.validatePreferredCountries(dto, errors);
@@ -33,6 +34,27 @@ export class AcademicFormValidator {
 
     if (errors.length > 0) {
       throw new BadRequestException(errors);
+    }
+  }
+
+  /**
+   * academicResults and lastAcademicInstitute must be sent together (non-empty institute).
+   */
+  private validateGpaInstitutePair(
+    dto: AcademicFormRequestDto,
+    errors: string[],
+  ): void {
+    const hasAcademicResults =
+      Array.isArray(dto.academicResults) && dto.academicResults.length > 0;
+
+    const hasLastInstitute =
+      dto.lastAcademicInstitute != null &&
+      String(dto.lastAcademicInstitute).trim() !== '';
+
+    if (hasAcademicResults !== hasLastInstitute) {
+      errors.push(
+        'academicResults and lastAcademicInstitute must be provided together',
+      );
     }
   }
 

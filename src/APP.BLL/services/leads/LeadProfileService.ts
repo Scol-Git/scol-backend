@@ -1,4 +1,9 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EntityManager, In, Not, Repository } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
@@ -30,6 +35,7 @@ import { IStorageService as IStorageServiceToken } from '@shared/tokens/injectio
 
 
 const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
+const DEFAULT_GPA_SCALE = 5;
 
 /** Relations required to load lead profile for academic form (GET) and for computing form status. */
 const ACADEMIC_FORM_LEAD_PROFILE_RELATIONS = {
@@ -179,7 +185,7 @@ export class LeadProfileService {
   /**
    * Saves academic form data within a transaction.
    * All fields are optional: only provided sections are updated (update/add only; no delete for academic/English).
-   * - Academic: levelOrder 1–4 only; lastAcademicInstitute applied to highest degree only when provided in DTO.
+   * - Academic: GPA upsert then lastAcademicInstitute on highest levelOrder row in DB (paired in request).
    * - English: overall + all section scores (when test has sections) already validated.
    * - Preferred: updated only when the corresponding array is present in DTO; omit to leave existing selection unchanged.
    */
@@ -226,8 +232,8 @@ export class LeadProfileService {
   }
 
   /**
-   * Upserts academic results when dto.academicResults is provided.
-   * Only levelOrder 1–4; lastAcademicInstitute applied to highest degree only when provided.
+   * Upserts academic GPAs when academicResults + lastAcademicInstitute are paired in the DTO.
+   * Institute is applied separately to the highest levelOrder row among all DB rows.
    */
   private async saveAcademicResultsIfPresent(
     manager: EntityManager,
@@ -235,43 +241,89 @@ export class LeadProfileService {
     leadId: string,
     dto: AcademicFormRequestDto,
   ): Promise<void> {
-    if (!dto.academicResults?.length) return;
+    const hasAcademicResults =
+      Array.isArray(dto.academicResults) && dto.academicResults.length > 0;
+    const hasLastInstitute =
+      dto.lastAcademicInstitute != null &&
+      String(dto.lastAcademicInstitute).trim() !== '';
 
-    const degreeIds = dto.academicResults.map((r) => r.degreeId);
+    if (!hasAcademicResults && !hasLastInstitute) return;
+    if (hasAcademicResults !== hasLastInstitute) return;
+
+    const degreeIds = dto.academicResults!.map((r) => r.degreeId);
     const degrees = await manager.getRepository(SysAcademicDegrees).find({
       where: degreeIds.map((id) => ({ id })),
     });
     const degreeMap = new Map(degrees.map((d) => [d.id, d]));
 
-    const validAcademic = dto.academicResults.filter((r) => {
+    const validAcademic = dto.academicResults!.filter((r) => {
       const degree = degreeMap.get(r.degreeId);
       if (!degree || !LEVEL_ORDER_1_4.has(degree.levelOrder)) return false;
-      const scale = degree.gpaScale ? parseFloat(degree.gpaScale) : 5;
+      const scale = degree.gpaScale
+        ? parseFloat(degree.gpaScale)
+        : DEFAULT_GPA_SCALE;
       const gpa = r.gpa;
       return gpa != null && gpa > 0 && gpa <= scale;
     });
     if (validAcademic.length === 0) return;
 
-    const maxLevelOrder = Math.max(
-      ...validAcademic.map((r) => degreeMap.get(r.degreeId)!.levelOrder),
-    );
-    const lastInstitute =
-      dto.lastAcademicInstitute != null &&
-      String(dto.lastAcademicInstitute).trim() !== ''
-        ? dto.lastAcademicInstitute.trim()
-        : '';
-
     await this.upsertAcademicResults(
       repo,
       leadId,
       validAcademic.map((r) => ({
-        ...r,
-        institute:
-          degreeMap.get(r.degreeId)!.levelOrder === maxLevelOrder
-            ? lastInstitute
-            : '',
+        degreeId: r.degreeId,
+        gpa: r.gpa,
+        passingDate: r.passingDate,
       })),
     );
+
+    await this.applyLastAcademicInstitute(
+      repo,
+      leadId,
+      String(dto.lastAcademicInstitute).trim(),
+    );
+  }
+
+  /**
+   * Sets institute on the lead row whose degree has the highest levelOrder (1–4) in the DB.
+   */
+  private async applyLastAcademicInstitute(
+    repo: Repository<LeadAcademicResults>,
+    leadId: string,
+    institute: string,
+  ): Promise<void> {
+    const rows = await repo.find({
+      where: { leadId },
+      relations: { SysAcademicDegree: true },
+    });
+    const target = this.findHighestLevelOrderDegree(rows);
+    if (!target) {
+      throw new BadRequestException(
+        'No academic result row found for lastAcademicInstitute',
+      );
+    }
+    await repo.update(target.id, { institute: institute.trim() });
+  }
+
+  private findHighestLevelOrderDegree(
+    rows: LeadAcademicResults[],
+  ): LeadAcademicResults | null {
+    let best: LeadAcademicResults | null = null;
+    let bestOrder = -1;
+
+    for (const row of rows) {
+      const degree = row.SysAcademicDegree;
+      const order =
+        degree?.levelOrder != null ? Number(degree.levelOrder) : null;
+      if (order == null || !LEVEL_ORDER_1_4.has(order)) continue;
+
+      if (order > bestOrder) {
+        bestOrder = order;
+        best = row;
+      }
+    }
+
+    return best;
   }
 
   /**
@@ -396,26 +448,40 @@ export class LeadProfileService {
     for (const result of results) {
       const existing = existingByDegreeId.get(result.degreeId);
       const gpaStr = result.gpa != null ? String(result.gpa) : undefined;
-      const instituteVal = result.institute ?? '';
       const passingDateVal = result.passingDate
         ? new Date(result.passingDate)
         : undefined;
+
       if (existing) {
-        await repo.update(existing.id, {
-          gpa: gpaStr,
-          institute: instituteVal,
-          passingDate: passingDateVal,
-        });
+        const update: {
+          gpa?: string;
+          institute?: string;
+          passingDate?: Date;
+        } = {};
+        if (gpaStr !== undefined) {
+          update.gpa = gpaStr;
+        }
+        if (passingDateVal !== undefined) {
+          update.passingDate = passingDateVal;
+        }
+        if (result.institute !== undefined) {
+          update.institute = result.institute;
+        }
+        if (Object.keys(update).length > 0) {
+          await repo.update(existing.id, update);
+        }
       } else {
-        await repo.save(
-          repo.create({
-            leadId,
-            degreeId: result.degreeId,
-            gpa: gpaStr,
-            institute: instituteVal,
-            passingDate: passingDateVal,
-          }),
-        );
+        const entity = repo.create({
+          leadId,
+          degreeId: result.degreeId,
+          gpa: gpaStr,
+          passingDate: passingDateVal,
+          institute: '',
+        });
+        if (result.institute !== undefined) {
+          entity.institute = result.institute;
+        }
+        await repo.save(entity);
       }
     }
   }
