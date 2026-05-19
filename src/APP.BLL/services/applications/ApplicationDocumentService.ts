@@ -307,71 +307,116 @@ export class ApplicationDocumentService {
     );
   }
 
-// ==============================
-// MAIN DELETE ENTRY
-// ==============================
-async deleteApplicationDocument(
-  currentUserId: string,
-  applicationId: string,
-  documentId: string,
-): Promise<{ success: true }> {
-  const application = await this.access.ensureLeadCanAccessApplicationOrThrow(
-    currentUserId,
-    applicationId,
-  );
+  // ==============================
+  // MAIN DELETE ENTRY
+  // ==============================
+  async deleteApplicationDocument(
+    currentUserId: string,
+    applicationId: string,
+    documentId: string,
+  ): Promise<{ success: true }> {
+    const application = await this.access.ensureLeadCanAccessApplicationOrThrow(
+      currentUserId,
+      applicationId,
+    );
 
-  return this.deleteDocumentForAuthorizedApplication(application, documentId);
-}
-
-
-// ==============================
-// ORCHESTRATOR (APPLICATION + LEAD)
-// ==============================
-async deleteDocumentForAuthorizedApplication(
-  application: Applications,
-  documentId: string,
-): Promise<{ success: true }> {
-
-  // 1. APPLICATION scoped delete first
-  const applicationResolved = await this.resolveApplicationScopedOrNull(
-    application.id,
-    documentId,
-  );
-
-  if (applicationResolved) {
-   
-   // 3. Delete version first
-   await this.db.applicationDocumentVersions.delete(applicationResolved.version.id);
-  
-   // 4. Delete document
-   await this.db.applicationDocuments.delete(applicationResolved.document.id);
-    return { success: true };
+    return this.deleteDocumentForAuthorizedApplication(
+      application,
+      documentId,
+      currentUserId,
+    );
   }
 
-  // 2. LEAD scoped delete
-  if (!application.leadId) {
+  // ==============================
+  // ORCHESTRATOR (APPLICATION + LEAD)
+  // ==============================
+  async deleteDocumentForAuthorizedApplication(
+    application: Applications,
+    documentId: string,
+    actedByUserId?: string,
+  ): Promise<{ success: true }> {
+    
+    const applicationResolved = await this.resolveApplicationScopedOrNull(
+      application.id,
+      documentId,
+    );
+
+    if (applicationResolved) {
+      await this.db.transaction(async (manager) => {
+        const activitiesRepo = manager.getRepository(ApplicationActivities);
+
+        await this.activity.logDocumentDeleted(manager, {
+          applicationId: application.id,
+          actedByUserId,
+          documentRequirementId:
+            applicationResolved.document.applicationRequirementId,
+          documentId: applicationResolved.document.id,
+          documentVersionId: applicationResolved.version.id,
+          documentScope: 'APPLICATION',
+          fileName: applicationResolved.version.originalFileName,
+        });
+
+        await activitiesRepo
+          .createQueryBuilder()
+          .update(ApplicationActivities)
+          .set({
+            documentVersionId: () => 'NULL',
+            applicationDocumentId: () => 'NULL',
+          })
+          .where(
+            'documentVersionId = :versionId OR applicationDocumentId = :docId',
+            {
+              versionId: applicationResolved.version.id,
+              docId: applicationResolved.document.id,
+            },
+          )
+          .execute();
+
+        await manager
+          .getRepository(ApplicationDocumentVersions)
+          .delete(applicationResolved.version.id);
+
+        await manager
+          .getRepository(ApplicationDocuments)
+          .delete(applicationResolved.document.id);
+      });
+
+      return { success: true };
+    }
+
+    if (!application.leadId) {
+      throw new NotFoundException('Document cannot be deleted');
+    }
+
+    const leadResolved = await this.resolveLeadScopedOrNull(
+      application,
+      application.leadId,
+      documentId,
+    );
+
+    if (leadResolved) {
+      await this.db.transaction(async (manager) => {
+        await this.activity.logDocumentDeleted(manager, {
+          applicationId: application.id,
+          actedByUserId,
+          documentId: leadResolved.document.id,
+          documentVersionId: leadResolved.version.id,
+          documentScope: 'LEAD',
+          fileName: leadResolved.version.originalFileName,
+        });
+
+        await manager
+          .getRepository(LeadDocumentVersions)
+          .delete(leadResolved.version.id);
+
+        await manager.getRepository(LeadDocuments).delete(leadResolved.document.id);
+      });
+
+      return { success: true };
+    }
+
     throw new NotFoundException('Document cannot be deleted');
   }
-
-  const leadResolved = await this.resolveLeadScopedOrNull(
-    application,
-    application.leadId,
-    documentId,
-  );
-
-  if (leadResolved) {
-    
-
-    // 3. Delete version first
-    await this.db.leadDocumentVersions.delete(leadResolved.version.id);
-  
-    // 4. Delete document
-    await this.db.leadDocuments.delete(leadResolved.document.id);
-    return { success: true };
-  }
-
-  throw new NotFoundException('Document cannot be deleted');
-}
 
 
 // ==============================

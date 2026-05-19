@@ -10,6 +10,8 @@ import { AcademicFormRequestDto } from '@shared/dtos/leads/AcademicFormRequestDt
 import { AcademicFormResponseDto } from '@shared/dtos/leads/AcademicFormResponseDto';
 import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
 import { LeadAcademicResults } from '@entity/entities/LeadAcademicResults.entity';
+import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
+import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { LeadEnglishTestResults } from '@entity/entities/LeadEnglishTestResults.entity';
 import { LeadEnglishTestSectionResults } from '@entity/entities/LeadEnglishTestSectionResults.entity';
 import { LeadPreferredCountries } from '@entity/entities/LeadPreferredCountries.entity';
@@ -733,12 +735,11 @@ export class LeadProfileService {
       throw new NotFoundException('Document version not found');
     }
   
-    // 3. Delete version first
-    await this.db.leadDocumentVersions.delete(version.id);
-  
-    // 4. Delete document
-    await this.db.leadDocuments.delete(document.id);
-  
+    await this.db.transaction(async (manager) => {
+      await manager.getRepository(LeadDocumentVersions).delete(version.id);
+      await manager.getRepository(LeadDocuments).delete(document.id);
+    });
+
     return { success: true };
   }
 }

@@ -9,6 +9,7 @@ export enum ApplicationActivityType {
   DocumentChanged = 'DOCUMENT_CHANGED',
   DocumentVersionChanged = 'DOCUMENT_VERSION_CHANGED',
   DocUploaded = 'DOC_UPLOADED',
+  DocDeleted = 'DOC_DELETED',
   DocRejected = 'DOC_REJECTED',
   DocReuploaded = 'DOC_REUPLOADED',
   DocVerified = 'DOC_VERIFIED',
