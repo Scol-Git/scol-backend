@@ -5,6 +5,6 @@
 export const COURSE_DEGREE_LEVEL_ORDER: Record<string, number> = {
   SSC: 1,
   HSC: 2,
-  BSC: 3,
-  MSC: 4
+  BSc: 3,
+  MSc: 4
 };
