@@ -1,67 +1,83 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { In } from 'typeorm';
+
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { AcademicFormRequestDto } from '@shared/dtos/leads/AcademicFormRequestDto';
 import type { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 
-/** Only degrees with these level orders are accepted for academic results. */
-const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
+const VALID_LEVEL_ORDERS = new Set([1, 2, 3, 4]);
 
-const DEFAULT_GPA_SCALE = 5;
-const DEFAULT_MAX_SCORE = 9;
-
-const PREFERRED_MAX_ITEMS = 3;
+type EnglishTestWithSections = SysEnglishTests & {
+  SysEnglishTestSection?: Array<{
+    id: string;
+    sectionName?: string;
+    maxScore?: string;
+  }>;
+};
 
 /**
- * Validates academic form input data.
- * All fields are optional; when provided, entries must be valid (update/add only).
+ * Validates academic form input.
+ * All top-level sections are optional; when provided each entry must satisfy its DB constraints.
+ * English tests with DB sections require overall score and every section score.
  */
 @Injectable()
 export class AcademicFormValidator {
   constructor(private readonly db: AppDbContext) {}
 
-  /**
-   * Validates the entire academic form request.
-   * Throws BadRequestException with an array of error messages when invalid.
-   */
   async validateAcademicForm(dto: AcademicFormRequestDto): Promise<void> {
     const errors: string[] = [];
 
-    this.validateGpaInstitutePair(dto, errors);
+    this.validateAcademicInstitutePairing(dto, errors);
     await this.validateAcademicResults(dto, errors);
     await this.validateEnglishTestResults(dto, errors);
-    await this.validatePreferredCountries(dto, errors);
-    await this.validatePreferredProgrammes(dto, errors);
+    await this.validatePreferredIds(
+      'country',
+      dto.preferredCountryIds,
+      () =>
+        this.db.countries.find({
+          where: dto.preferredCountryIds!.map((id) => ({ id })),
+        }),
+      errors,
+    );
+    await this.validatePreferredIds(
+      'programme',
+      dto.preferredProgrammeIds,
+      () =>
+        this.db.programmes.find({
+          where: dto.preferredProgrammeIds!.map((id) => ({ id })),
+        }),
+      errors,
+    );
 
-    if (errors.length > 0) {
-      throw new BadRequestException(errors);
-    }
+    if (errors.length > 0) throw new BadRequestException(errors);
   }
 
-  /**
-   * academicResults and lastAcademicInstitute must be sent together (non-empty institute).
-   */
-  private validateGpaInstitutePair(
+  // -------------------------------------------------------------------------
+  // Academic — pairing rule
+  // -------------------------------------------------------------------------
+
+  /** academicResults and lastAcademicInstitute must be provided together. */
+  private validateAcademicInstitutePairing(
     dto: AcademicFormRequestDto,
     errors: string[],
   ): void {
-    const hasAcademicResults =
+    const hasResults =
       Array.isArray(dto.academicResults) && dto.academicResults.length > 0;
-
-    const hasLastInstitute =
+    const hasInstitute =
       dto.lastAcademicInstitute != null &&
       String(dto.lastAcademicInstitute).trim() !== '';
 
-    if (hasAcademicResults !== hasLastInstitute) {
+    if (hasResults !== hasInstitute) {
       errors.push(
         'academicResults and lastAcademicInstitute must be provided together',
       );
     }
   }
 
-  /**
-   * Academic results: no duplicates; each degreeId must exist and have levelOrder 1–4;
-   * each entry must have gpa not null, > 0, and within degree gpaScale.
-   */
+  // -------------------------------------------------------------------------
+  // Academic results
+  // -------------------------------------------------------------------------
+
   private async validateAcademicResults(
     dto: AcademicFormRequestDto,
     errors: string[],
@@ -73,55 +89,56 @@ export class AcademicFormValidator {
 
     if (degreeIds.length !== uniqueDegreeIds.length) {
       errors.push('Duplicate degree entries are not allowed');
+      return;
     }
 
     const degrees = await this.db.academicDegrees.find({
-      where: uniqueDegreeIds.map((id) => ({ id })),
+      where: uniqueDegreeIds.map((id) => ({
+        id,
+        levelOrder: In([...VALID_LEVEL_ORDERS]),
+      })),
     });
     const degreeMap = new Map(degrees.map((d) => [d.id, d]));
 
-    const invalidDegreeIds = uniqueDegreeIds.filter((id) => !degreeMap.has(id));
-    if (invalidDegreeIds.length > 0) {
-      errors.push(`Invalid degree IDs: ${invalidDegreeIds.join(', ')}`);
+    const invalidIds = uniqueDegreeIds.filter((id) => !degreeMap.has(id));
+    if (invalidIds.length > 0) {
+      errors.push(`Invalid degree IDs: ${invalidIds.join(', ')}`);
+      return;
     }
 
     for (const result of dto.academicResults) {
-      const degree = degreeMap.get(result.degreeId);
-      if (!degree) continue;
+      const degree = degreeMap.get(result.degreeId)!;
 
-      if (!LEVEL_ORDER_1_4.has(degree.levelOrder)) {
-        errors.push(
-          `Degree ${degree.degreeName} (levelOrder ${degree.levelOrder}) is not allowed; only levelOrder 1–4 are accepted`,
+      if (!degree.gpaScale) {
+        throw new Error(
+          `Degree ${degree.degreeName} has no gpaScale configured`,
         );
-        continue;
+      }
+      const scale = parseFloat(degree.gpaScale);
+      if (isNaN(scale)) {
+        throw new Error(
+          `Degree ${degree.degreeName} has invalid gpaScale: ${degree.gpaScale}`,
+        );
       }
 
-      const scale = degree.gpaScale
-        ? parseFloat(degree.gpaScale)
-        : DEFAULT_GPA_SCALE;
-      const gpa = result.gpa;
-
-      if (gpa == null || typeof gpa !== 'number') {
+      if (result.gpa == null) {
+        errors.push(`GPA is required for ${degree.degreeName}`);
+      } else if (result.gpa <= 0) {
         errors.push(
-          `GPA is required for degree ${degree.degreeName} (degreeId: ${result.degreeId})`,
+          `GPA must be > 0 for ${degree.degreeName} (received ${result.gpa})`,
         );
-      } else if (gpa <= 0) {
+      } else if (result.gpa > scale) {
         errors.push(
-          `GPA must be greater than 0 for degree ${degree.degreeName} (received ${gpa})`,
-        );
-      } else if (gpa > scale) {
-        errors.push(
-          `GPA ${gpa} exceeds maximum scale ${scale} for degree ${degree.degreeName}`,
+          `GPA ${result.gpa} exceeds scale ${scale} for ${degree.degreeName}`,
         );
       }
     }
   }
 
-  /**
-   * English test results: no duplicates; each testId must exist;
-   * overallScore required, > 0, within test maxScore;
-   * when test has sections in DB, all section ids must be present with score > 0 and within section maxScore.
-   */
+  // -------------------------------------------------------------------------
+  // English test results
+  // -------------------------------------------------------------------------
+
   private async validateEnglishTestResults(
     dto: AcademicFormRequestDto,
     errors: string[],
@@ -135,150 +152,142 @@ export class AcademicFormValidator {
       errors.push('Duplicate English test entries are not allowed');
     }
 
-    const tests = await this.db.englishTests.find({
+    const tests = (await this.db.englishTests.find({
       where: uniqueTestIds.map((id) => ({ id })),
       relations: { SysEnglishTestSection: true },
-    });
+    })) as EnglishTestWithSections[];
+
     const testMap = new Map(tests.map((t) => [t.id, t]));
 
     const invalidTestIds = uniqueTestIds.filter((id) => !testMap.has(id));
     if (invalidTestIds.length > 0) {
-      errors.push(`Invalid English test IDs: ${invalidTestIds.join(', ')}`);
+      errors.push(
+        'Unknown English test — use testId from GET /leads/profile/academic-form',
+      );
     }
 
     for (const result of dto.englishTestResults) {
-      const test = testMap.get(result.testId) as (typeof tests)[0] | undefined;
+      const test = testMap.get(result.testId);
       if (!test) continue;
 
-      const testMaxScore = test.maxScore
-        ? parseFloat(test.maxScore)
-        : DEFAULT_MAX_SCORE;
+      if (!test.maxScore) {
+        throw new Error(
+          `English test ${test.testName} has no maxScore configured`,
+        );
+      }
+      const testMaxScore = parseFloat(test.maxScore);
       const overall = result.overallScore;
 
+      const testName = test.testName ?? 'English test';
       if (overall == null || typeof overall !== 'number') {
-        errors.push(
-          `Overall score is required for test ${test.testName} (testId: ${result.testId})`,
-        );
+        errors.push(`${testName}: overall score is required`);
       } else if (overall <= 0) {
         errors.push(
-          `Overall score must be greater than 0 for test ${test.testName} (received ${overall})`,
+          `${testName}: overall score must be greater than 0 (received ${overall})`,
         );
       } else if (overall > testMaxScore) {
         errors.push(
-          `Overall score ${overall} exceeds maximum ${testMaxScore} for test ${test.testName}`,
+          `${testName}: overall score ${overall} exceeds maximum ${testMaxScore}`,
         );
       }
 
-      const sections =
-        (
-          test as SysEnglishTests & {
-            SysEnglishTestSection?: Array<{ id: string; maxScore?: string }>;
-          }
-        ).SysEnglishTestSection ?? [];
-      if (sections.length === 0) continue;
+      this.validateEnglishTestSections(test, result.sections ?? [], errors);
+    }
+  }
 
-      const requiredSectionIds = new Set(sections.map((s) => s.id));
-      const providedSections = result.sections ?? [];
+  /**
+   * When the test has sections in DB, every section id must be present with a valid score.
+   */
+  private validateEnglishTestSections(
+    test: EnglishTestWithSections,
+    providedSections: Array<{ id: string; score: number }>,
+    errors: string[],
+  ): void {
+    const sections = test.SysEnglishTestSection ?? [];
+    if (sections.length === 0) return;
 
-      for (const sectionId of requiredSectionIds) {
-        const section = sections.find((s) => s.id === sectionId);
-        const sectionMax = section?.maxScore
-          ? parseFloat(section.maxScore)
-          : DEFAULT_MAX_SCORE;
-        const provided = providedSections.find((s) => s.id === sectionId);
+    const testName = test.testName ?? 'English test';
+    const requiredSectionIds = new Set(sections.map((s) => s.id));
 
-        if (!provided) {
+    for (const sectionId of requiredSectionIds) {
+      const section = sections.find((s) => s.id === sectionId)!;
+      if (!section.maxScore) {
+        throw new Error(
+          `${testName} ${this.sectionLabel(section)} has no maxScore configured`,
+        );
+      }
+      const sectionMax = parseFloat(section.maxScore);
+      const label = this.sectionLabel(section);
+      const provided = providedSections.find((s) => s.id === sectionId);
+
+      if (!provided) {
+        errors.push(
+          `${testName}: ${label} is required; all section scores must be provided when the test has sections`,
+        );
+      } else {
+        const score = provided.score;
+        if (score == null || typeof score !== 'number') {
+          errors.push(`${testName} ${label}: score is required`);
+        } else if (score <= 0) {
           errors.push(
-            `Section ${sectionId} is required for test ${test.testName}; all section scores must be provided when the test has sections`,
+            `${testName} ${label}: score must be greater than 0 (received ${score})`,
           );
-        } else {
-          const score = provided.score;
-          if (score == null || typeof score !== 'number') {
-            errors.push(
-              `Score is required for section ${sectionId} of test ${test.testName}`,
-            );
-          } else if (score <= 0) {
-            errors.push(
-              `Section score must be greater than 0 for section ${sectionId} of test ${test.testName} (received ${score})`,
-            );
-          } else if (score > sectionMax) {
-            errors.push(
-              `Section score ${score} exceeds maximum ${sectionMax} for section ${sectionId} of test ${test.testName}`,
-            );
-          }
+        } else if (score > sectionMax) {
+          errors.push(
+            `${testName} ${label}: score ${score} exceeds maximum ${sectionMax}`,
+          );
         }
       }
-
-      const invalidSectionIds = providedSections
-        .map((s) => s.id)
-        .filter((id) => !requiredSectionIds.has(id));
-      if (invalidSectionIds.length > 0) {
-        errors.push(
-          `Invalid section ID(s) for test ${test.testName}: ${invalidSectionIds.join(', ')}`,
-        );
-      }
     }
-  }
 
-  /**
-   * Preferred countries: when provided, no duplicates, IDs must exist, max 3.
-   */
-  private async validatePreferredCountries(
-    dto: AcademicFormRequestDto,
-    errors: string[],
-  ): Promise<void> {
-    if (!dto.preferredCountryIds?.length) return;
-
-    const ids = dto.preferredCountryIds;
-    const uniqueIds = [...new Set(ids)];
-
-    if (ids.length !== uniqueIds.length) {
-      errors.push('Duplicate country selections are not allowed');
-    }
-    if (uniqueIds.length > PREFERRED_MAX_ITEMS) {
+    const invalidSectionIds = providedSections
+      .map((s) => s.id)
+      .filter((id) => !requiredSectionIds.has(id));
+    if (invalidSectionIds.length > 0) {
       errors.push(
-        `preferredCountryIds must contain at most ${PREFERRED_MAX_ITEMS} items`,
+        `${testName}: invalid section ID(s) — use ids from GET academic-form`,
       );
     }
 
-    const existing = await this.db.countries.find({
-      where: uniqueIds.map((id) => ({ id })),
-    });
-    const existingIds = new Set(existing.map((c) => c.id));
-    const invalidIds = uniqueIds.filter((id) => !existingIds.has(id));
-    if (invalidIds.length > 0) {
-      errors.push(`Invalid country IDs: ${invalidIds.join(', ')}`);
+    const duplicateIds = providedSections
+      .map((s) => s.id)
+      .filter((id, i, arr) => arr.indexOf(id) !== i);
+    if (duplicateIds.length > 0) {
+      errors.push(`${testName}: duplicate section scores are not allowed`);
     }
   }
 
-  /**
-   * Preferred programmes: when provided, no duplicates, IDs must exist, max 3.
-   */
-  private async validatePreferredProgrammes(
-    dto: AcademicFormRequestDto,
+  private sectionLabel(section: {
+    id: string;
+    sectionName?: string;
+  }): string {
+    const name = section.sectionName?.trim();
+    return name || 'section';
+  }
+
+  // -------------------------------------------------------------------------
+  // Preferred countries / programmes (shared logic)
+  // -------------------------------------------------------------------------
+
+  private async validatePreferredIds(
+    label: string,
+    ids: string[] | undefined,
+    fetchExisting: () => Promise<Array<{ id: string }>>,
     errors: string[],
   ): Promise<void> {
-    if (!dto.preferredProgrammeIds?.length) return;
+    if (!ids?.length) return;
 
-    const ids = dto.preferredProgrammeIds;
     const uniqueIds = [...new Set(ids)];
 
     if (ids.length !== uniqueIds.length) {
-      errors.push('Duplicate programme selections are not allowed');
-    }
-    if (uniqueIds.length > PREFERRED_MAX_ITEMS) {
-      errors.push(
-        `preferredProgrammeIds must contain at most ${PREFERRED_MAX_ITEMS} items`,
-      );
+      errors.push(`Duplicate ${label} selections are not allowed`);
     }
 
-    const existing = await this.db.programmes.find({
-      where: uniqueIds.map((id) => ({ id })),
-    });
-    const existingIds = new Set(existing.map((p) => p.id));
+    const existing = await fetchExisting();
+    const existingIds = new Set(existing.map((e) => e.id));
     const invalidIds = uniqueIds.filter((id) => !existingIds.has(id));
     if (invalidIds.length > 0) {
-      errors.push(`Invalid programme IDs: ${invalidIds.join(', ')}`);
+      errors.push(`Invalid ${label} IDs: ${invalidIds.join(', ')}`);
     }
   }
 }

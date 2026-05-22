@@ -49,7 +49,8 @@ export class EnglishTestInputDto {
   testDate?: string;
 
   @ApiPropertyOptional({
-    description: 'Section scores',
+    description:
+      'Section scores. Required (all bands) when the test has sections in GET academic-form.',
     type: [EnglishTestSectionInputDto],
   })
   @IsArray()

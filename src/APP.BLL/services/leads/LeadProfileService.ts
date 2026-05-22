@@ -21,7 +21,6 @@ import { LeadEnglishTestResults } from '@entity/entities/LeadEnglishTestResults.
 import { LeadEnglishTestSectionResults } from '@entity/entities/LeadEnglishTestSectionResults.entity';
 import { LeadPreferredCountries } from '@entity/entities/LeadPreferredCountries.entity';
 import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.entity';
-import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
 import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { SearchCacheInvalidationService } from '../search/shared/cache/SearchCacheInvalidationService';
 import { LeadProfileMapper } from './LeadProfileMapper';
@@ -33,9 +32,8 @@ import { ValidationException } from '@shared/exceptions/ValidationException';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
 import { IStorageService as IStorageServiceToken } from '@shared/tokens/injection.tokens';
 
+const VALID_LEVEL_ORDERS = new Set([1, 2, 3, 4]);
 
-const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
-const DEFAULT_GPA_SCALE = 5;
 
 /** Relations required to load lead profile for academic form (GET) and for computing form status. */
 const ACADEMIC_FORM_LEAD_PROFILE_RELATIONS = {
@@ -97,12 +95,10 @@ export class LeadProfileService {
 
     return LeadProfileMapper.toResponse(profile);
   }
-  async getAcademicForm(userId: string): Promise<AcademicFormResponseDto> {
-    this.logger.LogInfo('Getting academic form', {
-      context: 'LeadProfileService.getAcademicForm',
-      userId,
-    });
 
+
+  async getAcademicForm(userId: string): Promise<AcademicFormResponseDto> {
+   
     const [
       leadProfile,
       systemDegrees,
@@ -115,7 +111,7 @@ export class LeadProfileService {
         relations: ACADEMIC_FORM_LEAD_PROFILE_RELATIONS,
       }),
       this.db.academicDegrees.find({
-        where: { levelOrder: In([...LEVEL_ORDER_1_4]) },
+        where: { levelOrder: In([...VALID_LEVEL_ORDERS]) },
         order: { levelOrder: 'ASC' },
       }),
       this.db.englishTests.find({
@@ -145,10 +141,7 @@ export class LeadProfileService {
     userId: string,
     dto: AcademicFormRequestDto,
   ): Promise<AcademicFormResponseDto> {
-    this.logger.LogInfo('Updating academic form', {
-      context: 'LeadProfileService.updateAcademicForm',
-      userId,
-    });
+    
 
     // Validate input
     await this.validator.validateAcademicForm(dto);
@@ -207,7 +200,6 @@ export class LeadProfileService {
     const preferredProgramsRepo = manager.getRepository(LeadPreferredPrograms);
 
     await this.saveAcademicResultsIfPresent(
-      manager,
       academicResultsRepo,
       leadId,
       dto,
@@ -231,58 +223,31 @@ export class LeadProfileService {
     );
   }
 
-  /**
-   * Upserts academic GPAs when academicResults + lastAcademicInstitute are paired in the DTO.
-   * Institute is applied separately to the highest levelOrder row among all DB rows.
-   */
   private async saveAcademicResultsIfPresent(
-    manager: EntityManager,
     repo: Repository<LeadAcademicResults>,
     leadId: string,
     dto: AcademicFormRequestDto,
   ): Promise<void> {
-    const hasAcademicResults =
-      Array.isArray(dto.academicResults) && dto.academicResults.length > 0;
-    const hasLastInstitute =
-      dto.lastAcademicInstitute != null &&
-      String(dto.lastAcademicInstitute).trim() !== '';
-
-    if (!hasAcademicResults && !hasLastInstitute) return;
-    if (hasAcademicResults !== hasLastInstitute) return;
-
-    const degreeIds = dto.academicResults!.map((r) => r.degreeId);
-    const degrees = await manager.getRepository(SysAcademicDegrees).find({
-      where: degreeIds.map((id) => ({ id })),
-    });
-    const degreeMap = new Map(degrees.map((d) => [d.id, d]));
-
-    const validAcademic = dto.academicResults!.filter((r) => {
-      const degree = degreeMap.get(r.degreeId);
-      if (!degree || !LEVEL_ORDER_1_4.has(degree.levelOrder)) return false;
-      const scale = degree.gpaScale
-        ? parseFloat(degree.gpaScale)
-        : DEFAULT_GPA_SCALE;
-      const gpa = r.gpa;
-      return gpa != null && gpa > 0 && gpa <= scale;
-    });
-    if (validAcademic.length === 0) return;
-
+    if (!dto.academicResults?.length) return;
+  
     await this.upsertAcademicResults(
       repo,
       leadId,
-      validAcademic.map((r) => ({
+      dto.academicResults.map((r) => ({
         degreeId: r.degreeId,
         gpa: r.gpa,
         passingDate: r.passingDate,
       })),
     );
-
+  
     await this.applyLastAcademicInstitute(
       repo,
       leadId,
-      String(dto.lastAcademicInstitute).trim(),
+      dto.lastAcademicInstitute!.trim(),
     );
   }
+  
+  
 
   /**
    * Sets institute on the lead row whose degree has the highest levelOrder (1–4) in the DB.
@@ -296,7 +261,10 @@ export class LeadProfileService {
       where: { leadId },
       relations: { SysAcademicDegree: true },
     });
-    const target = this.findHighestLevelOrderDegree(rows);
+    const validRows = rows.filter((r) =>
+      VALID_LEVEL_ORDERS.has(Number(r.SysAcademicDegree?.levelOrder)),
+    );
+    const target = LeadProfileService.findHighestLevelAcademicResult(validRows);
     if (!target) {
       throw new BadRequestException(
         'No academic result row found for lastAcademicInstitute',
@@ -305,30 +273,11 @@ export class LeadProfileService {
     await repo.update(target.id, { institute: institute.trim() });
   }
 
-  private findHighestLevelOrderDegree(
-    rows: LeadAcademicResults[],
-  ): LeadAcademicResults | null {
-    let best: LeadAcademicResults | null = null;
-    let bestOrder = -1;
 
-    for (const row of rows) {
-      const degree = row.SysAcademicDegree;
-      const order =
-        degree?.levelOrder != null ? Number(degree.levelOrder) : null;
-      if (order == null || !LEVEL_ORDER_1_4.has(order)) continue;
-
-      if (order > bestOrder) {
-        bestOrder = order;
-        best = row;
-      }
-    }
-
-    return best;
-  }
 
   /**
    * Upserts English test results when dto.englishTestResults is provided.
-   * Input is already validated (overall + all sections when test has sections).
+   * Only rows with valid overall and all required section scores are saved.
    */
   private async saveEnglishTestResultsIfPresent(
     manager: EntityManager,
@@ -346,36 +295,44 @@ export class LeadProfileService {
     });
     const testMap = new Map(tests.map((t) => [t.id, t]));
 
-    const defaultMaxScore = 9;
     const validEnglish = dto.englishTestResults.filter((result) => {
       const test = testMap.get(result.testId);
-      if (!test) return false;
-      const testMaxScore = test.maxScore
-        ? parseFloat(test.maxScore)
-        : defaultMaxScore;
+      if (!test?.maxScore) return false;
+
+      const testMaxScore = parseFloat(test.maxScore);
+      if (isNaN(testMaxScore)) return false;
+
       const overallValid =
         result.overallScore != null &&
         result.overallScore > 0 &&
         result.overallScore <= testMaxScore;
+
       const sections =
         (
           test as SysEnglishTests & {
             SysEnglishTestSection?: Array<{ id: string; maxScore?: string }>;
           }
         ).SysEnglishTestSection ?? [];
+
       if (sections.length === 0) return overallValid;
-      const sectionIds = new Set(sections.map((s) => s.id));
+
       const sectionScores = result.sections ?? [];
-      const allSectionsValid = [...sectionIds].every((sectionId) => {
-        const section = sections.find((s) => s.id === sectionId);
-        const max = section?.maxScore
-          ? parseFloat(section.maxScore)
-          : defaultMaxScore;
-        const provided = sectionScores.find((s) => s.id === sectionId);
-        return provided != null && provided.score > 0 && provided.score <= max;
-      });
-      return overallValid && allSectionsValid;
+      return (
+        overallValid &&
+        sections.every((section) => {
+          if (!section.maxScore) return false;
+          const max = parseFloat(section.maxScore);
+          if (isNaN(max)) return false;
+          const provided = sectionScores.find((s) => s.id === section.id);
+          return (
+            provided != null &&
+            provided.score > 0 &&
+            provided.score <= max
+          );
+        })
+      );
     });
+
     if (validEnglish.length === 0) return;
 
     await this.upsertEnglishTestResults(
@@ -385,7 +342,6 @@ export class LeadProfileService {
       validEnglish,
     );
   }
-
   /**
    * Replaces preferred countries when countryIds is defined (omit to leave unchanged).
    */
@@ -397,10 +353,9 @@ export class LeadProfileService {
     if (countryIds === undefined) return;
 
     await repo.delete({ leadId });
-    const ids = countryIds.slice(0, 3);
-    if (ids.length > 0) {
+    if (countryIds.length > 0) {
       await repo.save(
-        ids.map((countryId) => repo.create({ leadId, countryId })),
+        countryIds.map((countryId) => repo.create({ leadId, countryId })),
       );
     }
   }
@@ -416,10 +371,9 @@ export class LeadProfileService {
     if (programmeIds === undefined) return;
 
     await repo.delete({ leadId });
-    const ids = programmeIds.slice(0, 3);
-    if (ids.length > 0) {
+    if (programmeIds.length > 0) {
       await repo.save(
-        ids.map((programmeId) => repo.create({ leadId, programmeId })),
+        programmeIds.map((programmeId) => repo.create({ leadId, programmeId })),
       );
     }
   }
@@ -550,20 +504,13 @@ export class LeadProfileService {
     }
   }
 
-  /**
-   * Upsert English test sections (keyed by id)
-   * - Empty array = skip (no changes to sections)
-   * - Values provided = upsert (update existing by id, insert new)
-   */
+  /** Upsert English test sections (keyed by section id). */
   private async upsertEnglishTestSections(
     repo: Repository<LeadEnglishTestSectionResults>,
     resultId: string,
     sections: { id: string; score: number }[],
   ): Promise<void> {
-    if (!sections || sections.length === 0) {
-      // Empty = skip, don't touch existing sections
-      return;
-    }
+    if (!sections?.length) return;
 
     const existingSections = await repo.find({ where: { resultId } });
     const existingBySectionId = new Map(
@@ -674,37 +621,6 @@ export class LeadProfileService {
       requiredSectionIds.size > 0 &&
       [...requiredSectionIds].every((id) => filledSectionIds.has(id))
     );
-  }
-
-  /**
-   * Determine full profile form status for a lead (4-field: academic, English, countries, programmes)
-   */
-  async getFormStatus(userId: string): Promise<AcademicFormStatus> {
-    const profile = await this.db.leadProfiles.findOne({
-      where: { userId },
-      relations: {
-        LeadAcademicResult: true,
-        LeadEnglishTestResult: true,
-        LeadPreferredCountry: true,
-        LeadPreferredProgram: true,
-      },
-    });
-
-    if (!profile) {
-      return AcademicFormStatus.INCOMPLETE;
-    }
-
-    const hasAcademic = (profile.LeadAcademicResult?.length ?? 0) > 0;
-    const hasEnglishTest = (profile.LeadEnglishTestResult?.length ?? 0) > 0;
-    const hasCountries = (profile.LeadPreferredCountry?.length ?? 0) > 0;
-    const hasPrograms = (profile.LeadPreferredProgram?.length ?? 0) > 0;
-
-    const fields = [hasAcademic, hasEnglishTest, hasCountries, hasPrograms];
-    const filledCount = fields.filter(Boolean).length;
-
-    if (filledCount === 0) return AcademicFormStatus.INCOMPLETE;
-    if (filledCount === fields.length) return AcademicFormStatus.COMPLETED;
-    return AcademicFormStatus.PARTIALLY_COMPLETED;
   }
 
   async generateLeadDocumentDownloadUrl(
@@ -819,5 +735,49 @@ export class LeadProfileService {
     });
 
     return { success: true };
+  }
+
+  static isAcademicEditable(
+    gpa: number | null,
+    gpaScale: number,
+  ): boolean {
+    return !(gpa != null && gpa > 0 && gpa <= gpaScale);
+  }
+
+  static isEnglishTestEditable(
+    overallScore: number | null,
+    overallMaxScore: number,
+    sectionScores: Array<{
+      score: number | null;
+      maxScore: number;
+    }>,
+  ): boolean {
+    const overallValid =
+      overallScore != null &&
+      overallScore > 0 &&
+      overallScore <= overallMaxScore;
+
+    const sectionsValid =
+      sectionScores.length === 0 ||
+      sectionScores.every(
+        (s) =>
+          s.score != null &&
+          s.score > 0 &&
+          s.score <= s.maxScore,
+      );
+
+    return !(overallValid && sectionsValid);
+  }
+
+  static findHighestLevelAcademicResult(
+    rows: LeadAcademicResults[],
+  ): LeadAcademicResults | null {
+    return rows.reduce<LeadAcademicResults | null>((best, row) => {
+      const order = row.SysAcademicDegree?.levelOrder;
+      if (order == null) return best;
+      return !best || order > (best.SysAcademicDegree?.levelOrder ?? 0)
+        ? row
+        : best;
+    }, null);
   }
 }
