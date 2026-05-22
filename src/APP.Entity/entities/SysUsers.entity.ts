@@ -166,9 +166,6 @@ export class SysUsers extends BaseEntity {
   @OneToMany(() => Applications, (app) => app.AssignedToUser)
   AssignedApplications!: Applications[];
 
-  @OneToMany(() => ApplicationActivities, (a) => a.ActedByUser)
-  ActedApplicationActivities!: ApplicationActivities[];
-
   /**
    * One-to-Many: Lead profiles assigned to this CRM user.
    */

@@ -10,12 +10,6 @@ import { ApplicationActivityType } from '@shared/enums/ApplicationActivityType.e
 import { ApplicationActivityEntityType } from '@shared/enums/ApplicationActivityEntityType.enum';
 import { BaseEntity } from './BaseEntity.template';
 import { Applications } from './Applications.entity';
-import { SysApplicationStage } from './SysApplicationStage.entity';
-import { SysApplicationStatus } from './SysApplicationStatus.entity';
-import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.entity';
-import { ApplicationDocuments } from './ApplicationDocuments.entity';
-import { ApplicationDocumentVersions } from './ApplicationDocumentVersions.entity';
-import { SysUsers } from './SysUsers.entity';
 
 /**
  * Timeline / audit rows for the application journey.
@@ -137,7 +131,7 @@ export class ApplicationActivities extends BaseEntity {
   actedByUserId?: string;
 
   // ========================================
-  // Navigation Properties (EF Core style)
+  // Navigation Properties
   // ========================================
 
   @ManyToOne(() => Applications, (app) => app.ApplicationActivities, {
@@ -145,46 +139,4 @@ export class ApplicationActivities extends BaseEntity {
   })
   @JoinColumn({ name: 'applicationId' })
   Application!: Applications;
-
-  @ManyToOne(() => SysApplicationStage, (s) => s.ApplicationActivities, {
-    nullable: true,
-  })
-  @JoinColumn({ name: 'stageId' })
-  SysApplicationStage?: SysApplicationStage;
-
-  @ManyToOne(() => SysApplicationStatus, (s) => s.ApplicationActivities, {
-    nullable: true,
-  })
-  @JoinColumn({ name: 'statusId' })
-  SysApplicationStatus?: SysApplicationStatus;
-
-  @ManyToOne(
-    () => ApplicationRequiredDocuments,
-    (req) => req.ApplicationActivities,
-    { nullable: true },
-  )
-  @JoinColumn({ name: 'documentRequirementId' })
-  ApplicationRequiredDocument?: ApplicationRequiredDocuments;
-
-  @ManyToOne(
-    () => ApplicationDocuments,
-    (doc) => doc.ApplicationActivities,
-    { nullable: true },
-  )
-  @JoinColumn({ name: 'applicationDocumentId' })
-  ApplicationDocument?: ApplicationDocuments;
-
-  @ManyToOne(
-    () => ApplicationDocumentVersions,
-    (v) => v.ApplicationActivities,
-    { nullable: true },
-  )
-  @JoinColumn({ name: 'documentVersionId' })
-  ApplicationDocumentVersion?: ApplicationDocumentVersions;
-
-  @ManyToOne(() => SysUsers, (u) => u.ActedApplicationActivities, {
-    nullable: true,
-  })
-  @JoinColumn({ name: 'actedByUserId' })
-  ActedByUser?: SysUsers;
 }

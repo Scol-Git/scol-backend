@@ -80,7 +80,4 @@ export class SysApplicationStage extends BaseEntity {
 
   @OneToMany(() => SysStageRequiredDocuments, (row) => row.SysApplicationStage)
   SysStageRequiredDocuments!: SysStageRequiredDocuments[];
-
-  @OneToMany(() => ApplicationActivities, (a) => a.SysApplicationStage)
-  ApplicationActivities!: ApplicationActivities[];
 }
