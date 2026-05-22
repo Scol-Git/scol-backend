@@ -23,10 +23,13 @@ export class AcademicFormValidator {
    * Validates the entire academic form request.
    * Throws BadRequestException with an array of error messages when invalid.
    */
-  async validateAcademicForm(dto: AcademicFormRequestDto): Promise<void> {
+  async validateAcademicForm(
+    dto: AcademicFormRequestDto,
+    leadId: string,
+  ): Promise<void> {
     const errors: string[] = [];
 
-    this.validateGpaInstitutePair(dto, errors);
+    await this.validateLastAcademicInstitute(dto, leadId, errors);
     await this.validateAcademicResults(dto, errors);
     await this.validateEnglishTestResults(dto, errors);
     await this.validatePreferredCountries(dto, errors);
@@ -38,22 +41,36 @@ export class AcademicFormValidator {
   }
 
   /**
-   * academicResults and lastAcademicInstitute must be sent together (non-empty institute).
+   * When lastAcademicInstitute is sent, there must be a degree row (levelOrder 1–4) in the DB
+   * to receive the institute (highest levelOrder row), or academicResults in the same request.
    */
-  private validateGpaInstitutePair(
+  private async validateLastAcademicInstitute(
     dto: AcademicFormRequestDto,
+    leadId: string,
     errors: string[],
-  ): void {
-    const hasAcademicResults =
-      Array.isArray(dto.academicResults) && dto.academicResults.length > 0;
-
+  ): Promise<void> {
     const hasLastInstitute =
       dto.lastAcademicInstitute != null &&
       String(dto.lastAcademicInstitute).trim() !== '';
 
-    if (hasAcademicResults !== hasLastInstitute) {
+    if (!hasLastInstitute) return;
+
+    const hasAcademicResults =
+      Array.isArray(dto.academicResults) && dto.academicResults.length > 0;
+
+    const rows = await this.db.leadAcademicResults.find({
+      where: { leadId },
+      relations: { SysAcademicDegree: true },
+    });
+
+    const hasDegreeRow = rows.some((row) => {
+      const order = row.SysAcademicDegree?.levelOrder;
+      return order != null && LEVEL_ORDER_1_4.has(Number(order));
+    });
+
+    if (!hasDegreeRow && !hasAcademicResults) {
       errors.push(
-        'academicResults and lastAcademicInstitute must be provided together',
+        'At least one academic degree result must be filled before setting lastAcademicInstitute',
       );
     }
   }
@@ -180,7 +197,11 @@ export class AcademicFormValidator {
       const requiredSectionIds = new Set(sections.map((s) => s.id));
       const providedSections = result.sections ?? [];
 
+      let sectionError: string | null = null;
+
       for (const sectionId of requiredSectionIds) {
+        if (sectionError) break;
+
         const section = sections.find((s) => s.id === sectionId);
         const sectionMax = section?.maxScore
           ? parseFloat(section.maxScore)
@@ -188,25 +209,20 @@ export class AcademicFormValidator {
         const provided = providedSections.find((s) => s.id === sectionId);
 
         if (!provided) {
-          errors.push(
-            `Section ${sectionId} is required for test ${test.testName}; all section scores must be provided when the test has sections`,
-          );
+          sectionError =
+            'All section scores must be provided when the test has sections';
         } else {
           const score = provided.score;
           if (score == null || typeof score !== 'number') {
-            errors.push(
-              `Score is required for section ${sectionId} of test ${test.testName}`,
-            );
-          } else if (score <= 0) {
-            errors.push(
-              `Section score must be greater than 0 for section ${sectionId} of test ${test.testName} (received ${score})`,
-            );
-          } else if (score > sectionMax) {
-            errors.push(
-              `Section score ${score} exceeds maximum ${sectionMax} for section ${sectionId} of test ${test.testName}`,
-            );
+            sectionError = 'Score is required for section';
+          } else if (score <= 0 || score > sectionMax) {
+            sectionError = `Section score must be greater than 0 AND less than or equal to maximum ${sectionMax}`;
           }
         }
+      }
+
+      if (sectionError) {
+        errors.push(sectionError);
       }
 
       const invalidSectionIds = providedSections
@@ -214,7 +230,7 @@ export class AcademicFormValidator {
         .filter((id) => !requiredSectionIds.has(id));
       if (invalidSectionIds.length > 0) {
         errors.push(
-          `Invalid section ID(s) for test ${test.testName}: ${invalidSectionIds.join(', ')}`,
+          `Invalid section ID(s) for test ${test.testName}`,
         );
       }
     }

@@ -37,7 +37,7 @@ import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/app
  *
  * Handles lead profile endpoints:
  * - GET /leads/profile/academic-form - Get academic form (academicResults always 4 items, englishTestResults all system tests, preferredCountries/preferredProgrammes full lists with selected)
- * - PUT /leads/profile/academic-form - Save academic form (GPA + institute paired; other sections optional)
+ * - PUT /leads/profile/academic-form - Save academic form (send academicResults and/or lastAcademicInstitute; other sections optional)
  */
 @ApiTags('leads')
 @ApiExtraModels(
@@ -86,7 +86,8 @@ export class LeadsProfileController {
    * Save academic form data
    * PUT /leads/profile/academic-form
    *
-   * academicResults and lastAcademicInstitute (non-empty) must be sent together; institute is saved on the highest levelOrder row in the DB.
+   * Send academicResults and/or lastAcademicInstitute to update; omit to leave unchanged.
+   * lastAcademicInstitute is saved on the highest levelOrder row in the DB.
    * englishTestResults, preferredCountryIds, and preferredProgrammeIds are optional.
    * Returns the updated form data (same response as GET).
    */

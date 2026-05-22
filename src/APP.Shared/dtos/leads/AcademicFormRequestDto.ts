@@ -12,9 +12,10 @@ import { EnglishTestInputDto } from './EnglishTestInputDto';
 
 /**
  * Request DTO for PUT /api/leads/profile/academic-form.
- * academicResults and lastAcademicInstitute (non-empty) must be provided together when either is sent.
- * lastAcademicInstitute is stored on the highest levelOrder degree row in the DB, not the highest degree in the request.
- * English/preferred sections are optional; omit to leave unchanged.
+ * Send academicResults and/or lastAcademicInstitute to update those sections; omit to leave unchanged.
+ * lastAcademicInstitute is stored on the highest levelOrder degree row in the DB.
+ * lastAcademicInstitute is applied to the highest levelOrder degree row in the DB; requires that row or academicResults in the same request.
+ * English/preferred sections: send to update; omit to leave unchanged.
  */
 export class AcademicFormRequestDto {
   @ApiPropertyOptional({
@@ -30,7 +31,7 @@ export class AcademicFormRequestDto {
 
   @ApiPropertyOptional({
     description:
-      'Last institute name; required together with academicResults. Stored on the highest levelOrder degree row in the database.',
+      'Last institute name. Stored on the highest levelOrder degree row in the database. Requires at least one academic degree row for the lead, or send academicResults in the same request.',
     example: 'Daffodil University',
     nullable: true,
   })
