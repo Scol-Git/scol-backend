@@ -11,10 +11,35 @@ import { EnglishTestResultItemDto } from '@shared/dtos/leads/EnglishTestResultIt
 import { EnglishTestSectionItemDto } from '@shared/dtos/leads/EnglishTestSectionItemDto';
 import { PreferredCountryItemDto } from '@shared/dtos/leads/PreferredCountryItemDto';
 import { PreferredProgrammeItemDto } from '@shared/dtos/leads/PreferredProgrammeItemDto';
+import { LeadProfileService } from './LeadProfileService';
+import { LeadAcademicResults } from '@entity/entities/LeadAcademicResults.entity';
 
-const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
-const DEFAULT_GPA_SCALE = 5;
-const DEFAULT_MAX_SCORE = 9;
+// ---------------------------------------------------------------------------
+// Extended entity types (sections are loaded at runtime via relations)
+// ---------------------------------------------------------------------------
+
+type EnglishTestWithSections = SysEnglishTests & {
+  SysEnglishTestSection?: Array<{
+    id: string;
+    sectionName?: string;
+    maxScore?: string;
+  }>;
+};
+
+type EnglishTestResultWithSections = {
+  id: string;
+  sysEngTestId: string;
+  overallScore?: string | null;
+  testDate?: Date | null;
+  LeadEnglishTestSectionResult?: Array<{
+    sysEngTestSectionId: string;
+    sectionScore?: string | null;
+  }>;
+};
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 /**
  * Maps entities to Academic Form response DTO.
@@ -68,7 +93,7 @@ export class AcademicFormMapper {
 
     return systemDegrees.map((degree) => {
       const r = byDegreeId.get(degree.id);
-      const validation = this.toDegreeValidation(degree);
+      const gpaScale = Number(degree.gpaScale);
 
       if (!r) {
         return {
@@ -78,113 +103,113 @@ export class AcademicFormMapper {
           institute: null,
           passingDate: null,
           isEditable: true,
-          validation,
+          validation: { gpaScale },
         };
       }
 
-      const gpaVal =
-        r.gpa != null && String(r.gpa).trim() !== '' ? parseFloat(r.gpa) : null;
-      const instituteVal =
-        r.institute != null && String(r.institute).trim() !== ''
-          ? r.institute
-          : null;
-      const passingDateVal = r.passingDate
+      const gpa = this.parseNullableDecimal(r.gpa);
+      const institute = this.parseNullableString(r.institute);
+      const passingDate = r.passingDate
         ? this.formatDate(r.passingDate)
         : null;
-      const isEditable = this.isAcademicRowEditable(gpaVal);
+    
 
       return {
         degreeId: r.degreeId,
         degreeName: degree.degreeName,
-        gpa: gpaVal,
-        institute: instituteVal,
-        passingDate: passingDateVal,
-        isEditable,
-        validation,
+        gpa,
+        institute,
+        passingDate,
+        isEditable: LeadProfileService.isAcademicEditable(gpa, gpaScale),
+        validation: { gpaScale }, 
       };
     });
   }
 
-  /** Build validation object for a degree (gpaScale from entity or default). */
-  private toDegreeValidation(degree: SysAcademicDegrees): { gpaScale: number } {
-    const gpaScale = degree.gpaScale
-      ? parseFloat(degree.gpaScale)
-      : DEFAULT_GPA_SCALE;
-    return { gpaScale };
-  }
-
-  /** Editable when no valid GPA is set (null or zero). */
-  private isAcademicRowEditable(gpa: number | null): boolean {
-    return gpa == null || gpa === 0;
-  }
+   // English test results
 
   private mapEnglishTestResults(
     leadProfile: SysLeadProfiles | null,
     systemEnglishTests: SysEnglishTests[],
   ): EnglishTestResultItemDto[] {
-    const results = leadProfile?.LeadEnglishTestResult ?? [];
-    const byTestId = new Map(results.map((r) => [r.sysEngTestId, r] as const));
 
-    return systemEnglishTests.map((test) => {
-      const r = byTestId.get(test.id);
-      const sections = (test as any).SysEnglishTestSection ?? [];
-      const validation = this.toEnglishTestValidation(test);
+    //const results = leadProfile?.LeadEnglishTestResult ?? [];
+    //const byTestId = new Map(results.map((r) => [r.sysEngTestId, r] as const));
 
-      if (!r) {
+    const byTestId = new Map(( (leadProfile?.LeadEnglishTestResult ??[]) as EnglishTestResultWithSections[]).map((r) => [r.sysEngTestId, r]),);
+
+
+
+    // return systemEnglishTests.map((test) => {
+    //   const r = byTestId.get(test.id);
+    //   const sections = (test as any).SysEnglishTestSection ?? [];
+    //   const validation = this.toEnglishTestValidation(test);
+    return (systemEnglishTests as EnglishTestWithSections[]).map((test) => {
+      const sections = test.SysEnglishTestSection ?? [];
+      const maxScore = Number(test.maxScore);
+      const validation = {
+        maxScore,
+        sections: sections.map((s) => ({
+          id: s.id,
+          name: s.sectionName ?? '',
+          maxScore: Number(s.maxScore),
+        })),
+      };
+
+    const record = byTestId.get(test.id);
+
+
+      if (!record) {
         return {
           testId: test.id,
           testName: test.testName,
           overallScore: null,
           testDate: null,
           isEditable: true,
-          sections: sections.map((section: any) => ({
-            id: section.id,
-            name: section.sectionName,
+          sections: sections.map((s) => ({
+            id: s.id,
+            name: s.sectionName ?? '',
             score: null,
           })),
           validation,
         };
       }
 
-      const maxScore = test.maxScore
-        ? parseFloat(test.maxScore)
-        : DEFAULT_MAX_SCORE;
-      const overallVal =
-        r.overallScore != null && String(r.overallScore).trim() !== ''
-          ? parseFloat(r.overallScore)
-          : null;
-      const testDateVal = r.testDate ? this.formatDate(r.testDate) : null;
+      const overallScore = this.parseNullableDecimal(record.overallScore);
+      const testDate = record.testDate
+        ? this.formatDate(record.testDate)
+        : null;
 
       const sectionDtos: EnglishTestSectionItemDto[] = sections.map(
-        (section: any) => {
-          const sectionResult = (r.LeadEnglishTestSectionResult ?? []).find(
-            (sr: any) => sr.sysEngTestSectionId === section.id,
-          );
-          const scoreVal =
-            sectionResult?.sectionScore != null &&
-            String(sectionResult.sectionScore).trim() !== ''
-              ? parseFloat(sectionResult.sectionScore)
-              : null;
+        (section) => {
+          const sectionResult = (
+            record.LeadEnglishTestSectionResult ?? []
+          ).find((sr) => sr.sysEngTestSectionId === section.id);
+
+
           return {
             id: section.id,
-            name: section.sectionName,
-            score: scoreVal,
+            name: section.sectionName ?? '',
+            score: this.parseNullableDecimal(sectionResult?.sectionScore),
           };
         },
       );
 
-      const isEditable = this.isEnglishTestEditable(
-        overallVal,
-        sectionDtos,
+      const isEditable = LeadProfileService.isEnglishTestEditable(
+        overallScore,
         maxScore,
-        sections,
+        sectionDtos.map((dto) => ({
+          score: dto.score,
+          maxScore:
+            validation.sections.find((s) => s.id === dto.id)?.maxScore ?? 0,
+        })),
       );
 
       return {
-        testId: r.sysEngTestId,
+        testId: record.sysEngTestId,
         testName: test.testName,
-        overallScore: overallVal,
-        testDate: testDateVal,
+        overallScore,
+        testDate,
         isEditable,
         sections: sectionDtos,
         validation,
@@ -192,58 +217,10 @@ export class AcademicFormMapper {
     });
   }
 
-  /** Build validation object for an English test (maxScore + section maxScores). */
-  private toEnglishTestValidation(
-    test: SysEnglishTests & {
-      SysEnglishTestSection?: Array<{
-        id: string;
-        sectionName?: string;
-        maxScore?: string;
-      }>;
-    },
-  ): {
-    maxScore: number;
-    sections: Array<{ id: string; name: string; maxScore: number }>;
-  } {
-    const sections = test.SysEnglishTestSection ?? [];
-    const maxScore = test.maxScore
-      ? parseFloat(test.maxScore)
-      : DEFAULT_MAX_SCORE;
-    const sectionValidations = sections.map((section) => ({
-      id: section.id,
-      name: section.sectionName ?? '',
-      maxScore: section.maxScore
-        ? parseFloat(section.maxScore)
-        : DEFAULT_MAX_SCORE,
-    }));
-    return { maxScore, sections: sectionValidations };
-  }
-
-  /**
-   * Editable unless overall score and every section score are set and non-zero.
-   */
-  private isEnglishTestEditable(
-    overallScore: number | null,
-    sectionDtos: EnglishTestSectionItemDto[],
-    testMaxScore: number,
-    systemSections: Array<{ id: string; maxScore?: string }>,
-  ): boolean {
-    const overallFilled =
-      overallScore != null && overallScore > 0 && overallScore <= testMaxScore;
-
-    if (systemSections.length === 0) {
-      return !overallFilled;
-    }
-
-    const allSectionsFilled = sectionDtos.every((dto) => {
-      const section = systemSections.find((s) => s.id === dto.id);
-      const max = section?.maxScore ? parseFloat(section.maxScore) : 9;
-      const score = dto.score;
-      return score != null && score > 0 && score <= max;
-    });
-
-    return !(overallFilled && allSectionsFilled);
-  }
+  
+  // -------------------------------------------------------------------------
+  // Preferred countries / programmes
+  // -------------------------------------------------------------------------
 
   private mapPreferredCountries(
     leadProfile: SysLeadProfiles | null,
@@ -279,40 +256,34 @@ export class AcademicFormMapper {
   private deriveLastAcademicInstitute(
     leadProfile: SysLeadProfiles | null,
   ): string | null {
-    const results = leadProfile?.LeadAcademicResult ?? [];
-    const withDegree = results
-      .map((r) => {
-        const degree = (r as any).SysAcademicDegree;
-        const order =
-          degree?.levelOrder != null ? Number(degree.levelOrder) : null;
-        if (order == null || !LEVEL_ORDER_1_4.has(order)) return null;
-        const gpaScale = degree?.gpaScale ? parseFloat(degree.gpaScale) : 5;
-        const gpaVal =
-          r.gpa != null && String(r.gpa).trim() !== ''
-            ? parseFloat(r.gpa)
-            : null;
-        const valid = gpaVal != null && gpaVal > 0 && gpaVal <= gpaScale;
-        if (!valid) return null;
-        const institute =
-          r.institute != null && String(r.institute).trim() !== ''
-            ? r.institute
-            : null;
-        return { levelOrder: order, institute };
-      })
-      .filter(
-        (x): x is { levelOrder: number; institute: string | null } => x != null,
-      );
-
-    if (withDegree.length === 0) return null;
-    const highest = withDegree.reduce((a, b) =>
-      a.levelOrder > b.levelOrder ? a : b,
+    const highest = LeadProfileService.findHighestLevelAcademicResult(
+      (leadProfile?.LeadAcademicResult ?? []) as LeadAcademicResults[],
     );
-    return highest.institute;
+    return this.parseNullableString(highest?.institute);
   }
 
+
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+
+  private parseNullableDecimal(
+    value: string | null | undefined,
+  ): number | null {
+    if (value == null || String(value).trim() === '') return null;
+    return parseFloat(value);
+  }
+
+  private parseNullableString(
+    value: string | null | undefined,
+  ): string | null {
+    if (value == null || String(value).trim() === '') return null;
+    return value;
+  }
   private formatDate(date: Date | string): string {
     if (typeof date === 'string') return date.split('T')[0];
-    if (date instanceof Date) return date.toISOString().split('T')[0];
-    return new Date(date).toISOString().split('T')[0];
+    return (date instanceof Date ? date : new Date(date))
+      .toISOString()
+      .split('T')[0];
   }
 }

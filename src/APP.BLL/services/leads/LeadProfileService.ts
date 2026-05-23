@@ -34,8 +34,7 @@ import type { IStorageService } from '@shared/interfaces/IStorageService.interfa
 import { IStorageService as IStorageServiceToken } from '@shared/tokens/injection.tokens';
 
 
-const LEVEL_ORDER_1_4 = new Set([1, 2, 3, 4]);
-const DEFAULT_GPA_SCALE = 5;
+const VALID_LEVEL_ORDERS = new Set([1, 2, 3, 4]);
 
 /** Relations required to load lead profile for academic form (GET) and for computing form status. */
 const ACADEMIC_FORM_LEAD_PROFILE_RELATIONS = {
@@ -98,10 +97,7 @@ export class LeadProfileService {
     return LeadProfileMapper.toResponse(profile);
   }
   async getAcademicForm(userId: string): Promise<AcademicFormResponseDto> {
-    this.logger.LogInfo('Getting academic form', {
-      context: 'LeadProfileService.getAcademicForm',
-      userId,
-    });
+    
 
     const [
       leadProfile,
@@ -115,7 +111,7 @@ export class LeadProfileService {
         relations: ACADEMIC_FORM_LEAD_PROFILE_RELATIONS,
       }),
       this.db.academicDegrees.find({
-        where: { levelOrder: In([...LEVEL_ORDER_1_4]) },
+        where: { levelOrder: In([...VALID_LEVEL_ORDERS]) },
         order: { levelOrder: 'ASC' },
       }),
       this.db.englishTests.find({
@@ -145,10 +141,8 @@ export class LeadProfileService {
     userId: string,
     dto: AcademicFormRequestDto,
   ): Promise<AcademicFormResponseDto> {
-    this.logger.LogInfo('Updating academic form', {
-      context: 'LeadProfileService.updateAcademicForm',
-      userId,
-    });
+    
+    
 
     const leadProfile = await this.db.leadProfiles.findOne({
       where: { userId },
@@ -158,8 +152,8 @@ export class LeadProfileService {
       throw new NotFoundException('Lead profile not found');
     }
 
+    // Validate input
     await this.validator.validateAcademicForm(dto, leadProfile.id);
-
     // Execute in transaction
     await this.db.transaction(async (manager: EntityManager) => {
       await this.saveAcademicFormInTransaction(manager, leadProfile.id, dto);
@@ -205,11 +199,17 @@ export class LeadProfileService {
     const preferredProgramsRepo = manager.getRepository(LeadPreferredPrograms);
 
     await this.saveAcademicResultsIfPresent(
-      manager,
       academicResultsRepo,
       leadId,
       dto,
     );
+    if (dto.lastAcademicInstitute !== undefined) {
+      await this.applyLastAcademicInstitute(
+        academicResultsRepo,
+        leadId,
+        dto.lastAcademicInstitute ?? '',
+      );
+    }
     await this.saveEnglishTestResultsIfPresent(
       manager,
       englishTestResultsRepo,
@@ -217,73 +217,40 @@ export class LeadProfileService {
       leadId,
       dto,
     );
-    await this.savePreferredCountriesIfPresent(
+    await this.savePreferredList(
       preferredCountriesRepo,
       leadId,
+      'countryId',
       dto.preferredCountryIds,
     );
-    await this.savePreferredProgrammesIfPresent(
+    await this.savePreferredList(
       preferredProgramsRepo,
       leadId,
+      'programmeId',
       dto.preferredProgrammeIds,
     );
   }
 
   /**
-   * Updates academic section when academicResults and/or lastAcademicInstitute are sent.
-   * GPA upsert runs when academicResults is present; institute applies to highest levelOrder DB row when lastAcademicInstitute is sent.
+   * Updates academic section when academicResults sent.
+   * GPA upsert runs when academicResults is present;
    */
   private async saveAcademicResultsIfPresent(
-    manager: EntityManager,
     repo: Repository<LeadAcademicResults>,
     leadId: string,
     dto: AcademicFormRequestDto,
   ): Promise<void> {
-    const hasAcademicResults =
-      Array.isArray(dto.academicResults) && dto.academicResults.length > 0;
-    const hasLastInstitute =
-      dto.lastAcademicInstitute != null &&
-      String(dto.lastAcademicInstitute).trim() !== '';
-
-    if (!hasAcademicResults && !hasLastInstitute) return;
-
-    if (hasAcademicResults) {
-      const degreeIds = dto.academicResults!.map((r) => r.degreeId);
-      const degrees = await manager.getRepository(SysAcademicDegrees).find({
-        where: degreeIds.map((id) => ({ id })),
-      });
-      const degreeMap = new Map(degrees.map((d) => [d.id, d]));
-
-      const validAcademic = dto.academicResults!.filter((r) => {
-        const degree = degreeMap.get(r.degreeId);
-        if (!degree || !LEVEL_ORDER_1_4.has(degree.levelOrder)) return false;
-        const scale = degree.gpaScale
-          ? parseFloat(degree.gpaScale)
-          : DEFAULT_GPA_SCALE;
-        const gpa = r.gpa;
-        return gpa != null && gpa > 0 && gpa <= scale;
-      });
-
-      if (validAcademic.length > 0) {
-        await this.upsertAcademicResults(
-          repo,
-          leadId,
-          validAcademic.map((r) => ({
-            degreeId: r.degreeId,
-            gpa: r.gpa,
-            passingDate: r.passingDate,
-          })),
-        );
-      }
-    }
-
-    if (hasLastInstitute) {
-      await this.applyLastAcademicInstitute(
-        repo,
-        leadId,
-        String(dto.lastAcademicInstitute).trim(),
-      );
-    }
+    if (!dto.academicResults?.length) return;
+  
+    await this.upsertAcademicResults(
+      repo,
+      leadId,
+      dto.academicResults.map((r) => ({
+        degreeId: r.degreeId,
+        gpa: r.gpa,
+        passingDate: r.passingDate,
+      })),
+    );
   }
 
   /**
@@ -299,34 +266,13 @@ export class LeadProfileService {
       where: { leadId },
       relations: { SysAcademicDegree: true },
     });
-    const target = this.findHighestLevelOrderDegree(rows);
+    const target = LeadProfileService.findHighestLevelAcademicResult(rows);
     if (!target) {
       throw new BadRequestException(
         'At least one academic degree result must be filled before setting lastAcademicInstitute',
       );
     }
     await repo.update(target.id, { institute: institute.trim() });
-  }
-
-  private findHighestLevelOrderDegree(
-    rows: LeadAcademicResults[],
-  ): LeadAcademicResults | null {
-    let best: LeadAcademicResults | null = null;
-    let bestOrder = -1;
-
-    for (const row of rows) {
-      const degree = row.SysAcademicDegree;
-      const order =
-        degree?.levelOrder != null ? Number(degree.levelOrder) : null;
-      if (order == null || !LEVEL_ORDER_1_4.has(order)) continue;
-
-      if (order > bestOrder) {
-        bestOrder = order;
-        best = row;
-      }
-    }
-
-    return best;
   }
 
   /**
@@ -349,13 +295,14 @@ export class LeadProfileService {
     });
     const testMap = new Map(tests.map((t) => [t.id, t]));
 
-    const defaultMaxScore = 9;
+    
     const validEnglish = dto.englishTestResults.filter((result) => {
       const test = testMap.get(result.testId);
-      if (!test) return false;
-      const testMaxScore = test.maxScore
-        ? parseFloat(test.maxScore)
-        : defaultMaxScore;
+
+      if (!test?.maxScore) return false;
+
+      const testMaxScore = parseFloat(test.maxScore);
+      if (isNaN(testMaxScore)) return false;
       const overallValid =
         result.overallScore != null &&
         result.overallScore > 0 &&
@@ -367,17 +314,22 @@ export class LeadProfileService {
           }
         ).SysEnglishTestSection ?? [];
       if (sections.length === 0) return overallValid;
-      const sectionIds = new Set(sections.map((s) => s.id));
+     
       const sectionScores = result.sections ?? [];
-      const allSectionsValid = [...sectionIds].every((sectionId) => {
-        const section = sections.find((s) => s.id === sectionId);
-        const max = section?.maxScore
-          ? parseFloat(section.maxScore)
-          : defaultMaxScore;
-        const provided = sectionScores.find((s) => s.id === sectionId);
-        return provided != null && provided.score > 0 && provided.score <= max;
-      });
-      return overallValid && allSectionsValid;
+      return (
+        overallValid &&
+        sections.every((section) => {
+          if (!section.maxScore) return false;
+          const max = parseFloat(section.maxScore);
+          if (isNaN(max)) return false;
+          const provided = sectionScores.find((s) => s.id === section.id);
+          return (
+            provided != null &&
+            provided.score > 0 &&
+            provided.score <= max
+          );
+        })
+      );
     });
     if (validEnglish.length === 0) return;
 
@@ -389,41 +341,22 @@ export class LeadProfileService {
     );
   }
 
-  /**
-   * Replaces preferred countries when countryIds is defined (omit to leave unchanged).
-   */
-  private async savePreferredCountriesIfPresent(
-    repo: Repository<LeadPreferredCountries>,
+  // ── Private: preferred lists ───────────────────────────────────────────────
+
+  /** Generic replace-all for preferred countries / programmes. */
+  private async savePreferredList<T extends object>(
+    repo: Repository<T>,
     leadId: string,
-    countryIds: string[] | undefined,
+    foreignKey: keyof T,
+    ids: string[] | undefined,
   ): Promise<void> {
-    if (countryIds === undefined) return;
-
-    await repo.delete({ leadId });
-    const ids = countryIds.slice(0, 3);
-    if (ids.length > 0) {
-      await repo.save(
-        ids.map((countryId) => repo.create({ leadId, countryId })),
+    if (ids === undefined) return;
+    await repo.delete({ leadId } as any);
+    if (ids.length) {
+      const rows = ids.map((id) =>
+        repo.create({ leadId, [foreignKey]: id } as any),
       );
-    }
-  }
-
-  /**
-   * Replaces preferred programmes when programmeIds is defined (omit to leave unchanged).
-   */
-  private async savePreferredProgrammesIfPresent(
-    repo: Repository<LeadPreferredPrograms>,
-    leadId: string,
-    programmeIds: string[] | undefined,
-  ): Promise<void> {
-    if (programmeIds === undefined) return;
-
-    await repo.delete({ leadId });
-    const ids = programmeIds.slice(0, 3);
-    if (ids.length > 0) {
-      await repo.save(
-        ids.map((programmeId) => repo.create({ leadId, programmeId })),
-      );
+      await repo.save(rows as any);
     }
   }
 
@@ -823,4 +756,59 @@ export class LeadProfileService {
 
     return { success: true };
   }
+  
+  static isAcademicEditable(
+    gpa: number | null,
+    gpaScale: number,
+  ): boolean {
+    return !(gpa != null && gpa > 0 && gpa <= gpaScale);
+  }
+
+  static isEnglishTestEditable(
+    overallScore: number | null,
+    overallMaxScore: number,
+    sectionScores: Array<{
+      score: number | null;
+      maxScore: number;
+    }>,
+  ): boolean {
+    const overallValid =
+      overallScore != null &&
+      overallScore > 0 &&
+      overallScore <= overallMaxScore;
+
+    const sectionsValid =
+      sectionScores.length === 0 ||
+      sectionScores.every(
+        (s) =>
+          s.score != null &&
+          s.score > 0 &&
+          s.score <= s.maxScore,
+      );
+
+    return !(overallValid && sectionsValid);
+  }
+
+  /** Highest academic result among degrees with levelOrder 1–4. */
+  static findHighestLevelAcademicResult(
+    rows: LeadAcademicResults[],
+  ): LeadAcademicResults | null {
+    let best: LeadAcademicResults | null = null;
+    let bestOrder = -1;
+
+    for (const row of rows) {
+      const order = row.SysAcademicDegree?.levelOrder != null ? Number(row.SysAcademicDegree.levelOrder): null;
+      if (order == null || !VALID_LEVEL_ORDERS.has(order)) continue;
+
+      if (order > bestOrder) {
+        bestOrder = order;
+        best = row;
+      }
+    }
+
+    return best;
+  }
+
+
+
 }
