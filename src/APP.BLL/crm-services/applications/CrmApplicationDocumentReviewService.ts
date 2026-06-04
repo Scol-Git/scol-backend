@@ -105,16 +105,16 @@ export class CrmApplicationDocumentReviewService {
         plan,
       );
 
-      await this.updateRequirementStatusAfterDocumentStatusChangeIfNeeded(
-        manager,
-        {
-          application,
-          applicationRequirementId: reviewable.applicationRequirementId,
-          documentScope: reviewable.documentScope,
-          toDocumentStatus: dto.toStatus,
-          remarks: dto.remarks,
-        },
-      );
+      // await this.updateRequirementStatusAfterDocumentStatusChangeIfNeeded(
+      //   manager,
+      //   {
+      //     application,
+      //     applicationRequirementId: reviewable.applicationRequirementId,
+      //     documentScope: reviewable.documentScope,
+      //     toDocumentStatus: dto.toStatus,
+      //     remarks: dto.remarks,
+      //   },
+      // );
 
       await this.activityService.logDocumentStatusChanged(manager, {
         applicationId: application.id,

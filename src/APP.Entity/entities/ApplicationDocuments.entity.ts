@@ -139,7 +139,4 @@ export class ApplicationDocuments extends BaseEntity {
 
   @OneToMany(() => ApplicationDocumentVersions, (v) => v.ApplicationDocument)
   ApplicationDocumentVersions!: ApplicationDocumentVersions[];
-
-  @OneToMany(() => ApplicationActivities, (a) => a.ApplicationDocument)
-  ApplicationActivities!: ApplicationActivities[];
 }

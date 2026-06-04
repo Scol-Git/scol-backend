@@ -335,7 +335,6 @@ export class ApplicationDocumentService {
     documentId: string,
     actedByUserId?: string,
   ): Promise<{ success: true }> {
-    
     const applicationResolved = await this.resolveApplicationScopedOrNull(
       application.id,
       documentId,
@@ -391,7 +390,9 @@ export class ApplicationDocumentService {
           leadDocumentId: leadResolved.document.id,
         });
 
-        await manager.getRepository(LeadDocuments).delete(leadResolved.document.id);
+        await manager
+          .getRepository(LeadDocuments)
+          .delete(leadResolved.document.id);
       });
 
       return { success: true };
@@ -400,82 +401,76 @@ export class ApplicationDocumentService {
     throw new NotFoundException('Document cannot be deleted');
   }
 
+  // ==============================
+  // RESOLVE LEAD (DELETE RULES)
+  // ==============================
+  private async resolveLeadScopedOrNull(
+    application: Applications | null,
+    leadId: string,
+    documentId: string,
+  ): Promise<ResolvedLeadDocument | null> {
+    const document = await this.db.leadDocuments.findOne({
+      where: {
+        id: documentId,
+        leadId,
+        overallStatus: Not(ApplicationDocumentStatus.Verified),
+      },
+    });
 
-// ==============================
-// RESOLVE LEAD (DELETE RULES)
-// ==============================
-private async resolveLeadScopedOrNull(
-  application: Applications | null,
-  leadId: string,
-  documentId: string,
-): Promise<ResolvedLeadDocument | null> {
+    if (!document?.currentLeadDocumentVersionId) {
+      return null;
+    }
 
-  const document = await this.db.leadDocuments.findOne({
-    where: {
-      id: documentId,
-      leadId,
-      overallStatus: Not(ApplicationDocumentStatus.Verified),
-    },
-  });
+    // 2. Resolve version
 
-  if (!document?.currentLeadDocumentVersionId) {
-    return null;
+    const version = await this.db.leadDocumentVersions.findOne({
+      where: {
+        id: document.currentLeadDocumentVersionId,
+        leadDocumentId: document.id,
+        uploadStatus: UploadStatus.UPLOADED,
+      },
+    });
+
+    if (!version) {
+      return null;
+    }
+
+    return { document, version };
   }
 
+  // ==============================
+  // RESOLVE APPLICATION DOC
+  // ==============================
+  private async resolveApplicationScopedOrNull(
+    applicationId: string,
+    documentId: string,
+  ): Promise<ResolvedApplicationDocument | null> {
+    const document = await this.db.applicationDocuments.findOne({
+      where: {
+        id: documentId,
+        applicationId,
+        overallStatus: Not(ApplicationDocumentStatus.Verified),
+      },
+    });
 
+    if (!document?.currentVersionId) {
+      return null;
+    }
 
-  // 2. Resolve version
+    const version = await this.db.applicationDocumentVersions.findOne({
+      where: {
+        id: document.currentVersionId,
+        applicationDocumentId: document.id,
+        uploadStatus: UploadStatus.UPLOADED,
+      },
+    });
 
-  const version = await this.db.leadDocumentVersions.findOne({
-    where: {
-      id: document.currentLeadDocumentVersionId,
-      leadDocumentId: document.id,
-      uploadStatus: UploadStatus.UPLOADED,
-    },
-  });
+    if (!version) {
+      return null;
+    }
 
-  if (!version) {
-    return null;
+    return { document, version };
   }
-
-  return { document, version };
-}
-
-
-// ==============================
-// RESOLVE APPLICATION DOC
-// ==============================
-private async resolveApplicationScopedOrNull(
-  applicationId: string,
-  documentId: string,
-): Promise<ResolvedApplicationDocument | null> {
-
-  const document = await this.db.applicationDocuments.findOne({
-    where: {
-      id: documentId,
-      applicationId,
-      overallStatus: Not(ApplicationDocumentStatus.Verified),
-    },
-  });
-
-  if (!document?.currentVersionId) {
-    return null;
-  }
-
-  const version = await this.db.applicationDocumentVersions.findOne({
-    where: {
-      id: document.currentVersionId,
-      applicationDocumentId: document.id,
-      uploadStatus: UploadStatus.UPLOADED,
-    },
-  });
-
-  if (!version) {
-    return null;
-  }
-
-  return { document, version };
-}
 
   async generateDownloadUrlForAuthorizedApplication(
     application: Applications,

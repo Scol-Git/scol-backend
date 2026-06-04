@@ -188,7 +188,4 @@ export class ApplicationRequiredDocuments extends BaseEntity {
     (doc) => doc.ApplicationRequiredDocument,
   )
   ApplicationDocuments!: ApplicationDocuments[];
-
-  @OneToMany(() => ApplicationActivities, (a) => a.ApplicationRequiredDocument)
-  ApplicationActivities!: ApplicationActivities[];
 }

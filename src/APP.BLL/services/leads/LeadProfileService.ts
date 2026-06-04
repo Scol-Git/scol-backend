@@ -33,7 +33,6 @@ import { ValidationException } from '@shared/exceptions/ValidationException';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
 import { IStorageService as IStorageServiceToken } from '@shared/tokens/injection.tokens';
 
-
 const VALID_LEVEL_ORDERS = new Set([1, 2, 3, 4]);
 
 /** Relations required to load lead profile for academic form (GET) and for computing form status. */
@@ -97,8 +96,6 @@ export class LeadProfileService {
     return LeadProfileMapper.toResponse(profile);
   }
   async getAcademicForm(userId: string): Promise<AcademicFormResponseDto> {
-    
-
     const [
       leadProfile,
       systemDegrees,
@@ -141,9 +138,6 @@ export class LeadProfileService {
     userId: string,
     dto: AcademicFormRequestDto,
   ): Promise<AcademicFormResponseDto> {
-    
-    
-
     const leadProfile = await this.db.leadProfiles.findOne({
       where: { userId },
     });
@@ -198,11 +192,7 @@ export class LeadProfileService {
     );
     const preferredProgramsRepo = manager.getRepository(LeadPreferredPrograms);
 
-    await this.saveAcademicResultsIfPresent(
-      academicResultsRepo,
-      leadId,
-      dto,
-    );
+    await this.saveAcademicResultsIfPresent(academicResultsRepo, leadId, dto);
     if (dto.lastAcademicInstitute !== undefined) {
       await this.applyLastAcademicInstitute(
         academicResultsRepo,
@@ -241,7 +231,7 @@ export class LeadProfileService {
     dto: AcademicFormRequestDto,
   ): Promise<void> {
     if (!dto.academicResults?.length) return;
-  
+
     await this.upsertAcademicResults(
       repo,
       leadId,
@@ -295,7 +285,6 @@ export class LeadProfileService {
     });
     const testMap = new Map(tests.map((t) => [t.id, t]));
 
-    
     const validEnglish = dto.englishTestResults.filter((result) => {
       const test = testMap.get(result.testId);
 
@@ -314,7 +303,7 @@ export class LeadProfileService {
           }
         ).SysEnglishTestSection ?? [];
       if (sections.length === 0) return overallValid;
-     
+
       const sectionScores = result.sections ?? [];
       return (
         overallValid &&
@@ -324,9 +313,7 @@ export class LeadProfileService {
           if (isNaN(max)) return false;
           const provided = sectionScores.find((s) => s.id === section.id);
           return (
-            provided != null &&
-            provided.score > 0 &&
-            provided.score <= max
+            provided != null && provided.score > 0 && provided.score <= max
           );
         })
       );
@@ -706,11 +693,11 @@ export class LeadProfileService {
     const leadProfile = await this.db.leadProfiles.findOne({
       where: { userId: currentUserId },
     });
-  
+
     if (!leadProfile) {
       throw new NotFoundException('Lead profile not found');
     }
-  
+
     // 1. Resolve document
     const document = await this.db.leadDocuments.findOne({
       where: {
@@ -719,11 +706,11 @@ export class LeadProfileService {
         overallStatus: Not(ApplicationDocumentStatus.Verified),
       },
     });
-  
+
     if (!document?.currentLeadDocumentVersionId) {
       throw new NotFoundException('Document cannot be deleted');
     }
-  
+
     // 2. Resolve version
     const version = await this.db.leadDocumentVersions.findOne({
       where: {
@@ -732,11 +719,11 @@ export class LeadProfileService {
         uploadStatus: UploadStatus.UPLOADED,
       },
     });
-  
+
     if (!version) {
       throw new NotFoundException('Document version not found');
     }
-  
+
     await this.db.transaction(async (manager) => {
       this.logger.LogInfo('Deleting lead document', {
         context: 'LeadProfileService.deleteLeadDocument',
@@ -756,11 +743,8 @@ export class LeadProfileService {
 
     return { success: true };
   }
-  
-  static isAcademicEditable(
-    gpa: number | null,
-    gpaScale: number,
-  ): boolean {
+
+  static isAcademicEditable(gpa: number | null, gpaScale: number): boolean {
     return !(gpa != null && gpa > 0 && gpa <= gpaScale);
   }
 
@@ -780,10 +764,7 @@ export class LeadProfileService {
     const sectionsValid =
       sectionScores.length === 0 ||
       sectionScores.every(
-        (s) =>
-          s.score != null &&
-          s.score > 0 &&
-          s.score <= s.maxScore,
+        (s) => s.score != null && s.score > 0 && s.score <= s.maxScore,
       );
 
     return !(overallValid && sectionsValid);
@@ -797,7 +778,10 @@ export class LeadProfileService {
     let bestOrder = -1;
 
     for (const row of rows) {
-      const order = row.SysAcademicDegree?.levelOrder != null ? Number(row.SysAcademicDegree.levelOrder): null;
+      const order =
+        row.SysAcademicDegree?.levelOrder != null
+          ? Number(row.SysAcademicDegree.levelOrder)
+          : null;
       if (order == null || !VALID_LEVEL_ORDERS.has(order)) continue;
 
       if (order > bestOrder) {
@@ -808,7 +792,4 @@ export class LeadProfileService {
 
     return best;
   }
-
-
-
 }

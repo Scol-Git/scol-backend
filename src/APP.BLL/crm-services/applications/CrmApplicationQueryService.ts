@@ -23,6 +23,7 @@ export class CrmApplicationQueryService {
     );
     return this.applicationQueryService.getApplicationsForAuthorizedLead(
       leadId,
+      'CRM',
     );
   }
 
@@ -40,6 +41,7 @@ export class CrmApplicationQueryService {
 
     return this.applicationQueryService.getApplicationDetailsForAuthorizedApplication(
       application.id,
+      'CRM',
     );
   }
 
@@ -57,6 +59,7 @@ export class CrmApplicationQueryService {
 
     return this.applicationQueryService.getApplicationStageProgressForAuthorizedApplication(
       application.id,
+      'CRM',
     );
   }
 
@@ -74,6 +77,7 @@ export class CrmApplicationQueryService {
 
     return this.applicationQueryService.getApplicationDocumentProgressForAuthorizedApplication(
       application.id,
+      'CRM',
     );
   }
 }

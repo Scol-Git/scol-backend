@@ -12,8 +12,10 @@ VALUES
 (gen_random_uuid(),'PAYMENT','Payment',6,false,'Tuition/deposit payment processing.',now(),now()),
 (gen_random_uuid(),'CAS_COE','CAS / COE',7,false,'CAS or COE document issuance.',now(),now()),
 (gen_random_uuid(),'VISA','Visa',8,false,'Visa application and decision.',now(),now()),
-(gen_random_uuid(),'ENROLLED','Enrolled',9,true,'Student enrolled at institution.',now(),now())
-ON CONFLICT ("stageCode") DO NOTHING;
+(gen_random_uuid(),'ENROLLED','Enrolled',9,false,'Student enrolled at institution.',now(),now()),
+(gen_random_uuid(),'COLLECT_COMMISSION','Collect Commission',10,false,'CRM commission collection stage.',now(),now()),
+(gen_random_uuid(),'COMPLETED','Completed',11,true,'CRM application workflow completed.',now(),now())
+
 
 -- ======================================================
 -- 2) APPLICATION STATUSES
@@ -52,6 +54,8 @@ JOIN st ON (
   OR (s."stageCode"='CAS_COE'       AND st."statusCode" IN ('IN_PROGRESS','PENDING','ON_HOLD','COMPLETED','REJECTED','CANCELLED'))
   OR (s."stageCode"='VISA'          AND st."statusCode" IN ('IN_PROGRESS','PENDING','ON_HOLD','COMPLETED','REJECTED','CANCELLED'))
   OR (s."stageCode"='ENROLLED'      AND st."statusCode" IN ('IN_PROGRESS','PENDING','ON_HOLD','COMPLETED','CANCELLED'))
+  OR (s."stageCode"='COLLECT_COMMISSION' AND st."statusCode" IN ('IN_PROGRESS','PENDING','ON_HOLD','COMPLETED','REJECTED','CANCELLED'))
+  OR (s."stageCode"='COMPLETED'     AND st."statusCode" IN ('COMPLETED'))
 )
 AND NOT EXISTS (
   SELECT 1
@@ -191,6 +195,7 @@ WHERE
   OR (s."stageCode"='ENROLLED' AND d."documentTypeCode" IN
     ('ENROLLMENT_CONFIRMATION','OTHERS'))
 )
+AND s."stageCode" NOT IN ('COLLECT_COMMISSION','COMPLETED')
 AND NOT EXISTS (
   SELECT 1
   FROM "sys_StageRequiredDocuments" x
@@ -403,6 +408,7 @@ WHERE
   )
 )
 
+AND s."stageCode" NOT IN ('COLLECT_COMMISSION','COMPLETED')
 AND NOT EXISTS (
   SELECT 1
   FROM "sys_StageRequiredDocuments" x
