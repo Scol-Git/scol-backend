@@ -11,5 +11,7 @@ export enum ApplicationStage {
   CasCoe = 'CAS_COE',
   Visa = 'VISA',
   Enrolled = 'ENROLLED',
+  CollectCommission = 'COLLECT_COMMISSION',
+  Completed = 'COMPLETED',
 }
 

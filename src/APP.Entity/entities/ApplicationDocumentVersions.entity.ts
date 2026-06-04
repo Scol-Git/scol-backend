@@ -140,7 +140,4 @@ export class ApplicationDocumentVersions extends BaseEntity {
   )
   @JoinColumn({ name: 'applicationDocumentId' })
   ApplicationDocument!: ApplicationDocuments;
-
-  @OneToMany(() => ApplicationActivities, (a) => a.ApplicationDocumentVersion)
-  ApplicationActivities!: ApplicationActivities[];
 }

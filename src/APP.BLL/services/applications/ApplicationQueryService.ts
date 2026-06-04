@@ -12,6 +12,7 @@ import { GetApplicationStageProgressResponseDto } from '@shared/dtos/application
 import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 import { ApplicationStageProgressState } from '@shared/enums/ApplicationStageProgressState.enum';
 import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocumentSourceType.enum';
+import { ApplicationStage } from '@shared/enums/ApplicationStage.enum';
 import {
   ApplicationRequirementWithDocuments,
   DocumentProgressViewModel,
@@ -22,6 +23,8 @@ import { ApplicationAccessService } from './helpers/ApplicationAccessService';
 import { ApplicationMapper } from './helpers/ApplicationMapper';
 import { In } from 'typeorm';
 import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
+
+type ApplicationReadScope = 'LEAD' | 'CRM';
 
 @Injectable()
 export class ApplicationQueryService {
@@ -44,6 +47,7 @@ export class ApplicationQueryService {
 
   async getApplicationsForAuthorizedLead(
     leadId: string,
+    scope: ApplicationReadScope = 'LEAD',
   ): Promise<GetApplicationsResponseDto> {
     const applications = await this.db.applications.find({
       where: { leadId },
@@ -57,8 +61,16 @@ export class ApplicationQueryService {
       order: { updatedAt: 'DESC' },
     });
 
-    const items = applications.map((app) =>
-      this.mapper.toApplicationListItem(app),
+    const items = await Promise.all(
+      applications.map(async (app) =>
+        this.mapper.toApplicationListItem(
+          app,
+          await this.resolveDisplayStageForScope(
+            app.CurrentSysApplicationStage,
+            scope,
+          ),
+        ),
+      ),
     );
 
     return this.mapper.toGetApplicationsResponse(items);
@@ -74,23 +86,30 @@ export class ApplicationQueryService {
         applicationId,
       );
 
-    return this.getApplicationDetailsForAuthorizedApplication(application.id);
+    return this.getApplicationDetailsForAuthorizedApplication(
+      application.id,
+      'LEAD',
+    );
   }
 
   async getApplicationDetailsForAuthorizedApplication(
     applicationId: string,
+    scope: ApplicationReadScope = 'LEAD',
   ): Promise<GetApplicationDetailsResponseDto> {
     const application =
       await this.loadApplicationOverviewOrThrow(applicationId);
 
-    const currentStageId = application.CurrentSysApplicationStage?.id;
-    if (!currentStageId) {
+    const displayStage = await this.resolveDisplayStageForScope(
+      application.CurrentSysApplicationStage,
+      scope,
+    );
+    if (!displayStage) {
       throw new NotFoundException('Current application stage not found');
     }
 
     const requirements = await this.loadCurrentStageRequirements(
       applicationId,
-      currentStageId,
+      displayStage.id,
     );
 
     /** Load application-scoped documents */
@@ -136,6 +155,7 @@ export class ApplicationQueryService {
     return this.mapper.toGetApplicationDetailsResponse(
       application,
       requirementsWithDocuments,
+      displayStage,
     );
   }
 
@@ -151,16 +171,35 @@ export class ApplicationQueryService {
 
     return this.getApplicationStageProgressForAuthorizedApplication(
       application.id,
+      'LEAD',
     );
   }
 
   async getApplicationStageProgressForAuthorizedApplication(
     applicationId: string,
+    scope: ApplicationReadScope = 'LEAD',
   ): Promise<GetApplicationStageProgressResponseDto> {
     const application =
       await this.loadApplicationCurrentStageOrThrow(applicationId);
-    const stages = await this.loadOrderedStages();
-    const viewModel = this.buildStageProgressViewModel(application, stages);
+    const actualCurrentStage = application.CurrentSysApplicationStage;
+    if (!actualCurrentStage) {
+      throw new NotFoundException('Current application stage not found');
+    }
+
+    const stages = await this.loadOrderedStagesForScope(scope);
+    const displayStage = await this.resolveDisplayStageForScope(
+      actualCurrentStage,
+      scope,
+    );
+    if (!displayStage) {
+      throw new NotFoundException('Current application stage not found');
+    }
+    const viewModel = this.buildStageProgressViewModel(
+      actualCurrentStage,
+      displayStage,
+      stages,
+      scope,
+    );
 
     return this.mapper.toStageProgressResponse(viewModel);
   }
@@ -177,23 +216,28 @@ export class ApplicationQueryService {
 
     return this.getApplicationDocumentProgressForAuthorizedApplication(
       application.id,
+      'LEAD',
     );
   }
 
   async getApplicationDocumentProgressForAuthorizedApplication(
     applicationId: string,
+    scope: ApplicationReadScope = 'LEAD',
   ): Promise<GetApplicationDocumentProgressResponseDto> {
     const application =
       await this.loadApplicationCurrentStageOrThrow(applicationId);
 
-    const currentStageId = application.CurrentSysApplicationStage?.id;
-    if (!currentStageId) {
+    const displayStage = await this.resolveDisplayStageForScope(
+      application.CurrentSysApplicationStage,
+      scope,
+    );
+    if (!displayStage) {
       throw new NotFoundException('Current application stage not found');
     }
 
     const requirements = await this.loadCurrentStageRequirements(
       applicationId,
-      currentStageId,
+      displayStage.id,
     );
 
     const viewModel = this.buildDocumentProgressViewModel(requirements);
@@ -222,19 +266,47 @@ export class ApplicationQueryService {
     });
   }
 
-  private buildStageProgressViewModel(
-    application: Applications,
-    stages: SysApplicationStage[],
-  ): StageProgressViewModel {
-    const currentStage = application.CurrentSysApplicationStage;
-    if (!currentStage) {
-      throw new NotFoundException('Current application stage not found');
+  private async loadOrderedStagesForScope(
+    scope: ApplicationReadScope,
+  ): Promise<SysApplicationStage[]> {
+    const stages = await this.loadOrderedStages();
+    if (scope === 'CRM') {
+      return stages;
     }
 
-    const currentStageOrder = currentStage.stageOrder;
+    const leadLastStage = stages.find((stage) =>
+      this.isSameStageCode(stage.stageCode, ApplicationStage.Enrolled),
+    );
+    if (!leadLastStage?.stageOrder) {
+      throw new NotFoundException('Lead terminal application stage not found');
+    }
+    const leadLastStageOrder = leadLastStage.stageOrder;
+
+    return stages.filter(
+      (stage) =>
+        stage.stageOrder != null && stage.stageOrder <= leadLastStageOrder,
+    );
+  }
+
+  private buildStageProgressViewModel(
+    actualCurrentStage: SysApplicationStage,
+    displayCurrentStage: SysApplicationStage,
+    stages: SysApplicationStage[],
+    scope: ApplicationReadScope,
+  ): StageProgressViewModel {
+    const currentStageOrder = actualCurrentStage.stageOrder;
     if (currentStageOrder == null) {
       throw new NotFoundException('Current application stage order not set');
     }
+    const lastVisibleStageOrder = stages[stages.length - 1]?.stageOrder;
+    if (lastVisibleStageOrder == null) {
+      throw new NotFoundException('Application stage order not set');
+    }
+
+    const isPastVisibleTerminal =
+      scope === 'CRM'
+        ? currentStageOrder >= lastVisibleStageOrder
+        : currentStageOrder > lastVisibleStageOrder;
 
     const totalStages = stages.length;
     let completedStages = 0;
@@ -246,7 +318,7 @@ export class ApplicationQueryService {
         throw new NotFoundException('Application stage order not set');
       }
 
-      if (order < currentStageOrder) {
+      if (order < currentStageOrder || isPastVisibleTerminal) {
         completedStages += 1;
         items.push({ stage, state: ApplicationStageProgressState.Completed });
       } else if (order === currentStageOrder) {
@@ -259,9 +331,50 @@ export class ApplicationQueryService {
     return {
       totalStages,
       completedStages,
-      currentStage,
+      currentStage: displayCurrentStage,
       items,
     };
+  }
+
+  private async resolveDisplayStageForScope(
+    actualStage: SysApplicationStage | undefined,
+    scope: ApplicationReadScope,
+  ): Promise<SysApplicationStage | undefined> {
+    if (!actualStage || scope === 'CRM' || !this.isCrmOnlyStage(actualStage)) {
+      return actualStage;
+    }
+
+    return this.loadStageByCodeOrThrow(ApplicationStage.Enrolled);
+  }
+
+  private async loadStageByCodeOrThrow(
+    stageCode: ApplicationStage,
+  ): Promise<SysApplicationStage> {
+    const stage = await this.db.applicationStages.findOne({
+      where: { stageCode },
+    });
+
+    if (!stage) {
+      throw new NotFoundException(`Application stage ${stageCode} not found`);
+    }
+
+    return stage;
+  }
+
+  private isCrmOnlyStage(stage: SysApplicationStage): boolean {
+    return (
+      this.isSameStageCode(
+        stage.stageCode,
+        ApplicationStage.CollectCommission,
+      ) || this.isSameStageCode(stage.stageCode, ApplicationStage.Completed)
+    );
+  }
+
+  private isSameStageCode(
+    value: string | null | undefined,
+    expected: ApplicationStage,
+  ): boolean {
+    return (value ?? '').trim().toUpperCase() === expected;
   }
 
   private buildDocumentProgressViewModel(

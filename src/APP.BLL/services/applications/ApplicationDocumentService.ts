@@ -307,148 +307,141 @@ export class ApplicationDocumentService {
     );
   }
 
-// ==============================
-// MAIN DELETE ENTRY
-// ==============================
-async deleteApplicationDocument(
-  currentUserId: string,
-  applicationId: string,
-  documentId: string,
-): Promise<{ success: true }> {
-  const application = await this.access.ensureLeadCanAccessApplicationOrThrow(
-    currentUserId,
-    applicationId,
-  );
+  // ==============================
+  // MAIN DELETE ENTRY
+  // ==============================
+  async deleteApplicationDocument(
+    currentUserId: string,
+    applicationId: string,
+    documentId: string,
+  ): Promise<{ success: true }> {
+    const application = await this.access.ensureLeadCanAccessApplicationOrThrow(
+      currentUserId,
+      applicationId,
+    );
 
-  return this.deleteDocumentForAuthorizedApplication(application, documentId);
-}
-
-
-// ==============================
-// ORCHESTRATOR (APPLICATION + LEAD)
-// ==============================
-async deleteDocumentForAuthorizedApplication(
-  application: Applications,
-  documentId: string,
-): Promise<{ success: true }> {
-
-  // 1. APPLICATION scoped delete first
-  const applicationResolved = await this.resolveApplicationScopedOrNull(
-    application.id,
-    documentId,
-  );
-
-  if (applicationResolved) {
-   
-   // 3. Delete version first
-   await this.db.applicationDocumentVersions.delete(applicationResolved.version.id);
-  
-   // 4. Delete document
-   await this.db.applicationDocuments.delete(applicationResolved.document.id);
-    return { success: true };
+    return this.deleteDocumentForAuthorizedApplication(application, documentId);
   }
 
-  // 2. LEAD scoped delete
-  if (!application.leadId) {
+  // ==============================
+  // ORCHESTRATOR (APPLICATION + LEAD)
+  // ==============================
+  async deleteDocumentForAuthorizedApplication(
+    application: Applications,
+    documentId: string,
+  ): Promise<{ success: true }> {
+    // 1. APPLICATION scoped delete first
+    const applicationResolved = await this.resolveApplicationScopedOrNull(
+      application.id,
+      documentId,
+    );
+
+    if (applicationResolved) {
+      // 3. Delete version first
+      await this.db.applicationDocumentVersions.delete(
+        applicationResolved.version.id,
+      );
+
+      // 4. Delete document
+      await this.db.applicationDocuments.delete(
+        applicationResolved.document.id,
+      );
+      return { success: true };
+    }
+
+    // 2. LEAD scoped delete
+    if (!application.leadId) {
+      throw new NotFoundException('Document cannot be deleted');
+    }
+
+    const leadResolved = await this.resolveLeadScopedOrNull(
+      application,
+      application.leadId,
+      documentId,
+    );
+
+    if (leadResolved) {
+      // 3. Delete version first
+      await this.db.leadDocumentVersions.delete(leadResolved.version.id);
+
+      // 4. Delete document
+      await this.db.leadDocuments.delete(leadResolved.document.id);
+      return { success: true };
+    }
+
     throw new NotFoundException('Document cannot be deleted');
   }
 
-  const leadResolved = await this.resolveLeadScopedOrNull(
-    application,
-    application.leadId,
-    documentId,
-  );
+  // ==============================
+  // RESOLVE LEAD (DELETE RULES)
+  // ==============================
+  private async resolveLeadScopedOrNull(
+    application: Applications | null,
+    leadId: string,
+    documentId: string,
+  ): Promise<ResolvedLeadDocument | null> {
+    const document = await this.db.leadDocuments.findOne({
+      where: {
+        id: documentId,
+        leadId,
+        overallStatus: Not(ApplicationDocumentStatus.Verified),
+      },
+    });
 
-  if (leadResolved) {
-    
+    if (!document?.currentLeadDocumentVersionId) {
+      return null;
+    }
 
-    // 3. Delete version first
-    await this.db.leadDocumentVersions.delete(leadResolved.version.id);
-  
-    // 4. Delete document
-    await this.db.leadDocuments.delete(leadResolved.document.id);
-    return { success: true };
+    // 2. Resolve version
+
+    const version = await this.db.leadDocumentVersions.findOne({
+      where: {
+        id: document.currentLeadDocumentVersionId,
+        leadDocumentId: document.id,
+        uploadStatus: UploadStatus.UPLOADED,
+      },
+    });
+
+    if (!version) {
+      return null;
+    }
+
+    return { document, version };
   }
 
-  throw new NotFoundException('Document cannot be deleted');
-}
+  // ==============================
+  // RESOLVE APPLICATION DOC
+  // ==============================
+  private async resolveApplicationScopedOrNull(
+    applicationId: string,
+    documentId: string,
+  ): Promise<ResolvedApplicationDocument | null> {
+    const document = await this.db.applicationDocuments.findOne({
+      where: {
+        id: documentId,
+        applicationId,
+        overallStatus: Not(ApplicationDocumentStatus.Verified),
+      },
+    });
 
+    if (!document?.currentVersionId) {
+      return null;
+    }
 
-// ==============================
-// RESOLVE LEAD (DELETE RULES)
-// ==============================
-private async resolveLeadScopedOrNull(
-  application: Applications | null,
-  leadId: string,
-  documentId: string,
-): Promise<ResolvedLeadDocument | null> {
+    const version = await this.db.applicationDocumentVersions.findOne({
+      where: {
+        id: document.currentVersionId,
+        applicationDocumentId: document.id,
+        uploadStatus: UploadStatus.UPLOADED,
+      },
+    });
 
-  const document = await this.db.leadDocuments.findOne({
-    where: {
-      id: documentId,
-      leadId,
-      overallStatus: Not(ApplicationDocumentStatus.Verified),
-    },
-  });
+    if (!version) {
+      return null;
+    }
 
-  if (!document?.currentLeadDocumentVersionId) {
-    return null;
+    return { document, version };
   }
-
-
-
-  // 2. Resolve version
-
-  const version = await this.db.leadDocumentVersions.findOne({
-    where: {
-      id: document.currentLeadDocumentVersionId,
-      leadDocumentId: document.id,
-      uploadStatus: UploadStatus.UPLOADED,
-    },
-  });
-
-  if (!version) {
-    return null;
-  }
-
-  return { document, version };
-}
-
-
-// ==============================
-// RESOLVE APPLICATION DOC
-// ==============================
-private async resolveApplicationScopedOrNull(
-  applicationId: string,
-  documentId: string,
-): Promise<ResolvedApplicationDocument | null> {
-
-  const document = await this.db.applicationDocuments.findOne({
-    where: {
-      id: documentId,
-      applicationId,
-      overallStatus: Not(ApplicationDocumentStatus.Verified),
-    },
-  });
-
-  if (!document?.currentVersionId) {
-    return null;
-  }
-
-  const version = await this.db.applicationDocumentVersions.findOne({
-    where: {
-      id: document.currentVersionId,
-      applicationDocumentId: document.id,
-      uploadStatus: UploadStatus.UPLOADED,
-    },
-  });
-
-  if (!version) {
-    return null;
-  }
-
-  return { document, version };
-}
 
   async generateDownloadUrlForAuthorizedApplication(
     application: Applications,

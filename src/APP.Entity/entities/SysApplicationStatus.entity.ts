@@ -56,7 +56,4 @@ export class SysApplicationStatus extends BaseEntity {
     (row) => row.SysApplicationStatus,
   )
   ApplicationStageToStatuses!: SysApplicationStage2Status[];
-
-  @OneToMany(() => ApplicationActivities, (a) => a.SysApplicationStatus)
-  ApplicationActivities!: ApplicationActivities[];
 }
