@@ -320,7 +320,11 @@ export class ApplicationDocumentService {
       applicationId,
     );
 
-    return this.deleteDocumentForAuthorizedApplication(application, documentId);
+    return this.deleteDocumentForAuthorizedApplication(
+      application,
+      documentId,
+      currentUserId,
+    );
   }
 
   // ==============================
@@ -329,27 +333,38 @@ export class ApplicationDocumentService {
   async deleteDocumentForAuthorizedApplication(
     application: Applications,
     documentId: string,
+    actedByUserId?: string,
   ): Promise<{ success: true }> {
-    // 1. APPLICATION scoped delete first
     const applicationResolved = await this.resolveApplicationScopedOrNull(
       application.id,
       documentId,
     );
 
     if (applicationResolved) {
-      // 3. Delete version first
-      await this.db.applicationDocumentVersions.delete(
-        applicationResolved.version.id,
-      );
+      await this.db.transaction(async (manager) => {
+        await this.activity.logDocumentDeleted(manager, {
+          applicationId: application.id,
+          actedByUserId,
+          documentRequirementId:
+            applicationResolved.document.applicationRequirementId,
+          documentId: applicationResolved.document.id,
+          documentVersionId: applicationResolved.version.id,
+          documentScope: 'APPLICATION',
+          fileName: applicationResolved.version.originalFileName,
+        });
 
-      // 4. Delete document
-      await this.db.applicationDocuments.delete(
-        applicationResolved.document.id,
-      );
+        await manager.getRepository(ApplicationDocumentVersions).delete({
+          applicationDocumentId: applicationResolved.document.id,
+        });
+
+        await manager
+          .getRepository(ApplicationDocuments)
+          .delete(applicationResolved.document.id);
+      });
+
       return { success: true };
     }
 
-    // 2. LEAD scoped delete
     if (!application.leadId) {
       throw new NotFoundException('Document cannot be deleted');
     }
@@ -361,11 +376,25 @@ export class ApplicationDocumentService {
     );
 
     if (leadResolved) {
-      // 3. Delete version first
-      await this.db.leadDocumentVersions.delete(leadResolved.version.id);
+      await this.db.transaction(async (manager) => {
+        await this.activity.logDocumentDeleted(manager, {
+          applicationId: application.id,
+          actedByUserId,
+          documentId: leadResolved.document.id,
+          documentVersionId: leadResolved.version.id,
+          documentScope: 'LEAD',
+          fileName: leadResolved.version.originalFileName,
+        });
 
-      // 4. Delete document
-      await this.db.leadDocuments.delete(leadResolved.document.id);
+        await manager.getRepository(LeadDocumentVersions).delete({
+          leadDocumentId: leadResolved.document.id,
+        });
+
+        await manager
+          .getRepository(LeadDocuments)
+          .delete(leadResolved.document.id);
+      });
+
       return { success: true };
     }
 

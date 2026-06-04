@@ -42,6 +42,17 @@ export interface LogDocumentUploadedInput {
   remarks?: string;
 }
 
+export interface LogDocumentDeletedInput {
+  applicationId: string;
+  actedByUserId?: string;
+  documentRequirementId?: string;
+  documentId: string;
+  documentVersionId: string;
+  documentScope: 'APPLICATION' | 'LEAD';
+  fileName?: string | null;
+  remarks?: string;
+}
+
 export interface LogDocumentStatusChangedInput {
   applicationId: string;
   actedByUserId?: string;
@@ -149,6 +160,33 @@ export class ApplicationActivityService {
           : undefined,
       fromValue: UploadStatus.PENDING,
       toValue: UploadStatus.UPLOADED,
+      remarks: input.remarks,
+      metaData: {
+        documentScope: input.documentScope,
+        documentId: input.documentId,
+        documentVersionId: input.documentVersionId,
+        fileName: input.fileName ?? null,
+      },
+    });
+  }
+
+  async logDocumentDeleted(
+    manager: EntityManager,
+    input: LogDocumentDeletedInput,
+  ): Promise<ApplicationActivities> {
+    return this.log(manager, {
+      applicationId: input.applicationId,
+      activityType: ApplicationActivityType.DocDeleted,
+      entityType: ApplicationActivityEntityType.ApplicationDocumentVersion,
+      entityId: input.documentVersionId,
+      actedByUserId: input.actedByUserId,
+      documentRequirementId: input.documentRequirementId,
+      applicationDocumentId:
+        input.documentScope === 'APPLICATION' ? input.documentId : undefined,
+      documentVersionId:
+        input.documentScope === 'APPLICATION'
+          ? input.documentVersionId
+          : undefined,
       remarks: input.remarks,
       metaData: {
         documentScope: input.documentScope,
