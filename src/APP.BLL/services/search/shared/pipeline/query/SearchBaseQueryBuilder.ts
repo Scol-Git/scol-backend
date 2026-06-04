@@ -184,12 +184,25 @@ export class SearchBaseQueryBuilder {
     qb: SelectQueryBuilder<UniCourseIntakes>,
     params: PipelineParams,
   ): SelectQueryBuilder<UniCourseIntakes> {
-    if (params.flags?.hasScholarship !== true) return qb;
+    const hasScholarship = params.flags?.hasScholarship;
+    if (hasScholarship == null) return qb;
 
-    qb.andWhere(`
-      jsonb_typeof(ci."scholarshipMetaData") = 'array'
-      AND jsonb_array_length(ci."scholarshipMetaData") > 0
-    `);
+    if (hasScholarship === true) {
+      qb.andWhere(`
+        jsonb_typeof(ci."scholarshipMetaData") = 'array'
+        AND jsonb_array_length(ci."scholarshipMetaData") > 0
+      `);
+      return qb;
+    }
+
+    qb.andWhere(
+      new Brackets((sub) => {
+        sub
+          .where('ci."scholarshipMetaData" IS NULL')
+          .orWhere(`ci."scholarshipMetaData" = '[]'::jsonb`)
+          .orWhere(`ci."scholarshipMetaData" = '{}'::jsonb`);
+      }),
+    );
 
     return qb;
   }
