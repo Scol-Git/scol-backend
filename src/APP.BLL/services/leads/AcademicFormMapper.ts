@@ -12,7 +12,6 @@ import { EnglishTestSectionItemDto } from '@shared/dtos/leads/EnglishTestSection
 import { PreferredCountryItemDto } from '@shared/dtos/leads/PreferredCountryItemDto';
 import { PreferredProgrammeItemDto } from '@shared/dtos/leads/PreferredProgrammeItemDto';
 import { LeadProfileService } from './LeadProfileService';
-import { LeadAcademicResults } from '@entity/entities/LeadAcademicResults.entity';
 
 // ---------------------------------------------------------------------------
 // Extended entity types (sections are loaded at runtime via relations)
@@ -77,10 +76,10 @@ export class AcademicFormMapper {
     return {
       academicFormStatus,
       academicResults,
+      lastAcademicInstitute,
       englishTestResults,
       preferredCountries,
       preferredProgrammes,
-      lastAcademicInstitute,
     };
   }
 
@@ -109,10 +108,7 @@ export class AcademicFormMapper {
 
       const gpa = this.parseNullableDecimal(r.gpa);
       const institute = this.parseNullableString(r.institute);
-      const passingDate = r.passingDate
-        ? this.formatDate(r.passingDate)
-        : null;
-    
+      const passingDate = r.passingDate ? this.formatDate(r.passingDate) : null;
 
       return {
         degreeId: r.degreeId,
@@ -121,24 +117,26 @@ export class AcademicFormMapper {
         institute,
         passingDate,
         isEditable: LeadProfileService.isAcademicEditable(gpa, gpaScale),
-        validation: { gpaScale }, 
+        validation: { gpaScale },
       };
     });
   }
 
-   // English test results
+  // English test results
 
   private mapEnglishTestResults(
     leadProfile: SysLeadProfiles | null,
     systemEnglishTests: SysEnglishTests[],
   ): EnglishTestResultItemDto[] {
-
     //const results = leadProfile?.LeadEnglishTestResult ?? [];
     //const byTestId = new Map(results.map((r) => [r.sysEngTestId, r] as const));
 
-    const byTestId = new Map(( (leadProfile?.LeadEnglishTestResult ??[]) as EnglishTestResultWithSections[]).map((r) => [r.sysEngTestId, r]),);
-
-
+    const byTestId = new Map(
+      (
+        (leadProfile?.LeadEnglishTestResult ??
+          []) as EnglishTestResultWithSections[]
+      ).map((r) => [r.sysEngTestId, r]),
+    );
 
     // return systemEnglishTests.map((test) => {
     //   const r = byTestId.get(test.id);
@@ -156,8 +154,7 @@ export class AcademicFormMapper {
         })),
       };
 
-    const record = byTestId.get(test.id);
-
+      const record = byTestId.get(test.id);
 
       if (!record) {
         return {
@@ -185,7 +182,6 @@ export class AcademicFormMapper {
           const sectionResult = (
             record.LeadEnglishTestSectionResult ?? []
           ).find((sr) => sr.sysEngTestSectionId === section.id);
-
 
           return {
             id: section.id,
@@ -217,7 +213,6 @@ export class AcademicFormMapper {
     });
   }
 
-  
   // -------------------------------------------------------------------------
   // Preferred countries / programmes
   // -------------------------------------------------------------------------
@@ -257,11 +252,10 @@ export class AcademicFormMapper {
     leadProfile: SysLeadProfiles | null,
   ): string | null {
     const highest = LeadProfileService.findHighestLevelAcademicResult(
-      (leadProfile?.LeadAcademicResult ?? []) as LeadAcademicResults[],
+      leadProfile?.LeadAcademicResult ?? [],
     );
     return this.parseNullableString(highest?.institute);
   }
-
 
   // -------------------------------------------------------------------------
   // Helpers
@@ -274,9 +268,7 @@ export class AcademicFormMapper {
     return parseFloat(value);
   }
 
-  private parseNullableString(
-    value: string | null | undefined,
-  ): string | null {
+  private parseNullableString(value: string | null | undefined): string | null {
     if (value == null || String(value).trim() === '') return null;
     return value;
   }
