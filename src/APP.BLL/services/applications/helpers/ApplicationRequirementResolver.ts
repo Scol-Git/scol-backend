@@ -5,11 +5,17 @@ import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocu
 import { SysDocumentTypes } from '@entity/entities/SysDocumentTypes.entity';
 import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocumentSourceType.enum';
 import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
+import { ApplicationStage } from '@shared/enums/ApplicationStage.enum';
 import { DocumentScope } from '@shared/enums/DocumentScope.enum';
 
 type SysStageRequiredDocumentWithType = SysStageRequiredDocuments & {
   SysDocumentType: SysDocumentTypes;
 };
+
+const CRM_ONLY_APPLICATION_STAGES = new Set<string>([
+  ApplicationStage.CollectCommission,
+  ApplicationStage.Completed,
+]);
 
 @Injectable()
 export class ApplicationRequirementResolver {
@@ -56,19 +62,26 @@ export class ApplicationRequirementResolver {
       SysStageRequiredDocuments,
     );
 
-    return (await sysStageRequiredDocumentsRepository.find({
-      where: {
-        sysCountryId,
-        isActive: true,
-      },
-      relations: {
-        SysDocumentType: true,
-      },
-      order: {
-        displayOrder: 'ASC',
-        sysApplicationStageId: 'ASC',
-      },
-    })) as SysStageRequiredDocumentWithType[];
+    const stageRequiredDocuments =
+      (await sysStageRequiredDocumentsRepository.find({
+        where: {
+          sysCountryId,
+          isActive: true,
+        },
+        relations: {
+          SysDocumentType: true,
+          SysApplicationStage: true,
+        },
+        order: {
+          displayOrder: 'ASC',
+          sysApplicationStageId: 'ASC',
+        },
+      })) as SysStageRequiredDocumentWithType[];
+
+    return stageRequiredDocuments.filter(
+      (row) =>
+        !CRM_ONLY_APPLICATION_STAGES.has(row.SysApplicationStage.stageCode),
+    );
   }
 
   private buildApplicationRequiredDocumentRow(

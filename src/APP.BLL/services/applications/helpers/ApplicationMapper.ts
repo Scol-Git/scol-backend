@@ -101,11 +101,14 @@ export class ApplicationMapper {
     };
   }
 
-  toApplicationListItem(application: Applications): ApplicationListItemDto {
+  toApplicationListItem(
+    application: Applications,
+    displayStage?: SysApplicationStage,
+  ): ApplicationListItemDto {
     const intake = application.UniCourseIntake;
     const course = intake?.UniCourse;
     const university = course?.SysUniversity;
-    const stage = application.CurrentSysApplicationStage;
+    const stage = displayStage ?? application.CurrentSysApplicationStage;
     const status = application.CurrentSysApplicationStatus;
 
     if (!intake || !course || !university || !stage || !status) {
@@ -180,8 +183,9 @@ export class ApplicationMapper {
   toGetApplicationDetailsResponse(
     application: Applications,
     requirementsWithDocuments: ApplicationRequirementWithDocuments[],
+    displayStage?: SysApplicationStage,
   ): GetApplicationDetailsResponseDto {
-    const overview = this.toApplicationOverviewDto(application);
+    const overview = this.toApplicationOverviewDto(application, displayStage);
 
     const documentCheckLists: ApplicationDocumentChecklistItemDto[] =
       requirementsWithDocuments.map((row) =>
@@ -201,11 +205,12 @@ export class ApplicationMapper {
 
   private toApplicationOverviewDto(
     application: Applications,
+    displayStage?: SysApplicationStage,
   ): ApplicationOverviewDto {
     const intake = application.UniCourseIntake;
     const course = intake?.UniCourse;
     const university = course?.SysUniversity;
-    const stage = application.CurrentSysApplicationStage;
+    const stage = displayStage ?? application.CurrentSysApplicationStage;
     const status = application.CurrentSysApplicationStatus;
 
     if (!intake || !course || !university || !stage || !status) {
