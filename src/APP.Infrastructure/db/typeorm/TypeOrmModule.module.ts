@@ -53,6 +53,7 @@ import { ApplicationActivities } from '@entity/entities/ApplicationActivities.en
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
+import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -113,6 +114,7 @@ import { AppDbContext } from './AppDbContext';
             LeadDocuments,
             LeadDocumentVersions,
             LeadFavouriteCourses,
+            LeadCrmInfos,
           ],
           synchronize: false,
           logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
@@ -171,6 +173,7 @@ import { AppDbContext } from './AppDbContext';
       LeadDocuments,
       LeadDocumentVersions,
       LeadFavouriteCourses,
+      LeadCrmInfos,
     ]),
   ],
   providers: [AppDbContext],

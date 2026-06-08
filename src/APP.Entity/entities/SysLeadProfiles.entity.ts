@@ -18,6 +18,7 @@ import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
 import { Applications } from './Applications.entity';
 import { LeadDocuments } from './LeadDocuments.entity';
 import { LeadFavouriteCourses } from './LeadFavouriteCourses.entity';
+import { LeadCrmInfos } from './LeadCrmInfos.entity';
 
 /**
  * @class SysLeadProfiles
@@ -185,4 +186,10 @@ export class SysLeadProfiles extends BaseEntity {
   })
   @JoinColumn({ name: 'assignedToUserId' })
   AssignedToUser?: SysUsers | null;
+
+  /**
+   * One-to-One: CRM info for this lead profile
+   */
+  @OneToOne(() => LeadCrmInfos, (crm) => crm.SysLeadProfile)
+  LeadCrmInfo?: LeadCrmInfos;
 }

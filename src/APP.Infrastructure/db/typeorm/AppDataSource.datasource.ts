@@ -96,6 +96,7 @@ import { ApplicationActivities } from '@entity/entities/ApplicationActivities.en
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
+import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 
 /**
  * AppDataSource - TypeORM DataSource for migrations and CLI operations
@@ -156,6 +157,7 @@ const AppDataSource = new DataSource({
     LeadDocuments,
     LeadDocumentVersions,
     LeadFavouriteCourses,
+    LeadCrmInfos,
   ],
 
   migrations: [migrationPath],
