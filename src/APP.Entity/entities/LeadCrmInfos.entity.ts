@@ -9,7 +9,7 @@ import {
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysLeadProfiles } from './SysLeadProfiles.entity';
-import { SysUsers } from './SysUsers.entity';
+import { SysConsultantProfiles } from './SysConsultantProfiles.entity';
 import { SysCountries } from './SysCountries.entity';
 import { RegisterSource } from '@shared/enums/crm/RegisterSource.enum';
 import { LeadStatus } from '@shared/enums/crm/LeadStatus.enum';
@@ -30,12 +30,12 @@ export class LeadCrmInfos extends BaseEntity {
   leadId!: string;
 
   @Column({
-    name: 'consultantUserId',
+    name: 'consultantId',
     type: 'uuid',
     nullable: true,
   })
   @AutoMap()
-  consultantUserId?: string | null;
+  consultantId?: string | null;
 
   @Column({
     name: 'registerSource',
@@ -120,11 +120,15 @@ export class LeadCrmInfos extends BaseEntity {
   @JoinColumn({ name: 'leadId' })
   SysLeadProfile!: SysLeadProfiles;
 
-  @ManyToOne(() => SysUsers, (user) => user.ConsultantLeadCrmInfos, {
-    nullable: true,
-  })
-  @JoinColumn({ name: 'consultantUserId' })
-  ConsultantUser?: SysUsers | null;
+  @ManyToOne(
+    () => SysConsultantProfiles,
+    (profile) => profile.ConsultantLeadCrmInfos,
+    {
+      nullable: true,
+    },
+  )
+  @JoinColumn({ name: 'consultantId', referencedColumnName: 'id' })
+  ConsultantProfile?: SysConsultantProfiles | null;
 
   @ManyToOne(() => SysCountries, (country) => country.TargetLeadCrmInfos, {
     nullable: true,

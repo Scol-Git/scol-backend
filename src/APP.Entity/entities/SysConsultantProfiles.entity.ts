@@ -10,6 +10,9 @@ import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysUsers } from './SysUsers.entity';
 import { ConsultantCertifications } from './ConsultantCertifications.entity';
+import { LeadCrmInfos } from './LeadCrmInfos.entity';
+import { Applications } from './Applications.entity';
+import { SysLeadProfiles } from './SysLeadProfiles.entity';
 
 /**
  * Public-facing profile for CRM staff (counselor / admin / agent).
@@ -148,4 +151,22 @@ export class SysConsultantProfiles extends BaseEntity {
     { cascade: true },
   )
   ConsultantCertification!: ConsultantCertifications[];
+
+  /**
+   * One-to-Many: Lead CRM info rows assigned to this consultant profile
+   */
+  @OneToMany(() => LeadCrmInfos, 'ConsultantProfile')
+  ConsultantLeadCrmInfos!: LeadCrmInfos[];
+
+  /**
+   * One-to-Many: Applications assigned to this consultant profile
+   */
+  @OneToMany(() => Applications, 'AssignedToConsultant')
+  AssignedApplications!: Applications[];
+
+  /**
+   * One-to-Many: Lead profiles assigned to this consultant profile
+   */
+  @OneToMany(() => SysLeadProfiles, 'AssignedToUser')
+  AssignedLeadProfiles!: SysLeadProfiles[];
 }

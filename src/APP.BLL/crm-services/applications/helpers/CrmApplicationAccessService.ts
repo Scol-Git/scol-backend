@@ -26,7 +26,7 @@ export class CrmApplicationAccessService {
     }
 
     if (this.hasAnyRole(crmUser, [Role.COUNSELLOR])) {
-      if (leadProfile.assignedToUserId === crmUser.id) {
+      if (leadProfile.assignedConsultantId === crmUser.id) {
         return leadProfile;
       }
     }

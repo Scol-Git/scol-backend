@@ -30,10 +30,10 @@ export class CrmLeadService {
       dto.targetCountryId,
     );
 
-    const consultantUserId =
+    const consultantId =
       await this.accessService.ensureCrmCanAssignConsultantOrThrow(
         currentUserId,
-        dto.consultantUserId,
+        dto.consultantId,
       );
 
     const plainPassword = generateTemporaryPassword();
@@ -53,7 +53,7 @@ export class CrmLeadService {
         registerDate: new Date(),
         leadStatus: dto.leadStatus ?? LeadStatus.NewLead,
         targetSysCountryId: dto.targetCountryId ?? null,
-        consultantUserId,
+        consultantId,
         hasPassedEnglishTest: dto.hasPassedEnglishTest ?? null,
       },
     });
@@ -80,32 +80,30 @@ export class CrmLeadService {
 
     await this.validationService.ensureLeadExistsOrThrow(leadId);
 
-    if (dto.phone) {
+    if (dto.phone != null) {
       this.validationService.validatePhone(dto.phone ?? '');
     }
     await this.validationService.ensureTargetCountryExistsOrThrow(
       dto.targetCountryId,
     );
 
-    let consultantUserId: string | null | undefined;
+    let consultantId: string | null | undefined;
 
-    if (dto.consultantUserId !== undefined) {
-      consultantUserId =
+    if (dto.consultantId != null) {
+      consultantId =
         await this.accessService.ensureCrmCanAssignConsultantOrThrow(
           currentUserId,
-          dto.consultantUserId,
+          dto.consultantId,
         );
     }
 
     await this.leadCreationService.updateLeadAccount(leadId, {
+      phone: dto.phone,
       fullName: dto.name,
       email: dto.email,
       address: dto.address,
       city: dto.city,
       gender: dto.gender,
-      ...(consultantUserId !== undefined
-        ? { assignedToUserId: consultantUserId }
-        : {}),
       crmInfo: {
         ...(dto.registerSource !== undefined
           ? { registerSource: dto.registerSource }
@@ -114,7 +112,7 @@ export class CrmLeadService {
         ...(dto.targetCountryId !== undefined
           ? { targetSysCountryId: dto.targetCountryId }
           : {}),
-        ...(consultantUserId !== undefined ? { consultantUserId } : {}),
+        ...(consultantId !== undefined ? { consultantId: consultantId } : {}),
         ...(dto.hasPassedEnglishTest !== undefined
           ? { hasPassedEnglishTest: dto.hasPassedEnglishTest }
           : {}),

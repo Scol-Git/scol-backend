@@ -466,7 +466,7 @@ export class ApplicationQueryService {
         'UniCourseIntake.UniCourse.SysUniversity',
         'CurrentSysApplicationStage',
         'CurrentSysApplicationStatus',
-        'AssignedToUser',
+        'AssignedToConsultant',
       ],
     });
 

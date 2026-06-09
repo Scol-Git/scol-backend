@@ -73,29 +73,66 @@ export class LeadCreationService {
         throw new NotFoundException('Lead CRM info not found');
       }
 
-      if (input.email && input.email !== user.email) {
+      const phone = input.phone;
+
+      if (phone != null && phone !== user.phone) {
+        await this.ensurePhoneAvailable(phone);
+      }
+
+      if (input.email != null && input.email !== user.email) {
         await this.ensureEmailAvailable(input.email);
       }
 
-      profile.fullName = input.fullName ?? '';
+      if (phone != null) {
+        user.phone = phone;
+      }
 
-      profile.address = input.address ?? '';
-      profile.city = input.city ?? '';
-      profile.gender = input.gender ?? '';
+      if (input.fullName != null) {
+        profile.fullName = input.fullName;
+      }
 
-      user.email = input.email ?? '';
+      if (input.email != null) {
+        user.email = input.email;
+      }
 
-      crmInfo.registerSource = input.crmInfo.registerSource ?? undefined;
-      crmInfo.leadStatus = input.crmInfo.leadStatus ?? undefined;
-      crmInfo.targetSysCountryId = input.crmInfo.targetSysCountryId ?? null;
-      crmInfo.consultantUserId = input.crmInfo.consultantUserId ?? undefined;
-      crmInfo.hasPassedEnglishTest =
-        input.crmInfo.hasPassedEnglishTest ?? undefined;
-      if (input.crmInfo.enrollmentStatus !== undefined) {
-        crmInfo.enrollmentStatus = input.crmInfo.enrollmentStatus ?? undefined;
-        if (input.crmInfo.enrollmentDate !== undefined) {
-          crmInfo.enrollmentDate = input.crmInfo.enrollmentDate ?? undefined;
-        } else if (input.crmInfo.enrollmentStatus) {
+      if (input.address != null) {
+        profile.address = input.address;
+      }
+
+      if (input.city != null) {
+        profile.city = input.city;
+      }
+
+      if (input.gender != null) {
+        profile.gender = input.gender;
+      }
+
+      if (input.crmInfo.registerSource != null) {
+        crmInfo.registerSource = input.crmInfo.registerSource;
+      }
+
+      if (input.crmInfo.leadStatus != null) {
+        crmInfo.leadStatus = input.crmInfo.leadStatus;
+      }
+
+      if (input.crmInfo.targetSysCountryId != null) {
+        crmInfo.targetSysCountryId = input.crmInfo.targetSysCountryId;
+      }
+
+      if (input.crmInfo.consultantId != null) {
+        profile.assignedConsultantId = input.crmInfo.consultantId;
+        crmInfo.consultantId = input.crmInfo.consultantId;
+      }
+
+      if (input.crmInfo.hasPassedEnglishTest != null) {
+        crmInfo.hasPassedEnglishTest = input.crmInfo.hasPassedEnglishTest;
+      }
+
+      if (input.crmInfo.enrollmentStatus != null) {
+        crmInfo.enrollmentStatus = input.crmInfo.enrollmentStatus;
+        if (input.crmInfo.enrollmentDate != null) {
+          crmInfo.enrollmentDate = input.crmInfo.enrollmentDate;
+        } else {
           crmInfo.enrollmentDate = new Date();
         }
       }
@@ -148,7 +185,7 @@ export class LeadCreationService {
       address: input.address ?? undefined,
       city: input.city ?? undefined,
       gender: input.gender ?? undefined,
-      assignedToUserId: input.crmInfo.consultantUserId ?? null,
+      assignedConsultantId: input.crmInfo.consultantId ?? null,
     });
 
     const savedProfile = await profileRepo.save(profile);
@@ -159,7 +196,7 @@ export class LeadCreationService {
       registerDate: input.crmInfo.registerDate,
       leadStatus: input.crmInfo.leadStatus ?? LeadStatus.NewLead,
       targetSysCountryId: input.crmInfo.targetSysCountryId ?? null,
-      consultantUserId: input.crmInfo.consultantUserId ?? null,
+      consultantId: input.crmInfo.consultantId ?? null,
       hasPassedEnglishTest: input.crmInfo.hasPassedEnglishTest ?? undefined,
       hasAnyApplication: false,
       hasSuccessfulVisa: false,

@@ -25,7 +25,7 @@ export class CrmLeadAccessService {
 
     if (
       this.hasAnyRole(crmUser, [Role.COUNSELLOR]) &&
-      leadProfile.assignedToUserId === crmUser.id
+      leadProfile.assignedConsultantId === crmUser.id
     ) {
       return leadProfile;
     }
@@ -35,18 +35,20 @@ export class CrmLeadAccessService {
 
   async ensureCrmCanAssignConsultantOrThrow(
     currentUserId: string,
-    consultantUserId?: string | null,
+    consultantId?: string | null,
   ): Promise<string | null> {
     const crmUser = await this.loadCrmUserWithRolesOrThrow(currentUserId);
 
-    if (this.hasAnyRole(crmUser, [Role.SUPER_ADMIN, Role.ADMIN])) {
-      if (!consultantUserId) {
-        return null;
-      }
-
-      await this.ensureConsultantExistsOrThrow(consultantUserId);
-      return consultantUserId;
+    if (!this.hasAnyRole(crmUser, [Role.SUPER_ADMIN, Role.ADMIN])) {
+      throw new ForbiddenException('You are not authorized to manage leads');
     }
+
+    if (!consultantId) {
+      return null;
+    }
+
+    await this.ensureConsultantExistsOrThrow(consultantId);
+    return consultantId;
 
     // if (this.hasAnyRole(crmUser, [Role.COUNSELLOR])) {
     //   if (consultantUserId && consultantUserId !== crmUser.id) {
@@ -57,29 +59,24 @@ export class CrmLeadAccessService {
 
     //   return crmUser.id;
     // }
-
-    throw new ForbiddenException('You are not authorized to manage leads');
   }
 
   private async ensureConsultantExistsOrThrow(
-    consultantUserId: string,
+    consultantId: string,
   ): Promise<void> {
-    const consultant = await this.db.users.findOne({
-      where: { id: consultantUserId },
-      relations: { roles: true },
+    const consultant = await this.db.consultantProfiles.findOne({
+      where: {
+        id: consultantId,
+        isPublished: true,
+      },
+      relations: { SysUser: { roles: true } },
     });
 
     if (!consultant) {
       throw new NotFoundException('Consultant user not found');
     }
 
-    if (
-      !this.hasAnyRole(consultant, [
-        Role.SUPER_ADMIN,
-        Role.ADMIN,
-        Role.COUNSELLOR,
-      ])
-    ) {
+    if (!this.hasAnyRole(consultant.SysUser, [Role.ADMIN, Role.COUNSELLOR])) {
       throw new ForbiddenException('Consultant user is not authorized');
     }
   }

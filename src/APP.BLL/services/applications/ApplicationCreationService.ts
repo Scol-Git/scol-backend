@@ -76,6 +76,7 @@ export class ApplicationCreationService {
         initialStage.id,
         initialStatus.id,
         serialNumber,
+        context.assignedToConsultantId,
         actedByUserId,
       ),
     );
@@ -126,6 +127,7 @@ export class ApplicationCreationService {
     stageId: string,
     statusId: string,
     serialNumber: string,
+    assignedToConsultantId: string | null,
     actedByUserId: string,
   ): Promise<Applications> {
     const applicationsRepository = manager.getRepository(Applications);
@@ -138,6 +140,7 @@ export class ApplicationCreationService {
         currentSysApplicationStageId: stageId,
         currentSysApplicationStatusId: statusId,
         serialNumber,
+        assignedToConsultantId,
       }),
     );
 

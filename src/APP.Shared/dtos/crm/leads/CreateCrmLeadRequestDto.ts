@@ -62,7 +62,7 @@ export class CreateCrmLeadRequestDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID('4')
-  consultantUserId?: string;
+  consultantId?: string;
 
   @ApiPropertyOptional({
     enum: RegisterSource,
