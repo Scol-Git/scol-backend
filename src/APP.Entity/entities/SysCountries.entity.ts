@@ -2,6 +2,7 @@ import { Entity, Column, OneToMany, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { LeadPreferredCountries } from './LeadPreferredCountries.entity';
+import { LeadCrmInfos } from './LeadCrmInfos.entity';
 import { SysStates } from './SysStates.entity';
 import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
 
@@ -53,4 +54,10 @@ export class SysCountries extends BaseEntity {
 
   @OneToMany(() => SysStageRequiredDocuments, (row) => row.SysCountry)
   SysStageRequiredDocuments!: SysStageRequiredDocuments[];
+
+  /**
+   * One-to-Many: CRM leads targeting this country
+   */
+  @OneToMany(() => LeadCrmInfos, (crm) => crm.TargetSysCountry)
+  TargetLeadCrmInfos!: LeadCrmInfos[];
 }

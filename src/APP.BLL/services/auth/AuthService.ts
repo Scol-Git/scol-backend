@@ -19,6 +19,9 @@ import { OtpService } from './OtpService';
 import { TokenService } from './TokenService';
 import { AuthValidationService } from './AuthValidationService';
 import { LeadProfileService } from '@bll/services/leads/LeadProfileService';
+import { LeadCreationService } from '@bll/services/leads/LeadCreationService';
+import { RegisterSource } from '@shared/enums/crm/RegisterSource.enum';
+import { LeadStatus } from '@shared/enums/crm/LeadStatus.enum';
 import { OtpPurpose } from '@entity/entities/OtpSession.entity';
 import { AuthResponseMapper } from '@bll/mappings/auth/AuthResponseMapper';
 import { UserResponseMapper } from '@bll/mappings/auth/UserResponseMapper';
@@ -44,12 +47,9 @@ import { InvalidTokenException } from '@shared/exceptions/auth/InvalidTokenExcep
 import { BusinessException } from '@shared/exceptions/BusinessException';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { PhoneNumberUtil } from '@shared/utils/PhoneNumberUtil';
-import { EntityManager } from 'typeorm';
 import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
 import { UserContextAccessor } from '@shared/context/UserContextAccessor';
 import { randomUUID } from 'crypto';
-import { SysRoles } from '@entity/entities/SysRoles.entity';
-import { Role } from '@shared/enums/Role.enum';
 
 /**
  * Auth Service
@@ -72,6 +72,7 @@ export class AuthService {
     private readonly authResponseMapper: AuthResponseMapper,
     private readonly userMapper: UserResponseMapper,
     private readonly leadProfileService: LeadProfileService,
+    private readonly leadCreationService: LeadCreationService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
     @Inject(IApplicationConfigToken)
     private readonly appConfig: IApplicationConfig,
@@ -376,67 +377,26 @@ export class AuthService {
         );
       }
 
-      // Create user and profile in a transaction
-      const result = await this.db.transaction(
-        async (manager: EntityManager) => {
-          const userRepo = manager.getRepository(SysUsers);
-          const profileRepo = manager.getRepository(SysLeadProfiles);
-          const roleRepo = manager.getRepository(SysRoles);
-          //session?id
-          // Race condition guard: Re-check phone uniqueness
-          const existingUser = await userRepo.findOne({
-            where: { phone: otpUserPayload.phone },
-          });
-
-          if (existingUser) {
-            throw new PhoneAlreadyExistsException(otpUserPayload.phone);
-          }
-
-          //fetch Lead role
-          const leadRole = await roleRepo.findOne({
-            where: { name: Role.LEAD },
-          });
-
-          if (!leadRole) {
-            throw new BusinessException(
-              'Lead role not found',
-              'LEAD_ROLE_NOT_FOUND',
-            );
-          }
-
-          // Create new user
-          const newUser = userRepo.create({
-            phone: otpUserPayload.phone,
-            passwordHash: pendingData.passwordHash,
-            accountStatus: AccountStatus.Active,
-            userType: UserType.Lead,
-            isPhoneVerified: true,
-            failedLoginAttempts: 0,
-            roles: [leadRole],
-          });
-
-          const savedUser = await userRepo.save(newUser);
-
-          // Create lead profile
-          const profile = profileRepo.create({
-            userId: savedUser.id,
-            fullName: pendingData.fullName,
-          });
-
-          await profileRepo.save(profile);
-
-          // Delete OTP session from Redis and DB
-          if (otpUserPayload.pendingId) {
-            await this.otp.deleteOtpSession(
-              otpUserPayload.phone,
-              OtpPurpose.Registration,
-              otpUserPayload.pendingId,
-            );
-          }
-
-          return { user: savedUser, profile };
+      const result = await this.leadCreationService.createLeadAccount({
+        phone: otpUserPayload.phone,
+        passwordHash: pendingData.passwordHash,
+        fullName: pendingData.fullName,
+        isPhoneVerified: true,
+        crmInfo: {
+          registerSource: RegisterSource.LoggedIn,
+          registerDate: new Date(),
+          leadStatus: LeadStatus.NewLead,
         },
-      );
+      });
+
+      // Delete OTP session from Redis and DB
+      if (otpUserPayload.pendingId) {
+        await this.otp.deleteOtpSession(
+          otpUserPayload.phone,
+          OtpPurpose.Registration,
+          otpUserPayload.pendingId,
+        );
+      }
 
       // Load user with relations for token generation
       const user = await this.db.users.findOne({

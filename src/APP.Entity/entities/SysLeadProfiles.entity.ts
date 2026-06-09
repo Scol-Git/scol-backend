@@ -10,6 +10,7 @@ import {
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysUsers } from './SysUsers.entity';
+import { SysConsultantProfiles } from './SysConsultantProfiles.entity';
 import { LeadAcademicResults } from './LeadAcademicResults.entity';
 import { LeadTestResults } from './LeadTestResults.entity';
 import { LeadEnglishTestResults } from './LeadEnglishTestResults.entity';
@@ -18,13 +19,14 @@ import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
 import { Applications } from './Applications.entity';
 import { LeadDocuments } from './LeadDocuments.entity';
 import { LeadFavouriteCourses } from './LeadFavouriteCourses.entity';
+import { LeadCrmInfos } from './LeadCrmInfos.entity';
 
 /**
  * @class SysLeadProfiles
  * @extends {BaseEntity}
  */
 @Index('IX_SysLeadProfiles_user', ['userId'], { unique: true })
-@Index('IX_SysLeadProfiles_assignedToUserId', ['assignedToUserId'])
+@Index('IX_SysLeadProfiles_assignedCounsultantId', ['assignedConsultantId'])
 @Entity('sys_LeadProfiles')
 export class SysLeadProfiles extends BaseEntity {
   @Column({
@@ -94,12 +96,12 @@ export class SysLeadProfiles extends BaseEntity {
    * Usually ADMIN / COUNSELLOR.
    */
   @Column({
-    name: 'assignedToUserId',
+    name: 'assignedCounsultantId',
     type: 'uuid',
     nullable: true,
   })
   @AutoMap()
-  assignedToUserId?: string | null;
+  assignedConsultantId?: string | null;
 
   // ========================================
   // Navigation Properties (EF Core style)
@@ -180,9 +182,15 @@ export class SysLeadProfiles extends BaseEntity {
    * Many-to-One: Assigned CRM user
    * One CRM user can be assigned to many lead profiles.
    */
-  @ManyToOne(() => SysUsers, (user) => user.AssignedLeadProfiles, {
+  @ManyToOne(() => SysConsultantProfiles, 'AssignedLeadProfiles', {
     nullable: true,
   })
-  @JoinColumn({ name: 'assignedToUserId' })
-  AssignedToUser?: SysUsers | null;
+  @JoinColumn({ name: 'assignedCounsultantId', referencedColumnName: 'id' })
+  AssignedConsultant?: SysConsultantProfiles | null;
+
+  /**
+   * One-to-One: CRM info for this lead profile
+   */
+  @OneToOne(() => LeadCrmInfos, (crm) => crm.SysLeadProfile)
+  LeadCrmInfo?: LeadCrmInfos;
 }

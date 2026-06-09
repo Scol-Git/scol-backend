@@ -14,6 +14,7 @@ export interface CreateApplicationContext {
   leadId: string;
   courseIntake: UniCourseIntakes;
   countryId: string;
+  assignedToConsultantId: string | null;
 }
 
 @Injectable()
@@ -65,6 +66,7 @@ export class ApplicationCreationContextService {
       leadId: lead.id,
       courseIntake,
       countryId,
+      assignedToConsultantId: lead.AssignedConsultant?.id ?? null,
     };
   }
 

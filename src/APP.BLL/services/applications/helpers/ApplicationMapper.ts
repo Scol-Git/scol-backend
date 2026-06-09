@@ -35,6 +35,7 @@ import {
   StageProgressViewModel,
   UploadedDocumentView,
 } from './application-read-model.types';
+import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
 
 const MONTH_NAMES_EN = [
   'January',
@@ -232,7 +233,9 @@ export class ApplicationMapper {
         ? application.submittedAt.toISOString()
         : null,
       lastUpdatedAt: application.updatedAt.toISOString(),
-      assignedTo: this.mapAssignedCounsellor(application.AssignedToUser),
+      assignedTo: this.mapAssignedCounsellor(
+        application.AssignedToConsultant ?? null,
+      ),
     };
   }
 
@@ -274,14 +277,14 @@ export class ApplicationMapper {
   }
 
   private mapAssignedCounsellor(
-    assigned: SysUsers | undefined | null,
+    consultant: SysConsultantProfiles | null,
   ): ApplicationOverviewAssignedToDto | null {
-    if (assigned == null) {
+    if (consultant == null) {
       return null;
     }
     return {
-      counsellorId: assigned.id,
-      counsellorName: assigned.email ?? assigned.phone,
+      counsellorId: consultant.id,
+      counsellorName: consultant.fullName,
     };
   }
 

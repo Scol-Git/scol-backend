@@ -12,7 +12,7 @@ import { SysLeadProfiles } from './SysLeadProfiles.entity';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
 import { SysApplicationStatus } from './SysApplicationStatus.entity';
 import { SysApplicationStage } from './SysApplicationStage.entity';
-import { SysUsers } from './SysUsers.entity';
+import { SysConsultantProfiles } from './SysConsultantProfiles.entity';
 import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.entity';
 import { ApplicationDocuments } from './ApplicationDocuments.entity';
 import { ApplicationActivities } from './ApplicationActivities.entity';
@@ -64,12 +64,12 @@ export class Applications extends BaseEntity {
   currentSysApplicationStageId!: string;
 
   @Column({
-    name: 'assignedToUserId',
+    name: 'assignedToConsultantId',
     type: 'uuid',
     nullable: true,
   })
   @AutoMap()
-  assignedToUserId?: string;
+  assignedToConsultantId?: string | null;
 
   @Column({
     name: 'submittedAt',
@@ -118,11 +118,18 @@ export class Applications extends BaseEntity {
   @JoinColumn({ name: 'currentSysApplicationStageId' })
   CurrentSysApplicationStage?: SysApplicationStage;
 
-  @ManyToOne(() => SysUsers, (user) => user.AssignedApplications, {
-    nullable: true,
+  @ManyToOne(
+    () => SysConsultantProfiles,
+    (profile) => profile.AssignedApplications,
+    {
+      nullable: true,
+    },
+  )
+  @JoinColumn({
+    name: 'assignedToConsultantId',
+    referencedColumnName: 'id',
   })
-  @JoinColumn({ name: 'assignedToUserId' })
-  AssignedToUser?: SysUsers;
+  AssignedToConsultant?: SysConsultantProfiles;
 
   @OneToMany(() => ApplicationRequiredDocuments, (req) => req.Application)
   ApplicationRequiredDocuments!: ApplicationRequiredDocuments[];
