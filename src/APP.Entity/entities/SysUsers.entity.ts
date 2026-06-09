@@ -13,6 +13,7 @@ import { SysRoles } from './SysRoles.entity';
 import { SysPermissions } from './SysPermissions.entity';
 import { UserSessions } from './UserSessions.entity';
 import { SysLeadProfiles } from './SysLeadProfiles.entity';
+import { SysConsultantProfiles } from './SysConsultantProfiles.entity';
 import { Applications } from './Applications.entity';
 import { LeadCrmInfos } from './LeadCrmInfos.entity';
 import { AccountStatus } from '@shared/enums/AccountStatus.enum';
@@ -159,6 +160,16 @@ export class SysUsers extends BaseEntity {
    */
   @OneToOne(() => SysLeadProfiles, (profile) => profile.SysUser)
   SysLeadProfile?: SysLeadProfiles;
+
+  /**
+   * One-to-One: Consultant public profile
+   * A CRM user may have an associated consultant profile
+   */
+  @OneToOne(
+    () => SysConsultantProfiles,
+    (profile) => profile.SysUser,
+  )
+  SysConsultantProfile?: SysConsultantProfiles;
 
   /**
    * One-to-Many: Applications assigned to this user (counsellor / ops)

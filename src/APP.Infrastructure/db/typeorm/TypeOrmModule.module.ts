@@ -54,6 +54,8 @@ import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
 import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
+import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
+import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -115,6 +117,8 @@ import { AppDbContext } from './AppDbContext';
             LeadDocumentVersions,
             LeadFavouriteCourses,
             LeadCrmInfos,
+            SysConsultantProfiles,
+            ConsultantCertifications,
           ],
           synchronize: false,
           logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
@@ -174,6 +178,8 @@ import { AppDbContext } from './AppDbContext';
       LeadDocumentVersions,
       LeadFavouriteCourses,
       LeadCrmInfos,
+      SysConsultantProfiles,
+      ConsultantCertifications,
     ]),
   ],
   providers: [AppDbContext],

@@ -55,6 +55,8 @@ import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
 import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
+import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
+import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
 
 /**
  * AppDbContext - EF Core-style DbContext for TypeORM
@@ -210,6 +212,12 @@ export class AppDbContext {
 
     @InjectRepository(LeadCrmInfos)
     public readonly leadCrmInfos: Repository<LeadCrmInfos>,
+
+    @InjectRepository(SysConsultantProfiles)
+    public readonly consultantProfiles: Repository<SysConsultantProfiles>,
+
+    @InjectRepository(ConsultantCertifications)
+    public readonly consultantCertifications: Repository<ConsultantCertifications>,
   ) {}
 
   /**

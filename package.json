@@ -17,7 +17,8 @@
     "typeorm:gen": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:generate -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts",
     "typeorm:run": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:run -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts",
     "typeorm:revert": "ts-node -r tsconfig-paths/register --transpile-only ./node_modules/typeorm/cli.js migration:revert -d ./src/APP.Infrastructure/db/typeorm/AppDataSource.datasource.ts",
-    "seed:admin": "ts-node -r tsconfig-paths/register --transpile-only src/seeds/create-admin.seed.ts"
+    "seed:admin": "ts-node -r tsconfig-paths/register --transpile-only src/seeds/create-admin.seed.ts",
+    "seed:consultant": "ts-node -r tsconfig-paths/register --transpile-only src/seeds/create-consultant.seed.ts"
   },
   "dependencies": {
     "@automapper/classes": "8.8.1",
