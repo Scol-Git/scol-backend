@@ -60,10 +60,26 @@ export class CrmLeadAccessService {
     //   return crmUser.id;
     // }
   }
+// similar to ensureConsultantExistsOrThrow but argument is user id not consultant id
+  async ensureConsultantUserExistsOrThrow(userId: string): Promise<void> {
+    const consultant = await this.db.consultantProfiles.findOne({
+      where: {
+        userId,
+        isPublished: true,
+      },
+      relations: { SysUser: { roles: true } },
+    });
 
-  async ensureConsultantExistsOrThrow(
-    consultantId: string,
-  ): Promise<void> {
+    if (!consultant) {
+      throw new NotFoundException('Consultant user not found');
+    }
+
+    if (!this.hasAnyRole(consultant.SysUser, [Role.ADMIN, Role.COUNSELLOR])) {
+      throw new ForbiddenException('Consultant user is not authorized');
+    }
+  }
+
+  async ensureConsultantExistsOrThrow(consultantId: string,): Promise<void> {
     const consultant = await this.db.consultantProfiles.findOne({
       where: {
         id: consultantId,
@@ -81,7 +97,7 @@ export class CrmLeadAccessService {
     }
   }
 
-  private async loadCrmUserWithRolesOrThrow(userId: string): Promise<SysUsers> {
+  private  async loadCrmUserWithRolesOrThrow(userId: string): Promise<SysUsers> {
     const user = await this.db.users.findOne({
       where: { id: userId },
       relations: { roles: true },

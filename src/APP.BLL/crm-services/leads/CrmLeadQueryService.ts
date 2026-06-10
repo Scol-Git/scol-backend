@@ -10,7 +10,6 @@ import { CrmLeadDropdownDataResponseDto } from '@shared/dtos/crm/leads/CrmLeadDr
 import { EnrollmentStatus } from '@shared/enums/crm/EnrollmentStatus.enum';
 import { LeadStatus } from '@shared/enums/crm/LeadStatus.enum';
 import { RegisterSource } from '@shared/enums/crm/RegisterSource.enum';
-import { Role } from '@shared/enums/Role.enum';
 import { CrmLeadAccessService } from './helpers/CrmLeadAccessService';
 
 interface CrmLeadListCursor {
@@ -29,8 +28,7 @@ export class CrmLeadQueryService {
     currentUserId: string,
     dto: CrmLeadListRequestDto,
   ): Promise<CrmLeadListResponseDto> {
-    const crmUser =
-      await this.accessService.ensureConsultantExistsOrThrow(currentUserId);
+    await this.accessService.ensureConsultantUserExistsOrThrow(currentUserId);
 
     const qb = this.db.leadProfiles
       .createQueryBuilder('lead')
@@ -92,17 +90,12 @@ export class CrmLeadQueryService {
       });
     }
 
-    if (ranges?.startDate) {
-      qb.andWhere('crm.registerDate >= :startDate', {
-        startDate: ranges.startDate,
-      });
-    }
+    const defaultRange = this.getDefaultRegisterDateRange();
+    const startDate = ranges?.startDate ?? defaultRange.startDate;
+    const endDate = ranges?.endDate ?? defaultRange.endDate;
 
-    if (ranges?.endDate) {
-      qb.andWhere('crm.registerDate <= :endDate', {
-        endDate: ranges.endDate,
-      });
-    }
+    qb.andWhere('crm.registerDate >= :startDate', { startDate });
+    qb.andWhere('crm.registerDate <= :endDate', { endDate });
 
     if (dto.flags?.hasPassedEnglishTest !== undefined) {
       qb.andWhere('crm.hasPassedEnglishTest = :value', {
@@ -247,5 +240,17 @@ export class CrmLeadQueryService {
     return date instanceof Date
       ? date.toISOString().split('T')[0]
       : String(date);
+  }
+
+  private getDefaultRegisterDateRange(): { startDate: string; endDate: string } {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+
+    return {
+      startDate: `${year}-${month}-01`,
+      endDate: `${year}-${month}-${day}`,
+    };
   }
 }
