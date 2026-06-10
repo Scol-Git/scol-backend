@@ -8,6 +8,7 @@ import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
 import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
+import { GetCrmApplicationDetailsResponseDto } from '@shared/dtos/applications/GetCrmApplicationDetailsResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 import { ApplicationStageProgressState } from '@shared/enums/ApplicationStageProgressState.enum';
@@ -15,6 +16,7 @@ import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocument
 import { ApplicationStage } from '@shared/enums/ApplicationStage.enum';
 import {
   ApplicationRequirementWithDocuments,
+  ApplicationStageRequirementsWithDocuments,
   DocumentProgressViewModel,
   StageProgressViewModel,
   UploadedDocumentView,
@@ -155,6 +157,68 @@ export class ApplicationQueryService {
     return this.mapper.toGetApplicationDetailsResponse(
       application,
       requirementsWithDocuments,
+      displayStage,
+    );
+  }
+
+  async getCrmApplicationDetailsForAuthorizedApplication(
+    applicationId: string,
+  ): Promise<GetCrmApplicationDetailsResponseDto> {
+    const application =
+      await this.loadApplicationOverviewOrThrow(applicationId);
+
+    const displayStage = await this.resolveDisplayStageForScope(
+      application.CurrentSysApplicationStage,
+      'CRM',
+    );
+    if (!displayStage) {
+      throw new NotFoundException('Current application stage not found');
+    }
+
+    const requirements = await this.loadAllStageRequirements(applicationId);
+
+    const applicationScopedRequirementIds = requirements
+      .filter(
+        (requirement) =>
+          requirement.sourceType === ApplicationDocumentSourceType.Application,
+      )
+      .map((requirement) => requirement.id);
+
+    const applicationDocuments =
+      await this.loadApplicationDocumentsForRequirements(
+        applicationId,
+        applicationScopedRequirementIds,
+      );
+
+    const leadScopedDocTypeIds = requirements
+      .filter(
+        (requirement) =>
+          requirement.sourceType === ApplicationDocumentSourceType.Lead,
+      )
+      .map((requirement) => requirement.sysDocumentTypeId);
+
+    const leadDocuments = await this.loadLeadDocumentsForRequirements(
+      application.leadId,
+      leadScopedDocTypeIds,
+    );
+
+    const applicationDocumentsByRequirementId =
+      this.groupApplicationDocumentsByRequirementId(applicationDocuments);
+    const leadDocumentsByDocTypeId =
+      this.groupLeadDocumentsByDocTypeId(leadDocuments);
+
+    const requirementsWithDocuments = this.buildRequirementWithUnifiedDocuments(
+      requirements,
+      applicationDocumentsByRequirementId,
+      leadDocumentsByDocTypeId,
+    );
+
+    const stageRequirementsWithDocuments =
+      this.groupRequirementsWithDocumentsByStage(requirementsWithDocuments);
+
+    return this.mapper.toGetCrmApplicationDetailsResponse(
+      application,
+      stageRequirementsWithDocuments,
       displayStage,
     );
   }
@@ -494,6 +558,67 @@ export class ApplicationQueryService {
         displayOrder: 'ASC',
       },
     });
+  }
+
+  /**
+   * All resolved requirements for the application across every workflow stage.
+   */
+  private async loadAllStageRequirements(
+    applicationId: string,
+  ): Promise<ApplicationRequiredDocuments[]> {
+    return this.db.applicationRequiredDocuments.find({
+      where: { applicationId },
+      relations: ['SysApplicationStage', 'SysDocumentType'],
+      order: {
+        displayOrder: 'ASC',
+      },
+    });
+  }
+
+  private groupRequirementsWithDocumentsByStage(
+    requirementsWithDocuments: ApplicationRequirementWithDocuments[],
+  ): ApplicationStageRequirementsWithDocuments[] {
+    const byStageId = new Map<
+      string,
+      ApplicationStageRequirementsWithDocuments
+    >();
+
+    for (const row of requirementsWithDocuments) {
+      const stage = row.requirement.SysApplicationStage;
+      if (!stage) {
+        continue;
+      }
+
+      const stageId = stage.id;
+      const existing = byStageId.get(stageId);
+      if (existing) {
+        existing.requirementsWithDocuments.push(row);
+        continue;
+      }
+
+      byStageId.set(stageId, {
+        stage,
+        requirementsWithDocuments: [row],
+      });
+    }
+
+    const grouped = Array.from(byStageId.values());
+    grouped.sort((a, b) => {
+      const orderA = a.stage.stageOrder ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.stage.stageOrder ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return a.stage.stageCode.localeCompare(b.stage.stageCode);
+    });
+
+    for (const stageGroup of grouped) {
+      this.sortChecklistRowsForDetailsResponse(
+        stageGroup.requirementsWithDocuments,
+      );
+    }
+
+    return grouped;
   }
 
   private async loadApplicationDocumentsForRequirements(

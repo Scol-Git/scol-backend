@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ApplicationQueryService } from '@bll/services/applications/ApplicationQueryService';
-import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
+import { GetCrmApplicationDetailsResponseDto } from '@shared/dtos/applications/GetCrmApplicationDetailsResponseDto';
 import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
@@ -31,7 +31,7 @@ export class CrmApplicationQueryService {
     currentUserId: string,
     leadId: string,
     applicationId: string,
-  ): Promise<GetApplicationDetailsResponseDto> {
+  ): Promise<GetCrmApplicationDetailsResponseDto> {
     const application =
       await this.accessService.ensureCrmCanAccessApplicationForLeadOrThrow(
         currentUserId,
@@ -39,9 +39,8 @@ export class CrmApplicationQueryService {
         applicationId,
       );
 
-    return this.applicationQueryService.getApplicationDetailsForAuthorizedApplication(
+    return this.applicationQueryService.getCrmApplicationDetailsForAuthorizedApplication(
       application.id,
-      'CRM',
     );
   }
 
