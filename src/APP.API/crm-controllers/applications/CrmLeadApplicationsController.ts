@@ -25,6 +25,7 @@ import { GetCrmApplicationDetailsResponseDto } from '@shared/dtos/applications/G
 import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
+import { GetCrmApplicationActivitiesResponseDto } from '@shared/dtos/applications/GetCrmApplicationActivitiesResponseDto';
 import { Role } from '@shared/enums/Role.enum';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 
@@ -81,6 +82,19 @@ export class CrmLeadApplicationsController {
     @Param('applicationId', ParseUUIDPipe) applicationId: string,
   ): Promise<GetApplicationDocumentProgressResponseDto> {
     return this.crmApplicationQuery.getApplicationDocumentProgress(
+      user.userId,
+      leadId,
+      applicationId,
+    );
+  }
+
+  @Get(':applicationId/activities')
+  async getApplicationActivities(
+    @CurrentUser() user: ICurrentUser,
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+  ): Promise<GetCrmApplicationActivitiesResponseDto> {
+    return this.crmApplicationQuery.getApplicationActivities(
       user.userId,
       leadId,
       applicationId,

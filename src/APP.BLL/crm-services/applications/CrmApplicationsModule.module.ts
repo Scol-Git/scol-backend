@@ -8,6 +8,7 @@ import { CrmApplicationDocumentReviewService } from './CrmApplicationDocumentRev
 import { CrmApplicationDocumentReviewPolicy } from './helpers/CrmApplicationDocumentReviewPolicy';
 import { CrmApplicationWorkflowPolicy } from './helpers/CrmApplicationWorkflowPolicy';
 import { CrmApplicationWorkflowService } from './CrmApplicationWorkflowService';
+import { CrmApplicationActivityMapper } from './helpers/CrmApplicationActivityMapper';
 
 @Module({
   imports: [ApplicationsModule],
@@ -15,6 +16,7 @@ import { CrmApplicationWorkflowService } from './CrmApplicationWorkflowService';
     CrmApplicationAccessService,
     CrmApplicationCreationService,
     CrmApplicationQueryService,
+    CrmApplicationActivityMapper,
     CrmApplicationDocumentService,
     CrmApplicationDocumentReviewPolicy,
     CrmApplicationDocumentReviewService,

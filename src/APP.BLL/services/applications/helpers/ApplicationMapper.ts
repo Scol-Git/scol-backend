@@ -4,7 +4,6 @@ import { Applications } from '@entity/entities/Applications.entity';
 import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
 import { SysApplicationStatus } from '@entity/entities/SysApplicationStatus.entity';
 import { SysUniversities } from '@entity/entities/SysUniversities.entity';
-import { SysUsers } from '@entity/entities/SysUsers.entity';
 import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
 import { ApplicationDocumentChecklistItemDto } from '@shared/dtos/applications/ApplicationDocumentChecklistItemDto';
