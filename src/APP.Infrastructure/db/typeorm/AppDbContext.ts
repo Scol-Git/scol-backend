@@ -51,6 +51,7 @@ import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.enti
 import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
 import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocuments.entity';
 import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
+import { ApplicationNotes } from '@entity/entities/ApplicationNotes.entity';
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
@@ -200,6 +201,9 @@ export class AppDbContext {
 
     @InjectRepository(ApplicationActivities)
     public readonly applicationActivities: Repository<ApplicationActivities>,
+
+    @InjectRepository(ApplicationNotes)
+    public readonly applicationNotes: Repository<ApplicationNotes>,
 
     @InjectRepository(LeadDocuments)
     public readonly leadDocuments: Repository<LeadDocuments>,

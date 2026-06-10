@@ -50,6 +50,7 @@ import { ApplicationDocuments } from '@entity/entities/ApplicationDocuments.enti
 import { ApplicationDocumentVersions } from '@entity/entities/ApplicationDocumentVersions.entity';
 import { SysStageRequiredDocuments } from '@entity/entities/SysStageRequiredDocuments.entity';
 import { ApplicationActivities } from '@entity/entities/ApplicationActivities.entity';
+import { ApplicationNotes } from '@entity/entities/ApplicationNotes.entity';
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
 import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.entity';
@@ -113,6 +114,7 @@ import { AppDbContext } from './AppDbContext';
             ApplicationDocumentVersions,
             SysStageRequiredDocuments,
             ApplicationActivities,
+            ApplicationNotes,
             LeadDocuments,
             LeadDocumentVersions,
             LeadFavouriteCourses,
@@ -174,6 +176,7 @@ import { AppDbContext } from './AppDbContext';
       ApplicationDocumentVersions,
       SysStageRequiredDocuments,
       ApplicationActivities,
+      ApplicationNotes,
       LeadDocuments,
       LeadDocumentVersions,
       LeadFavouriteCourses,
