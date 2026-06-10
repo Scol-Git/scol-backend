@@ -23,12 +23,12 @@ export class CrmLeadAccessService {
       return leadProfile;
     }
 
-    if (
-      this.hasAnyRole(crmUser, [Role.COUNSELLOR]) &&
-      leadProfile.assignedConsultantId === crmUser.id
-    ) {
-      return leadProfile;
-    }
+    // if (
+    //   this.hasAnyRole(crmUser, [Role.COUNSELLOR]) &&
+    //   leadProfile.assignedConsultantId === crmUser.id
+    // ) {
+    //   return leadProfile;
+    // }
 
     throw new ForbiddenException('You are not authorized to access this lead');
   }
@@ -61,7 +61,7 @@ export class CrmLeadAccessService {
     // }
   }
 
-  private async ensureConsultantExistsOrThrow(
+  async ensureConsultantExistsOrThrow(
     consultantId: string,
   ): Promise<void> {
     const consultant = await this.db.consultantProfiles.findOne({
