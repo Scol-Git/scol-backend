@@ -165,7 +165,7 @@ export class CrmLeadQueryService {
           isPublished: true,
         },
         order: {
-          fullName: 'ASC',
+          sortOrder: 'ASC',
         },
       }),
     ]);
