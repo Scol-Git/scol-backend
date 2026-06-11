@@ -4,7 +4,6 @@ import { Applications } from '@entity/entities/Applications.entity';
 import { SysApplicationStage } from '@entity/entities/SysApplicationStage.entity';
 import { SysApplicationStatus } from '@entity/entities/SysApplicationStatus.entity';
 import { SysUniversities } from '@entity/entities/SysUniversities.entity';
-import { SysUsers } from '@entity/entities/SysUsers.entity';
 import { UniCourses } from '@entity/entities/UniCourses.entity';
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
 import { ApplicationDocumentChecklistItemDto } from '@shared/dtos/applications/ApplicationDocumentChecklistItemDto';
@@ -23,7 +22,9 @@ import { ConfirmApplicationDocumentUploadResponseDto } from '@shared/dtos/applic
 import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
 import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentDownloadResponseDto';
 import { GenerateApplicationDocumentUploadUrlResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlResponseDto';
+import { CrmApplicationStageDocumentChecklistDto } from '@shared/dtos/applications/CrmApplicationStageDocumentChecklistDto';
 import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
+import { GetCrmApplicationDetailsResponseDto } from '@shared/dtos/applications/GetCrmApplicationDetailsResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { ApplicationDocumentChecklistDocumentTypeDto } from '@shared/dtos/applications/ApplicationDocumentChecklistItemDto';
@@ -31,6 +32,7 @@ import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequireme
 import { UploadStatus } from '@shared/enums/UploadStatus.enum';
 import {
   ApplicationRequirementWithDocuments,
+  ApplicationStageRequirementsWithDocuments,
   DocumentProgressViewModel,
   StageProgressViewModel,
   UploadedDocumentView,
@@ -195,6 +197,35 @@ export class ApplicationMapper {
           row.uploadedDocuments,
         ),
       );
+
+    return {
+      applicationId: application.id,
+      applicationSerialNumber: application.serialNumber ?? null,
+      applicationOverview: overview,
+      documentCheckLists,
+    };
+  }
+
+  toGetCrmApplicationDetailsResponse(
+    application: Applications,
+    stageRequirementsWithDocuments: ApplicationStageRequirementsWithDocuments[],
+    displayStage?: SysApplicationStage,
+  ): GetCrmApplicationDetailsResponseDto {
+    const overview = this.toApplicationOverviewDto(application, displayStage);
+
+    const documentCheckLists: CrmApplicationStageDocumentChecklistDto[] =
+      stageRequirementsWithDocuments.map((stageGroup) => ({
+        stageCode: stageGroup.stage.stageCode,
+        stageName: stageGroup.stage.stageName ?? stageGroup.stage.stageCode,
+        order: stageGroup.stage.stageOrder ?? null,
+        documentChecklistItems: stageGroup.requirementsWithDocuments.map(
+          (row) =>
+            this.toApplicationDocumentChecklistItem(
+              row.requirement,
+              row.uploadedDocuments,
+            ),
+        ),
+      }));
 
     return {
       applicationId: application.id,

@@ -16,6 +16,7 @@ import { SysConsultantProfiles } from './SysConsultantProfiles.entity';
 import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.entity';
 import { ApplicationDocuments } from './ApplicationDocuments.entity';
 import { ApplicationActivities } from './ApplicationActivities.entity';
+import { ApplicationNotes } from './ApplicationNotes.entity';
 
 /**
  * Application for a lead against a course intake (enrollment pipeline).
@@ -139,4 +140,7 @@ export class Applications extends BaseEntity {
 
   @OneToMany(() => ApplicationActivities, (a) => a.Application)
   ApplicationActivities!: ApplicationActivities[];
+
+  @OneToMany(() => ApplicationNotes, (note) => note.Application)
+  ApplicationNotes!: ApplicationNotes[];
 }

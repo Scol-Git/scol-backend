@@ -18,6 +18,12 @@ export interface ApplicationRequirementWithDocuments {
   uploadedDocuments: UploadedDocumentView[];
 }
 
+/** CRM details: requirements and uploaded documents grouped by workflow stage. */
+export interface ApplicationStageRequirementsWithDocuments {
+  stage: SysApplicationStage;
+  requirementsWithDocuments: ApplicationRequirementWithDocuments[];
+}
+
 export interface StageProgressViewModel {
   totalStages: number;
   completedStages: number;

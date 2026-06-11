@@ -21,10 +21,11 @@ import { ChangeCrmApplicationStatusRequestDto } from '@shared/dtos/applications/
 import { ChangeCrmApplicationStatusResponseDto } from '@shared/dtos/applications/ChangeCrmApplicationStatusResponseDto';
 import { CreateApplicationRequestDto } from '@shared/dtos/applications/CreateApplicationRequestDto';
 import { CreateApplicationResponseDto } from '@shared/dtos/applications/CreateApplicationResponseDto';
-import { GetApplicationDetailsResponseDto } from '@shared/dtos/applications/GetApplicationDetailsResponseDto';
+import { GetCrmApplicationDetailsResponseDto } from '@shared/dtos/applications/GetCrmApplicationDetailsResponseDto';
 import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applications/GetApplicationDocumentProgressResponseDto';
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
+import { GetCrmApplicationActivitiesResponseDto } from '@shared/dtos/applications/GetCrmApplicationActivitiesResponseDto';
 import { Role } from '@shared/enums/Role.enum';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 
@@ -87,6 +88,19 @@ export class CrmLeadApplicationsController {
     );
   }
 
+  @Get(':applicationId/activities')
+  async getApplicationActivities(
+    @CurrentUser() user: ICurrentUser,
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+  ): Promise<GetCrmApplicationActivitiesResponseDto> {
+    return this.crmApplicationQuery.getApplicationActivities(
+      user.userId,
+      leadId,
+      applicationId,
+    );
+  }
+
   @Post(':applicationId/status-changes')
   async changeApplicationStatus(
     @CurrentUser() user: ICurrentUser,
@@ -122,7 +136,7 @@ export class CrmLeadApplicationsController {
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
     @Param('applicationId', ParseUUIDPipe) applicationId: string,
-  ): Promise<GetApplicationDetailsResponseDto> {
+  ): Promise<GetCrmApplicationDetailsResponseDto> {
     return await this.crmApplicationQuery.getApplicationDetails(
       user.userId,
       leadId,

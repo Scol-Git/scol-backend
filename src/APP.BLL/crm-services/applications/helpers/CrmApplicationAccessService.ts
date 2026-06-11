@@ -25,11 +25,11 @@ export class CrmApplicationAccessService {
       return leadProfile;
     }
 
-    if (this.hasAnyRole(crmUser, [Role.COUNSELLOR])) {
-      if (leadProfile.assignedConsultantId === crmUser.id) {
-        return leadProfile;
-      }
-    }
+    // if (this.hasAnyRole(crmUser, [Role.COUNSELLOR])) {
+    //   if (leadProfile.assignedConsultantId === crmUser.id) {
+    //     return leadProfile;
+    //   }
+    // }
 
     throw new ForbiddenException('You are not authorized to access this lead');
   }
