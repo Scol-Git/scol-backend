@@ -37,12 +37,12 @@ export class CrmApplicationQueryService {
     currentUserId: string,
     dto: CrmApplicationListRequestDto,
   ): Promise<CrmApplicationListResponseDto> {
-   // await this.accessService.ensureConsultantUserExistsOrThrow(currentUserId);
+ 
 
     const qb = this.db.applications
       .createQueryBuilder('app')
       .innerJoinAndSelect('app.SysLeadProfile', 'lead')
-      // .innerJoinAndSelect('lead.SysUser', 'leadUser')
+      .innerJoinAndSelect('lead.SysUser', 'leadUser') // this is for the phone/email number
       .innerJoinAndSelect('app.UniCourseIntake', 'intake')
       .innerJoinAndSelect('intake.UniCourse', 'course')
       .innerJoinAndSelect('course.SysUniversity', 'uni')
