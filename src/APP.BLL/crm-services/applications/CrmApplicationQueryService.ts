@@ -37,12 +37,12 @@ export class CrmApplicationQueryService {
     currentUserId: string,
     dto: CrmApplicationListRequestDto,
   ): Promise<CrmApplicationListResponseDto> {
-    await this.accessService.ensureConsultantUserExistsOrThrow(currentUserId);
+   // await this.accessService.ensureConsultantUserExistsOrThrow(currentUserId);
 
     const qb = this.db.applications
       .createQueryBuilder('app')
       .innerJoinAndSelect('app.SysLeadProfile', 'lead')
-      .innerJoinAndSelect('lead.SysUser', 'leadUser')
+      // .innerJoinAndSelect('lead.SysUser', 'leadUser')
       .innerJoinAndSelect('app.UniCourseIntake', 'intake')
       .innerJoinAndSelect('intake.UniCourse', 'course')
       .innerJoinAndSelect('course.SysUniversity', 'uni')
@@ -91,8 +91,8 @@ export class CrmApplicationQueryService {
     const endDate = ranges?.dateRange?.endDate ?? defaultRange.endDate;
 
     qb.andWhere('"app"."createdAt" >= :startDate', { startDate });
-    qb.andWhere('"app"."createdAt" < :endDate', {
-      endDate: this.toExclusiveEndDate(endDate),
+    qb.andWhere('"app"."createdAt" <= :endDate', {
+      endDate: this.toEndOfDay(endDate),
     });
 
     const limit = dto.pagination?.limit ?? 15;
@@ -328,11 +328,8 @@ export class CrmApplicationQueryService {
       : String(date);
   }
 
-  private toExclusiveEndDate(endDate: string): string {
-    const nextDay = new Date(`${endDate}T00:00:00.000Z`);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-
-    return nextDay.toISOString().split('T')[0];
+  private toEndOfDay(endDate: string): string {
+    return `${endDate}T23:59:59.999Z`;
   }
 
   private getDefaultApplicationDateRange(): {

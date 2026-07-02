@@ -34,23 +34,23 @@ export class CrmApplicationAccessService {
     throw new ForbiddenException('You are not authorized to access this lead');
   }
 
-  async ensureConsultantUserExistsOrThrow(userId: string): Promise<void> {
-    const consultant = await this.db.consultantProfiles.findOne({
-      where: {
-        userId,
-        isPublished: true,
-      },
-      relations: { SysUser: { roles: true } },
-    });
+  // async ensureConsultantUserExistsOrThrow(userId: string): Promise<void> {
+  //   const consultant = await this.db.consultantProfiles.findOne({
+  //     where: {
+  //       userId,
+  //       isPublished: true,
+  //     },
+  //     relations: { SysUser: { roles: true } },
+  //   });
 
-    if (!consultant) {
-      throw new NotFoundException('Consultant user not found');
-    }
+  //   if (!consultant) {
+  //     throw new NotFoundException('Consultant user not found');
+  //   }
 
-    if (!this.hasAnyRole(consultant.SysUser, [Role.ADMIN, Role.COUNSELLOR])) {
-      throw new ForbiddenException('Consultant user is not authorized');
-    }
-  }
+  //   if (!this.hasAnyRole(consultant.SysUser, [Role.ADMIN, Role.COUNSELLOR])) {
+  //     throw new ForbiddenException('Consultant user is not authorized');
+  //   }
+  // }
 
   async ensureCrmCanAccessApplicationForLeadOrThrow(
     currentUserId: string,
