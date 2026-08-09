@@ -11,7 +11,7 @@ import { CrmApplicationListResponseDto } from '@shared/dtos/crm/applications/Crm
 import { Role } from '@shared/enums/Role.enum';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 
-@ApiTags('CRM Applications')
+@ApiTags('CRM Application List')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RoleGuard)
 @RequireRole(Role.ADMIN, Role.COUNSELLOR)
