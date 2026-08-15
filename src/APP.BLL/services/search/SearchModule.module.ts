@@ -60,6 +60,11 @@ import { CourseSearchHydrator } from './shared/pipeline/hydration/CourseSearchHy
     CourseCursorPaginationService,
     CourseResponseMapper,
   ],
-  exports: [HomeSearchService, CourseSearchService],
+  exports: [
+    HomeSearchService,
+    CourseSearchService,
+    SearchPipelineExecutor,
+    SearchFilterOptionsService,
+  ],
 })
 export class SearchModule {}
