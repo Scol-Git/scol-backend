@@ -64,7 +64,7 @@ export class LeadProfileMapper {
     };
   }
 
-  private static buildAcademicRecords(
+  static buildAcademicRecords(
     docs: LeadDocuments[] = [],
   ): AcademicRecordItemDto[] {
     const grouped: Record<string, AcademicRecordItemDto> = {};

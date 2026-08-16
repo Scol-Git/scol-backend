@@ -16,10 +16,13 @@ import { ApplicationDocumentSourceType } from '@shared/enums/ApplicationDocument
 import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
 import { ApplicationRequirementStatus } from '@shared/enums/ApplicationRequirementStatus.enum';
 import { UploadStatus } from '@shared/enums/UploadStatus.enum';
-import { VerificationStatus } from '@shared/enums/VerificationStatus.enum';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import { CrmApplicationAccessService } from './helpers/CrmApplicationAccessService';
 import { CrmApplicationDocumentReviewPolicy } from './helpers/CrmApplicationDocumentReviewPolicy';
+import {
+  CrmLeadScopedDocumentStatusApplier,
+  DocumentStatusTransitionPlan,
+} from './helpers/CrmLeadScopedDocumentStatusApplier';
 
 type ApplicationReviewableDocument = {
   documentScope: 'APPLICATION';
@@ -41,14 +44,6 @@ type ReviewableDocument =
   | ApplicationReviewableDocument
   | LeadReviewableDocument;
 
-type DocumentStatusTransitionPlan = {
-  documentStatus: ApplicationDocumentStatus;
-  verificationStatus: VerificationStatus;
-  verifiedByUserId?: string;
-  verifiedAt?: Date;
-  remarks?: string;
-};
-
 @Injectable()
 export class CrmApplicationDocumentReviewService {
   constructor(
@@ -56,6 +51,7 @@ export class CrmApplicationDocumentReviewService {
     private readonly accessService: CrmApplicationAccessService,
     private readonly activityService: ApplicationActivityService,
     private readonly reviewPolicy: CrmApplicationDocumentReviewPolicy,
+    private readonly leadDocumentStatusApplier: CrmLeadScopedDocumentStatusApplier,
   ) {}
 
   // #region changeDocumentStatus
@@ -92,7 +88,7 @@ export class CrmApplicationDocumentReviewService {
         return this.toDocumentStatusResponse(previousStatus, previousStatus);
       }
 
-      const plan = this.buildDocumentStatusTransitionPlan(
+      const plan = this.leadDocumentStatusApplier.buildDocumentStatusTransitionPlan(
         dto.toStatus,
         currentUserId,
         dto.remarks,
@@ -350,38 +346,6 @@ export class CrmApplicationDocumentReviewService {
   // #endregion
 
   // #region buildDocumentStatusTransitionPlan : changeDocumentStatus
-  private buildDocumentStatusTransitionPlan(
-    toStatus: ApplicationDocumentStatus,
-    actedByUserId: string,
-    remarks?: string,
-  ): DocumentStatusTransitionPlan {
-    if (toStatus === ApplicationDocumentStatus.Verified) {
-      return {
-        documentStatus: ApplicationDocumentStatus.Verified,
-        verificationStatus: VerificationStatus.VERIFIED,
-        verifiedByUserId: actedByUserId,
-        verifiedAt: new Date(),
-        remarks,
-      };
-    }
-
-    if (toStatus === ApplicationDocumentStatus.Rejected) {
-      return {
-        documentStatus: ApplicationDocumentStatus.Rejected,
-        verificationStatus: VerificationStatus.REJECTED,
-        verifiedByUserId: actedByUserId,
-        verifiedAt: new Date(),
-        remarks,
-      };
-    }
-
-    return {
-      documentStatus: ApplicationDocumentStatus.InProgress,
-      verificationStatus: VerificationStatus.PENDING,
-      remarks,
-    };
-  }
-
   private async applyDocumentStatusChange(
     manager: EntityManager,
     reviewable: ReviewableDocument,
@@ -398,7 +362,7 @@ export class CrmApplicationDocumentReviewService {
       return;
     }
 
-    await this.applyLeadScopedDocumentStatus(
+    await this.leadDocumentStatusApplier.applyLeadScopedDocumentStatus(
       manager,
       reviewable,
       actedByUserId,
@@ -424,29 +388,6 @@ export class CrmApplicationDocumentReviewService {
 
     reviewable.version.verificationStatus = plan.verificationStatus;
     reviewable.version.verifiedByUserId = plan.verifiedByUserId;
-
-    await versionRepo.save(reviewable.version);
-    await documentRepo.save(reviewable.document);
-  }
-
-  private async applyLeadScopedDocumentStatus(
-    manager: EntityManager,
-    reviewable: LeadReviewableDocument,
-    actedByUserId: string,
-    plan: DocumentStatusTransitionPlan,
-  ): Promise<void> {
-    const documentRepo = manager.getRepository(LeadDocuments);
-    const versionRepo = manager.getRepository(LeadDocumentVersions);
-
-    reviewable.document.overallStatus = plan.documentStatus;
-    reviewable.document.verificationStatus = plan.verificationStatus;
-    reviewable.document.updatedByUserId = actedByUserId;
-
-    reviewable.version.verificationStatus = plan.verificationStatus;
-    reviewable.version.verifiedByUserId = plan.verifiedByUserId;
-    if (plan.verifiedAt !== undefined) {
-      reviewable.version.verifiedAt = plan.verifiedAt;
-    }
 
     await versionRepo.save(reviewable.version);
     await documentRepo.save(reviewable.document);
