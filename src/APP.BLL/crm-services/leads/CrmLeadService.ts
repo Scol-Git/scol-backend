@@ -119,6 +119,9 @@ export class CrmLeadService {
         ...(dto.enrollmentStatus !== undefined
           ? { enrollmentStatus: dto.enrollmentStatus }
           : {}),
+        ...(dto.enrollmentDate !== undefined
+          ? { enrollmentDate: new Date(dto.enrollmentDate) }
+          : {}),
       },
     });
 

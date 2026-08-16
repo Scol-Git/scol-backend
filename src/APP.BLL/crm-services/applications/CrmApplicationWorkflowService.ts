@@ -18,6 +18,7 @@ import { ValidationException } from '@shared/exceptions/ValidationException';
 import { EntityManager } from 'typeorm';
 import { CrmApplicationAccessService } from './helpers/CrmApplicationAccessService';
 import { CrmApplicationWorkflowPolicy } from './helpers/CrmApplicationWorkflowPolicy';
+import { LeadCrmInfoSyncService } from '@bll/services/applications/helpers/LeadCrmInfoSyncService';
 
 @Injectable()
 export class CrmApplicationWorkflowService {
@@ -26,6 +27,7 @@ export class CrmApplicationWorkflowService {
     private readonly accessService: CrmApplicationAccessService,
     private readonly applicationActivityService: ApplicationActivityService,
     private readonly workflowPolicy: CrmApplicationWorkflowPolicy,
+    private readonly leadCrmInfoSyncService: LeadCrmInfoSyncService,
   ) {}
 
   // #region changeApplicationStatus
@@ -208,6 +210,13 @@ export class CrmApplicationWorkflowService {
           remarks: dto.remarks,
         },
       );
+
+      if (this.isSameCode(targetStage.stageCode, ApplicationStage.Enrolled)) {
+        await this.leadCrmInfoSyncService.syncEnrollmentOnFirstEnrolledStage(
+          manager,
+          leadId,
+        );
+      }
 
       return {
         success: true,

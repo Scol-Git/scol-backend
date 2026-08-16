@@ -17,6 +17,7 @@ import { ApplicationActivityService } from './helpers/ApplicationActivityService
 import { ApplicationStage } from '@shared/enums/ApplicationStage.enum';
 import { ApplicationStatus } from '@shared/enums/ApplicationStatus.enum';
 import { ApplicationAccessService } from './helpers/ApplicationAccessService';
+import { LeadCrmInfoSyncService } from './helpers/LeadCrmInfoSyncService';
 
 @Injectable()
 export class ApplicationCreationService {
@@ -29,6 +30,7 @@ export class ApplicationCreationService {
     private readonly serialNumberService: ApplicationSerialNumberService,
     private readonly requirementBootstrap: ApplicationRequirementBootstrapService,
     private readonly activityService: ApplicationActivityService,
+    private readonly leadCrmInfoSyncService: LeadCrmInfoSyncService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
   ) {}
 
@@ -154,6 +156,8 @@ export class ApplicationCreationService {
       applicationId: application.id,
       actedByUserId,
     });
+
+    await this.leadCrmInfoSyncService.markHasApplication(manager, leadId);
 
     return application;
   }

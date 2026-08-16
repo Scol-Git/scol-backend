@@ -16,6 +16,7 @@ import { ApplicationDocumentUploadPolicy } from './helpers/ApplicationDocumentUp
 import { ApplicationDocumentLinker } from './helpers/ApplicationDocumentLinker';
 import { ApplicationDocumentVersionSequencer } from './helpers/ApplicationDocumentVersionSequencer';
 import { ApplicationDocumentStorageKeyBuilder } from './helpers/ApplicationDocumentStorageKeyBuilder';
+import { LeadCrmInfoSyncService } from './helpers/LeadCrmInfoSyncService';
 
 // TODO(later phases): introduce ApplicationWorkflowService for CRM-only transitions
 // (requirement/document/app status, stage changes) without expanding phases 1–6 surface area.
@@ -38,12 +39,14 @@ import { ApplicationDocumentStorageKeyBuilder } from './helpers/ApplicationDocum
     ApplicationDocumentVersionSequencer,
     ApplicationDocumentStorageKeyBuilder,
     ApplicationDocumentUploadPolicy,
+    LeadCrmInfoSyncService,
   ],
   exports: [
     ApplicationCreationService,
     ApplicationQueryService,
     ApplicationDocumentService,
     ApplicationActivityService,
+    LeadCrmInfoSyncService,
   ],
 })
 export class ApplicationsModule {}

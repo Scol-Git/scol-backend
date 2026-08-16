@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -91,4 +92,12 @@ export class UpdateCrmLeadRequestDto {
   @IsOptional()
   @IsEnum(EnrollmentStatus)
   enrollmentStatus?: EnrollmentStatus;
+
+  @ApiPropertyOptional({
+    example: '2026-08-16',
+    description: 'Enrollment date (ISO 8601 date string)',
+  })
+  @IsOptional()
+  @IsDateString()
+  enrollmentDate?: string;
 }
