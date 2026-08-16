@@ -290,10 +290,10 @@ export class CrmApplicationQueryService {
     currentUserId: string,
     leadId: string,
   ): Promise<GetApplicationsResponseDto> {
-    await this.accessService.ensureCrmCanAccessLeadOrThrow(
-      currentUserId,
-      leadId,
-    );
+    // await this.accessService.ensureCrmCanAccessLeadOrThrow(
+    //   currentUserId,
+    //   leadId,
+    // );
     return this.applicationQueryService.getApplicationsForAuthorizedLead(
       leadId,
       'CRM',

@@ -17,10 +17,13 @@ import {
 import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto';
 import { RegisterLeadResponseDto } from '@shared/dtos/auth/RegisterLeadResponseDto';
 import { VerifyOtpRequestDto } from '@shared/dtos/auth/VerifyOtpRequestDto';
+import { VerifyOtpV2RequestDto } from '@shared/dtos/auth/VerifyOtpV2RequestDto';
+import { ResendOtpV2RequestDto } from '@shared/dtos/auth/ResendOtpV2RequestDto';
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
 import { TokenRefreshResponseDto } from '@shared/dtos/auth/TokenRefreshResponseDto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
+import { ResendOtpResponseDto } from '@shared/dtos/auth/ResendOtpResponseDto';
 
 import { UserDto } from '@shared/dtos/auth/UserDto';
 import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
@@ -224,6 +227,174 @@ const docs: Record<string, SwaggerDocSet> = {
     }),
     ApiUnauthorizedResponse({
       description: 'Invalid or expired OTP access token',
+      schema: { $ref: getSchemaPath(ErrorResponseDto) },
+    }),
+    ApiTooManyRequestsResponse({
+      description:
+        'Rate limit exceeded. Returns 429 with Retry-After header indicating seconds to wait. Applies to: (1) Cooldown: 1 resend per 60 seconds, (2) Hourly limit: maximum 3 resends per hour.',
+      schema: {
+        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
+        examples: {
+          cooldown: {
+            summary: 'Resend cooldown active (60 seconds)',
+            value: {
+              status: 'error',
+              message: 'Retry after 45 seconds',
+              statusCode: 429,
+              error: {
+                code: 'RATE_LIMIT_EXCEEDED',
+              },
+            },
+            headers: {
+              'Retry-After': {
+                description: 'Seconds to wait before retrying',
+                schema: { type: 'integer', example: 45 },
+              },
+            },
+          },
+          hourlyLimit: {
+            summary: 'Hourly limit exceeded (3 per hour)',
+            value: {
+              status: 'error',
+              message:
+                'You have exceeded the hourly OTP resend limit (3 per hour). Please wait 1800 seconds.',
+              statusCode: 429,
+              error: {
+                code: 'RATE_LIMIT_EXCEEDED',
+              },
+            },
+            headers: {
+              'Retry-After': {
+                description: 'Seconds to wait before retrying',
+                schema: { type: 'integer', example: 1800 },
+              },
+            },
+          },
+        },
+      },
+    }),
+  ],
+
+  'auth.verifyOtpV2': [
+    ApiOperation({
+      summary: 'Verify OTP (V2, token in body)',
+      description:
+        'Verify phone number with OTP code. OTP JWT is passed in the request body as otpAccessToken (no Authorization header). Supports two flows: (1) Registration (purpose=phone_verify): Activates account and returns access/refresh tokens. (2) Password reset (purpose=password_reset): Applies the provided new password and returns access/refresh tokens.',
+    }),
+    ApiBody({
+      schema: { $ref: getSchemaPath(VerifyOtpV2RequestDto) },
+      examples: {
+        default: {
+          summary: 'OTP verification with body token',
+          value: {
+            otp: '123456',
+            otpAccessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          },
+        },
+      },
+    }),
+    ApiOkResponse({
+      description:
+        'OTP verified successfully. Returns auth tokens (applies new password in password_reset flow).',
+      schema: {
+        allOf: [
+          { $ref: getSchemaPath(SuccessResponseDto) },
+          {
+            properties: {
+              data: {
+                $ref: getSchemaPath(AuthResponseDto),
+              },
+            },
+          },
+        ],
+      },
+    }),
+    ApiBadRequestResponse({
+      description:
+        'Invalid OTP, OTP expired, or maximum attempts exceeded (3 attempts)',
+      schema: {
+        allOf: [{ $ref: getSchemaPath(ErrorResponseDto) }],
+        examples: {
+          invalidOtp: {
+            summary: 'Invalid OTP',
+            value: {
+              status: 'error',
+              message: 'Incorrect OTP. Try again',
+              statusCode: 400,
+              error: {
+                code: 'INVALID_OTP',
+              },
+            },
+          },
+          otpExpired: {
+            summary: 'OTP expired',
+            value: {
+              status: 'error',
+              message: 'Your OTP has expired',
+              statusCode: 400,
+              error: {
+                code: 'OTP_EXPIRED',
+              },
+            },
+          },
+          attemptsExceeded: {
+            summary: 'Maximum attempts exceeded',
+            value: {
+              status: 'error',
+              message: 'Maximum OTP attempts exceeded',
+              statusCode: 400,
+              error: {
+                code: 'OTP_ATTEMPTS_EXCEEDED',
+              },
+            },
+          },
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Invalid, missing, or expired OTP access token',
+      schema: { $ref: getSchemaPath(ErrorResponseDto) },
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded (10 attempts per 5 minutes)',
+      schema: { $ref: getSchemaPath(ErrorResponseDto) },
+    }),
+  ],
+
+  'auth.resendOtpV2': [
+    ApiOperation({
+      summary: 'Resend OTP (V2, token in body)',
+      description:
+        'Request a new OTP code. OTP JWT is passed in the request body as otpAccessToken (no Authorization header). Subject to strict cooldown (1 resend per 60 seconds) and hourly limit (maximum 3 resends per hour). Returns 429 Too Many Requests with Retry-After header when limits are exceeded.',
+    }),
+    ApiBody({
+      schema: { $ref: getSchemaPath(ResendOtpV2RequestDto) },
+      examples: {
+        default: {
+          summary: 'Resend OTP with body token',
+          value: {
+            otpAccessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          },
+        },
+      },
+    }),
+    ApiOkResponse({
+      description: 'New OTP sent successfully via SMS',
+      schema: {
+        allOf: [
+          { $ref: getSchemaPath(SuccessResponseDto) },
+          {
+            properties: {
+              data: {
+                $ref: getSchemaPath(ResendOtpResponseDto),
+              },
+            },
+          },
+        ],
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Invalid, missing, or expired OTP access token',
       schema: { $ref: getSchemaPath(ErrorResponseDto) },
     }),
     ApiTooManyRequestsResponse({

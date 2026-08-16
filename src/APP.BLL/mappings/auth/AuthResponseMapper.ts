@@ -33,6 +33,7 @@ export class AuthResponseMapper {
     authResponse.user = {
       userId: user.id,
       academicFormStatus,
+      userRole: user.roles?.map((role) => role.name) ?? [],
       fullName: profile?.fullName ?? null,
       joinedAt: profile?.createdAt
         ? new Date(profile.createdAt).getFullYear()
