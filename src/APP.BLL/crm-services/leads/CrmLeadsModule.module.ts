@@ -13,6 +13,10 @@ import { CrmLeadService } from './CrmLeadService';
     CrmLeadService,
     CrmLeadQueryService,
   ],
-  exports: [CrmLeadService, CrmLeadQueryService],
+  exports: [
+    CrmLeadAccessService,
+    CrmLeadService,
+    CrmLeadQueryService,
+  ],
 })
 export class CrmLeadsModule {}
