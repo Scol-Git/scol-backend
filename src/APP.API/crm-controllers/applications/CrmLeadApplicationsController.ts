@@ -7,11 +7,13 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@api/common/decorators/CurrentUser.decorator';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
+import { AddSwaggerDoc } from '@api/common/swagger/add-swagger-doc.decorator';
+import '../common/swagger/applications/swagger.doc';
 import { CrmApplicationCreationService } from '@bll/crm-services/applications/CrmApplicationCreationService';
 import { CrmApplicationQueryService } from '@bll/crm-services/applications/CrmApplicationQueryService';
 import { CrmApplicationWorkflowService } from '@bll/crm-services/applications/CrmApplicationWorkflowService';
@@ -26,11 +28,25 @@ import { GetApplicationDocumentProgressResponseDto } from '@shared/dtos/applicat
 import { GetApplicationStageProgressResponseDto } from '@shared/dtos/applications/GetApplicationStageProgressResponseDto';
 import { GetApplicationsResponseDto } from '@shared/dtos/applications/GetApplicationsResponseDto';
 import { GetCrmApplicationActivitiesResponseDto } from '@shared/dtos/applications/GetCrmApplicationActivitiesResponseDto';
+import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
+import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 import { Role } from '@shared/enums/Role.enum';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 
 @ApiTags('CRM Applications')
 @ApiBearerAuth('JWT-auth')
+@ApiExtraModels(
+  SuccessResponseDto,
+  ErrorResponseDto,
+  CreateApplicationResponseDto,
+  GetApplicationsResponseDto,
+  GetApplicationStageProgressResponseDto,
+  GetApplicationDocumentProgressResponseDto,
+  GetCrmApplicationActivitiesResponseDto,
+  ChangeCrmApplicationStatusResponseDto,
+  ChangeCrmApplicationStageResponseDto,
+  GetCrmApplicationDetailsResponseDto,
+)
 @UseGuards(JwtAuthGuard, RoleGuard)
 @RequireRole(Role.ADMIN, Role.COUNSELLOR)
 @Controller('crm/leads/:leadId/applications')
@@ -42,6 +58,7 @@ export class CrmLeadApplicationsController {
   ) {}
 
   @Post()
+  @AddSwaggerDoc('crmLeadApplications', 'createApplicationForLead')
   async createApplicationForLead(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -55,6 +72,7 @@ export class CrmLeadApplicationsController {
   }
 
   @Get()
+  @AddSwaggerDoc('crmLeadApplications', 'getApplicationsForLead')
   async getApplicationsForLead(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -63,6 +81,7 @@ export class CrmLeadApplicationsController {
   }
 
   @Get(':applicationId/stage-progress')
+  @AddSwaggerDoc('crmLeadApplications', 'getApplicationStageProgress')
   async getApplicationStageProgress(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -76,6 +95,7 @@ export class CrmLeadApplicationsController {
   }
 
   @Get(':applicationId/document-progress')
+  @AddSwaggerDoc('crmLeadApplications', 'getApplicationDocumentProgress')
   async getApplicationDocumentProgress(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -89,6 +109,7 @@ export class CrmLeadApplicationsController {
   }
 
   @Get(':applicationId/activities')
+  @AddSwaggerDoc('crmLeadApplications', 'getApplicationActivities')
   async getApplicationActivities(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -102,6 +123,7 @@ export class CrmLeadApplicationsController {
   }
 
   @Post(':applicationId/status-changes')
+  @AddSwaggerDoc('crmLeadApplications', 'changeApplicationStatus')
   async changeApplicationStatus(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -117,6 +139,7 @@ export class CrmLeadApplicationsController {
   }
 
   @Post(':applicationId/stage-changes')
+  @AddSwaggerDoc('crmLeadApplications', 'changeApplicationStage')
   async changeApplicationStage(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -132,6 +155,7 @@ export class CrmLeadApplicationsController {
   }
 
   @Get(':applicationId')
+  @AddSwaggerDoc('crmLeadApplications', 'getApplicationById')
   async getApplicationById(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,

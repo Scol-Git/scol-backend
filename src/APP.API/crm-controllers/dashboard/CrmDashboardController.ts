@@ -1,14 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiExtraModels,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@api/common/decorators/CurrentUser.decorator';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
+import { AddSwaggerDoc } from '@api/common/swagger/add-swagger-doc.decorator';
+import '../common/swagger/dashboard/swagger.doc';
 import { CrmDashboardQueryService } from '@bll/crm-services/dashboard/CrmDashboardQueryService';
 import { CrmDashboardQueryDto } from '@shared/dtos/crm/dashboard/CrmDashboardQueryDto';
 import {
@@ -20,12 +17,16 @@ import {
   CrmDashboardRecentLeadDto,
   CrmDashboardResponseDto,
 } from '@shared/dtos/crm/dashboard/CrmDashboardResponseDto';
+import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
+import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 import { Role } from '@shared/enums/Role.enum';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 
 @ApiTags('CRM Dashboard')
 @ApiBearerAuth('JWT-auth')
 @ApiExtraModels(
+  SuccessResponseDto,
+  ErrorResponseDto,
   CrmDashboardQueryDto,
   CrmDashboardResponseDto,
   CrmDashboardLeadStatisticsDto,
@@ -44,7 +45,7 @@ export class CrmDashboardController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get CRM dashboard statistics' })
+  @AddSwaggerDoc('crmDashboard', 'getDashboard')
   async getDashboard(
     @CurrentUser() user: ICurrentUser,
     @Query() query: CrmDashboardQueryDto,

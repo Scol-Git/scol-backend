@@ -9,11 +9,13 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@api/common/decorators/CurrentUser.decorator';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
+import { AddSwaggerDoc } from '@api/common/swagger/add-swagger-doc.decorator';
+import '../common/swagger/leads/swagger.doc';
 import { CrmLeadDocumentReviewService } from '@bll/crm-services/leads/CrmLeadDocumentReviewService';
 import { CrmLeadProfileService } from '@bll/crm-services/leads/CrmLeadProfileService';
 import { CrmLeadQueryService } from '@bll/crm-services/leads/CrmLeadQueryService';
@@ -36,11 +38,28 @@ import { UpdateCrmLeadEnglishTestResultsRequestDto } from '@shared/dtos/crm/lead
 import { UpdateCrmLeadEnglishTestResultsResponseDto } from '@shared/dtos/crm/leads/UpdateCrmLeadEnglishTestResultsResponseDto';
 import { UpdateCrmLeadRequestDto } from '@shared/dtos/crm/leads/UpdateCrmLeadRequestDto';
 import { UpdateCrmLeadResponseDto } from '@shared/dtos/crm/leads/UpdateCrmLeadResponseDto';
+import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
+import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 import { Role } from '@shared/enums/Role.enum';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 
 @ApiTags('CRM Leads')
 @ApiBearerAuth('JWT-auth')
+@ApiExtraModels(
+  SuccessResponseDto,
+  ErrorResponseDto,
+  CreateCrmLeadResponseDto,
+  CrmLeadListResponseDto,
+  CrmLeadDropdownDataResponseDto,
+  GetCrmLeadProfileResponseDto,
+  UpdateCrmLeadAcademicResultsResponseDto,
+  ChangeCrmLeadAcademicResultVerificationResponseDto,
+  DeleteCrmLeadResultResponseDto,
+  UpdateCrmLeadEnglishTestResultsResponseDto,
+  ChangeCrmLeadEnglishTestResultVerificationResponseDto,
+  ChangeCrmApplicationDocumentStatusResponseDto,
+  UpdateCrmLeadResponseDto,
+)
 @UseGuards(JwtAuthGuard, RoleGuard)
 @RequireRole(Role.ADMIN, Role.COUNSELLOR)
 @Controller('crm/leads')
@@ -53,6 +72,7 @@ export class CrmLeadsController {
   ) {}
 
   @Post()
+  @AddSwaggerDoc('crmLeads', 'createLead')
   async createLead(
     @CurrentUser() user: ICurrentUser,
     @Body() dto: CreateCrmLeadRequestDto,
@@ -61,6 +81,7 @@ export class CrmLeadsController {
   }
 
   @Post('list')
+  @AddSwaggerDoc('crmLeads', 'getLeadList')
   async getLeadList(
     @CurrentUser() user: ICurrentUser,
     @Body() dto: CrmLeadListRequestDto,
@@ -69,11 +90,13 @@ export class CrmLeadsController {
   }
 
   @Get('dropdown-data')
+  @AddSwaggerDoc('crmLeads', 'getDropdownData')
   async getDropdownData(): Promise<CrmLeadDropdownDataResponseDto> {
     return this.crmLeadQueryService.getDropdownData();
   }
 
   @Get(':leadId/profile')
+  @AddSwaggerDoc('crmLeads', 'getLeadProfile')
   async getLeadProfile(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -82,6 +105,7 @@ export class CrmLeadsController {
   }
 
   @Put(':leadId/academic-results')
+  @AddSwaggerDoc('crmLeads', 'updateAcademicResults')
   async updateAcademicResults(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -95,6 +119,7 @@ export class CrmLeadsController {
   }
 
   @Post(':leadId/academic-results/:degreeId/verification-status-changes')
+  @AddSwaggerDoc('crmLeads', 'changeAcademicResultVerification')
   async changeAcademicResultVerification(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -110,6 +135,7 @@ export class CrmLeadsController {
   }
 
   @Delete(':leadId/academic-results/:degreeId')
+  @AddSwaggerDoc('crmLeads', 'deleteAcademicResult')
   async deleteAcademicResult(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -123,6 +149,7 @@ export class CrmLeadsController {
   }
 
   @Put(':leadId/english-test-results')
+  @AddSwaggerDoc('crmLeads', 'updateEnglishTestResults')
   async updateEnglishTestResults(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -136,6 +163,7 @@ export class CrmLeadsController {
   }
 
   @Post(':leadId/english-test-results/:testId/verification-status-changes')
+  @AddSwaggerDoc('crmLeads', 'changeEnglishTestResultVerification')
   async changeEnglishTestResultVerification(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -151,6 +179,7 @@ export class CrmLeadsController {
   }
 
   @Delete(':leadId/english-test-results/:testId')
+  @AddSwaggerDoc('crmLeads', 'deleteEnglishTestResult')
   async deleteEnglishTestResult(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -164,6 +193,7 @@ export class CrmLeadsController {
   }
 
   @Post(':leadId/documents/:documentId/status-changes')
+  @AddSwaggerDoc('crmLeads', 'changeLeadDocumentStatus')
   async changeLeadDocumentStatus(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -179,6 +209,7 @@ export class CrmLeadsController {
   }
 
   @Put(':leadId')
+  @AddSwaggerDoc('crmLeads', 'updateLead')
   async updateLead(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
