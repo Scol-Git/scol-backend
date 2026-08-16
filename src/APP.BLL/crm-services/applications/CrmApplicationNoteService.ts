@@ -4,6 +4,7 @@ import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ApplicationNotes } from '@entity/entities/ApplicationNotes.entity';
 import { CreateCrmApplicationNoteRequestDto } from '@shared/dtos/applications/CreateCrmApplicationNoteRequestDto';
 import { CreateCrmApplicationNoteResponseDto } from '@shared/dtos/applications/CreateCrmApplicationNoteResponseDto';
+import { DeleteCrmApplicationNoteResponseDto } from '@shared/dtos/applications/DeleteCrmApplicationNoteResponseDto';
 import { GetCrmApplicationNotesResponseDto } from '@shared/dtos/applications/GetCrmApplicationNotesResponseDto';
 import { UpdateCrmApplicationNoteRequestDto } from '@shared/dtos/applications/UpdateCrmApplicationNoteRequestDto';
 import { UpdateCrmApplicationNoteResponseDto } from '@shared/dtos/applications/UpdateCrmApplicationNoteResponseDto';
@@ -164,7 +165,7 @@ export class CrmApplicationNoteService {
     leadId: string,
     applicationId: string,
     noteId: string,
-  ): Promise<{ success: true }> {
+  ): Promise<DeleteCrmApplicationNoteResponseDto> {
     const application =
       await this.accessService.ensureCrmCanAccessApplicationForLeadOrThrow(
         currentUserId,

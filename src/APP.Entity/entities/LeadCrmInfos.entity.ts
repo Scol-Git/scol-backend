@@ -77,7 +77,7 @@ export class LeadCrmInfos extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  hasPassedEnglishTest?: boolean;
+  hasPassedEnglishTest?: boolean | null;
 
   @Column({
     name: 'hasAnyApplication',
@@ -85,7 +85,7 @@ export class LeadCrmInfos extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  hasAnyApplication?: boolean;
+  hasAnyApplication?: boolean | null;
 
   @Column({
     name: 'hasSuccessfulVisa',
@@ -93,7 +93,7 @@ export class LeadCrmInfos extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  hasSuccessfulVisa?: boolean;
+  hasSuccessfulVisa?: boolean | null;
 
   @Column({
     name: 'enrollmentStatus',
@@ -102,7 +102,7 @@ export class LeadCrmInfos extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  enrollmentStatus?: EnrollmentStatus;
+  enrollmentStatus?: EnrollmentStatus | null;
 
   @Column({
     name: 'enrollmentDate',
@@ -110,7 +110,7 @@ export class LeadCrmInfos extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  enrollmentDate?: Date;
+  enrollmentDate?: Date | null;
 
   // ========================================
   // Navigation Properties (EF Core style)

@@ -128,11 +128,16 @@ export class LeadCreationService {
         crmInfo.hasPassedEnglishTest = input.crmInfo.hasPassedEnglishTest;
       }
 
-      if (input.crmInfo.enrollmentStatus != null) {
+      if (input.crmInfo.enrollmentDate !== undefined) {
+        crmInfo.enrollmentDate = input.crmInfo.enrollmentDate;
+      }
+
+      if (input.crmInfo.enrollmentStatus !== undefined) {
         crmInfo.enrollmentStatus = input.crmInfo.enrollmentStatus;
-        if (input.crmInfo.enrollmentDate != null) {
-          crmInfo.enrollmentDate = input.crmInfo.enrollmentDate;
-        } else {
+        if (
+          input.crmInfo.enrollmentDate === undefined &&
+          crmInfo.enrollmentDate == null
+        ) {
           crmInfo.enrollmentDate = new Date();
         }
       }

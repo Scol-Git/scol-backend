@@ -8,6 +8,7 @@ export enum SearchExecutionSource {
   HOME = 'HOME',
   NORMAL_SEARCH = 'NORMAL_SEARCH',
   ADVANCED_SEARCH = 'ADVANCED_SEARCH',
+  CRM = 'CRM',
 }
 
 export interface PipelineParams {

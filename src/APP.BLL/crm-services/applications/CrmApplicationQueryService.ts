@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { In } from 'typeorm';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { In, ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 import { ApplicationQueryService } from '@bll/services/applications/ApplicationQueryService';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { Applications } from '@entity/entities/Applications.entity';
@@ -13,7 +13,9 @@ import { CrmApplicationListRequestDto } from '@shared/dtos/crm/applications/CrmA
 import {
   CrmApplicationListItemDto,
   CrmApplicationListResponseDto,
+  CrmApplicationListStatisticsDto,
 } from '@shared/dtos/crm/applications/CrmApplicationListResponseDto';
+import { ApplicationDocumentStatus } from '@shared/enums/ApplicationDocumentStatus.enum';
 import { ApplicationStage } from '@shared/enums/ApplicationStage.enum';
 import { ApplicationStatus } from '@shared/enums/ApplicationStatus.enum';
 import { CrmApplicationAccessService } from './helpers/CrmApplicationAccessService';
@@ -37,12 +39,28 @@ export class CrmApplicationQueryService {
     currentUserId: string,
     dto: CrmApplicationListRequestDto,
   ): Promise<CrmApplicationListResponseDto> {
- 
+    const [pageResult, statistics] = await Promise.all([
+      this.fetchApplicationListPage(dto),
+      this.fetchApplicationListStatistics(dto),
+    ]);
 
+    return {
+      success: true,
+      message: 'Application list fetched successfully',
+      pagination: pageResult.pagination,
+      statistics,
+      applications: pageResult.applications,
+    };
+  }
+
+  private async fetchApplicationListPage(dto: CrmApplicationListRequestDto): Promise<{
+    applications: CrmApplicationListItemDto[];
+    pagination: CrmApplicationListResponseDto['pagination'];
+  }> {
     const qb = this.db.applications
       .createQueryBuilder('app')
       .innerJoinAndSelect('app.SysLeadProfile', 'lead')
-      .innerJoinAndSelect('lead.SysUser', 'leadUser') // this is for the phone/email number
+      .innerJoinAndSelect('lead.SysUser', 'leadUser')
       .innerJoinAndSelect('app.UniCourseIntake', 'intake')
       .innerJoinAndSelect('intake.UniCourse', 'course')
       .innerJoinAndSelect('course.SysUniversity', 'uni')
@@ -50,6 +68,105 @@ export class CrmApplicationQueryService {
       .innerJoinAndSelect('app.CurrentSysApplicationStage', 'stage')
       .leftJoinAndSelect('app.AssignedToConsultant', 'consultant');
 
+    this.applyApplicationListFilters(qb, dto);
+
+    const limit = dto.pagination?.limit ?? 15;
+    const cursor = dto.pagination?.cursor
+      ? this.decodeCursor(dto.pagination.cursor)
+      : null;
+
+    if (cursor) {
+      qb.andWhere(
+        `
+          (
+            "app"."createdAt" < :createdAt
+          )
+          OR
+          (
+            "app"."createdAt" = :createdAt
+            AND "app"."id" < :applicationId
+          )
+        `,
+        {
+          createdAt: cursor.createdAt,
+          applicationId: cursor.applicationId,
+        },
+      );
+    }
+
+    qb.orderBy('app.createdAt', 'DESC').addOrderBy('app.id', 'DESC');
+    qb.take(limit + 1);
+
+    const entities = await qb.getMany();
+    const hasNext = entities.length > limit;
+    const pageEntities = hasNext ? entities.slice(0, limit) : entities;
+
+    const applications = pageEntities.map((x) => this.mapApplicationListItem(x));
+    const lastItem = pageEntities[pageEntities.length - 1];
+
+    return {
+      applications,
+      pagination: {
+        cursor:
+          lastItem && hasNext
+            ? this.encodeCursor({
+                createdAt: lastItem.createdAt.toISOString(),
+                applicationId: lastItem.id,
+              })
+            : null,
+        limit,
+        hasNext,
+      },
+    };
+  }
+
+  private async fetchApplicationListStatistics(
+    dto: CrmApplicationListRequestDto,
+  ): Promise<CrmApplicationListStatisticsDto> {
+    const submittedOrder = await this.resolveSubmittedStageOrder();
+
+    const baseQb = this.db.applications.createQueryBuilder('app');
+    this.applyApplicationListFilterJoins(baseQb);
+    this.applyApplicationListFilters(baseQb, dto);
+
+    const [
+      totalApplications,
+      applicationSubmitted,
+      pendingDocuments,
+      pendingReview,
+    ] = await Promise.all([
+      baseQb.getCount(),
+      baseQb
+        .clone()
+        .andWhere('stage.stageOrder >= :submittedOrder', { submittedOrder })
+        .getCount(),
+      this.countPendingRequiredDocuments(dto),
+      this.countPendingReviewDocuments(dto),
+    ]);
+
+    return {
+      totalApplications,
+      applicationSubmitted,
+      pendingDocuments,
+      pendingReview,
+    };
+  }
+
+  private applyApplicationListFilterJoins(
+    qb: SelectQueryBuilder<ObjectLiteral>,
+  ): void {
+    qb.innerJoin('app.SysLeadProfile', 'lead')
+      .innerJoin('app.UniCourseIntake', 'intake')
+      .innerJoin('intake.UniCourse', 'course')
+      .innerJoin('course.SysUniversity', 'uni')
+      .innerJoin('app.CurrentSysApplicationStatus', 'status')
+      .innerJoin('app.CurrentSysApplicationStage', 'stage');
+  }
+
+  private applyApplicationListFilters(
+    qb: SelectQueryBuilder<ObjectLiteral>,
+    dto: CrmApplicationListRequestDto,
+  ): void {
     if (dto.searchText) {
       qb.andWhere(
         `
@@ -94,57 +211,59 @@ export class CrmApplicationQueryService {
     qb.andWhere('"app"."createdAt" <= :endDate', {
       endDate: this.toEndOfDay(endDate),
     });
+  }
 
-    const limit = dto.pagination?.limit ?? 15;
-    const cursor = dto.pagination?.cursor
-      ? this.decodeCursor(dto.pagination.cursor)
-      : null;
+  private async countPendingRequiredDocuments(
+    dto: CrmApplicationListRequestDto,
+  ): Promise<number> {
+    const qb = this.db.applicationRequiredDocuments
+      .createQueryBuilder('req')
+      .innerJoin('req.Application', 'app');
 
-    if (cursor) {
-      qb.andWhere(
-        `
-          (
-            "app"."createdAt" < :createdAt
-          )
-          OR
-          (
-            "app"."createdAt" = :createdAt
-            AND "app"."id" < :applicationId
-          )
-        `,
-        {
-          createdAt: cursor.createdAt,
-          applicationId: cursor.applicationId,
-        },
+    this.applyApplicationListFilterJoins(qb);
+    this.applyApplicationListFilters(qb, dto);
+
+    qb.andWhere('req.isRequired = :isRequired', { isRequired: true });
+    qb.andWhere(
+      `NOT EXISTS (
+        SELECT 1 FROM "ApplicationDocuments" doc
+        WHERE doc."applicationRequirementId" = req.id
+      )`,
+    );
+
+    return qb.getCount();
+  }
+
+  private async countPendingReviewDocuments(
+    dto: CrmApplicationListRequestDto,
+  ): Promise<number> {
+    const qb = this.db.applicationDocuments
+      .createQueryBuilder('doc')
+      .innerJoin('doc.Application', 'app');
+
+    this.applyApplicationListFilterJoins(qb);
+    this.applyApplicationListFilters(qb, dto);
+
+    qb.andWhere('doc.overallStatus = :status', {
+      status: ApplicationDocumentStatus.Pending,
+    });
+
+    return qb.getCount();
+  }
+
+  private async resolveSubmittedStageOrder(): Promise<number> {
+    const submittedStage = await this.db.applicationStages.findOne({
+      where: { stageCode: ApplicationStage.Submitted },
+      select: ['stageOrder'],
+    });
+
+    if (submittedStage?.stageOrder == null) {
+      throw new InternalServerErrorException(
+        'Submitted application stage is not configured',
       );
     }
 
-    qb.orderBy('app.createdAt', 'DESC').addOrderBy('app.id', 'DESC');
-    qb.take(limit + 1);
-
-    const entities = await qb.getMany();
-    const hasNext = entities.length > limit;
-    const pageEntities = hasNext ? entities.slice(0, limit) : entities;
-
-    const applications = pageEntities.map((x) => this.mapApplicationListItem(x));
-    const lastItem = pageEntities[pageEntities.length - 1];
-
-    return {
-      success: true,
-      message: 'Application list fetched successfully',
-      pagination: {
-        cursor:
-          lastItem && hasNext
-            ? this.encodeCursor({
-                createdAt: lastItem.createdAt.toISOString(),
-                applicationId: lastItem.id,
-              })
-            : null,
-        limit,
-        hasNext,
-      },
-      applications,
-    };
+    return submittedStage.stageOrder;
   }
 
   async getDropdownData(): Promise<CrmApplicationDropdownDataResponseDto> {

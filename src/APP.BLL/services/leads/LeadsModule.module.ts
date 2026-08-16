@@ -3,6 +3,7 @@ import { LeadProfileService } from './LeadProfileService';
 import { LeadCreationService } from './LeadCreationService';
 import { AcademicFormValidator } from './AcademicFormValidator';
 import { AcademicFormMapper } from './AcademicFormMapper';
+import { LeadAcademicResultWriter } from './helpers/LeadAcademicResultWriter';
 import { SearchCacheSupportModule } from '@bll/services/search/shared/cache/SearchCacheSupportModule.module';
 import { StorageModule } from '@infra/storage/StorageModule.module';
 
@@ -22,7 +23,15 @@ import { StorageModule } from '@infra/storage/StorageModule.module';
     LeadCreationService,
     AcademicFormValidator,
     AcademicFormMapper,
+    LeadAcademicResultWriter,
   ],
-  exports: [LeadProfileService, LeadCreationService],
+  exports: [
+    LeadProfileService,
+    LeadCreationService,
+    AcademicFormValidator,
+    AcademicFormMapper,
+    LeadAcademicResultWriter,
+    SearchCacheSupportModule,
+  ],
 })
 export class LeadsModule {}

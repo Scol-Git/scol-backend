@@ -11,18 +11,15 @@ import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import { AcademicFormValidator } from './AcademicFormValidator';
 import { AcademicFormMapper } from './AcademicFormMapper';
+import { LeadAcademicResultWriter } from './helpers/LeadAcademicResultWriter';
 import { AcademicFormRequestDto } from '@shared/dtos/leads/AcademicFormRequestDto';
 import { AcademicFormResponseDto } from '@shared/dtos/leads/AcademicFormResponseDto';
 import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
 import { LeadAcademicResults } from '@entity/entities/LeadAcademicResults.entity';
 import { LeadDocuments } from '@entity/entities/LeadDocuments.entity';
 import { LeadDocumentVersions } from '@entity/entities/LeadDocumentVersions.entity';
-import { LeadEnglishTestResults } from '@entity/entities/LeadEnglishTestResults.entity';
-import { LeadEnglishTestSectionResults } from '@entity/entities/LeadEnglishTestSectionResults.entity';
 import { LeadPreferredCountries } from '@entity/entities/LeadPreferredCountries.entity';
 import { LeadPreferredPrograms } from '@entity/entities/LeadPreferredPrograms.entity';
-import { SysAcademicDegrees } from '@entity/entities/SysAcademicDegrees.entity';
-import { SysEnglishTests } from '@entity/entities/SysEnglishTests.entity';
 import { SearchCacheInvalidationService } from '../search/shared/cache/SearchCacheInvalidationService';
 import { LeadProfileMapper } from './LeadProfileMapper';
 import { LeadProfileResponseDto } from '@shared/dtos/leads/LeadProfileResponseDto';
@@ -57,6 +54,7 @@ export class LeadProfileService {
     private readonly db: AppDbContext,
     private readonly validator: AcademicFormValidator,
     private readonly mapper: AcademicFormMapper,
+    private readonly academicResultWriter: LeadAcademicResultWriter,
     private readonly searchCacheInvalidation: SearchCacheInvalidationService,
     @Inject(ILoggerToken) private readonly logger: ILogger,
     @Inject(IStorageServiceToken)
@@ -181,12 +179,6 @@ export class LeadProfileService {
     dto: AcademicFormRequestDto,
   ): Promise<void> {
     const academicResultsRepo = manager.getRepository(LeadAcademicResults);
-    const englishTestResultsRepo = manager.getRepository(
-      LeadEnglishTestResults,
-    );
-    const sectionResultsRepo = manager.getRepository(
-      LeadEnglishTestSectionResults,
-    );
     const preferredCountriesRepo = manager.getRepository(
       LeadPreferredCountries,
     );
@@ -200,13 +192,13 @@ export class LeadProfileService {
         dto.lastAcademicInstitute ?? '',
       );
     }
-    await this.saveEnglishTestResultsIfPresent(
-      manager,
-      englishTestResultsRepo,
-      sectionResultsRepo,
-      leadId,
-      dto,
-    );
+    if (dto.englishTestResults?.length) {
+      await this.academicResultWriter.saveValidatedEnglishTestResults(
+        manager,
+        leadId,
+        dto.englishTestResults,
+      );
+    }
     await this.savePreferredList(
       preferredCountriesRepo,
       leadId,
@@ -232,7 +224,7 @@ export class LeadProfileService {
   ): Promise<void> {
     if (!dto.academicResults?.length) return;
 
-    await this.upsertAcademicResults(
+    await this.academicResultWriter.upsertAcademicResults(
       repo,
       leadId,
       dto.academicResults.map((r) => ({
@@ -265,69 +257,6 @@ export class LeadProfileService {
     await repo.update(target.id, { institute: institute.trim() });
   }
 
-  /**
-   * Upserts English test results when dto.englishTestResults is provided.
-   * Input is already validated (overall + all sections when test has sections).
-   */
-  private async saveEnglishTestResultsIfPresent(
-    manager: EntityManager,
-    testRepo: Repository<LeadEnglishTestResults>,
-    sectionRepo: Repository<LeadEnglishTestSectionResults>,
-    leadId: string,
-    dto: AcademicFormRequestDto,
-  ): Promise<void> {
-    if (!dto.englishTestResults?.length) return;
-
-    const testIds = dto.englishTestResults.map((r) => r.testId);
-    const tests = await manager.getRepository(SysEnglishTests).find({
-      where: testIds.map((id) => ({ id })),
-      relations: { SysEnglishTestSection: true },
-    });
-    const testMap = new Map(tests.map((t) => [t.id, t]));
-
-    const validEnglish = dto.englishTestResults.filter((result) => {
-      const test = testMap.get(result.testId);
-
-      if (!test?.maxScore) return false;
-
-      const testMaxScore = parseFloat(test.maxScore);
-      if (isNaN(testMaxScore)) return false;
-      const overallValid =
-        result.overallScore != null &&
-        result.overallScore > 0 &&
-        result.overallScore <= testMaxScore;
-      const sections =
-        (
-          test as SysEnglishTests & {
-            SysEnglishTestSection?: Array<{ id: string; maxScore?: string }>;
-          }
-        ).SysEnglishTestSection ?? [];
-      if (sections.length === 0) return overallValid;
-
-      const sectionScores = result.sections ?? [];
-      return (
-        overallValid &&
-        sections.every((section) => {
-          if (!section.maxScore) return false;
-          const max = parseFloat(section.maxScore);
-          if (isNaN(max)) return false;
-          const provided = sectionScores.find((s) => s.id === section.id);
-          return (
-            provided != null && provided.score > 0 && provided.score <= max
-          );
-        })
-      );
-    });
-    if (validEnglish.length === 0) return;
-
-    await this.upsertEnglishTestResults(
-      testRepo,
-      sectionRepo,
-      leadId,
-      validEnglish,
-    );
-  }
-
   // ── Private: preferred lists ───────────────────────────────────────────────
 
   /** Generic replace-all for preferred countries / programmes. */
@@ -344,173 +273,6 @@ export class LeadProfileService {
         repo.create({ leadId, [foreignKey]: id } as any),
       );
       await repo.save(rows as any);
-    }
-  }
-
-  /**
-   * Upsert academic results (keyed by degreeId).
-   * Only the provided results are written; existing rows for other degrees are left as-is.
-   */
-  private async upsertAcademicResults(
-    repo: Repository<LeadAcademicResults>,
-    leadId: string,
-    results: Array<{
-      degreeId: string;
-      gpa?: number;
-      institute?: string;
-      passingDate?: string;
-    }>,
-  ): Promise<void> {
-    if (!results || results.length === 0) return;
-
-    const existingResults = await repo.find({ where: { leadId } });
-    const existingByDegreeId = new Map(
-      existingResults.map((r) => [r.degreeId, r]),
-    );
-
-    for (const result of results) {
-      const existing = existingByDegreeId.get(result.degreeId);
-      const gpaStr = result.gpa != null ? String(result.gpa) : undefined;
-      const passingDateVal = result.passingDate
-        ? new Date(result.passingDate)
-        : undefined;
-
-      if (existing) {
-        const update: {
-          gpa?: string;
-          institute?: string;
-          passingDate?: Date;
-        } = {};
-        if (gpaStr !== undefined) {
-          update.gpa = gpaStr;
-        }
-        if (passingDateVal !== undefined) {
-          update.passingDate = passingDateVal;
-        }
-        if (result.institute !== undefined) {
-          update.institute = result.institute;
-        }
-        if (Object.keys(update).length > 0) {
-          await repo.update(existing.id, update);
-        }
-      } else {
-        const entity = repo.create({
-          leadId,
-          degreeId: result.degreeId,
-          gpa: gpaStr,
-          passingDate: passingDateVal,
-          institute: '',
-        });
-        if (result.institute !== undefined) {
-          entity.institute = result.institute;
-        }
-        await repo.save(entity);
-      }
-    }
-  }
-
-  /**
-   * Upsert English test results (keyed by testId).
-   * Caller must pass only results that pass validation (valid overall + all section scores valid).
-   */
-  private async upsertEnglishTestResults(
-    testRepo: Repository<LeadEnglishTestResults>,
-    sectionRepo: Repository<LeadEnglishTestSectionResults>,
-    leadId: string,
-    results: AcademicFormRequestDto['englishTestResults'],
-  ): Promise<void> {
-    if (!results || results.length === 0) return;
-
-    const existingResults = await testRepo.find({ where: { leadId } });
-    const existingByTestId = new Map(
-      existingResults.map((r) => [r.sysEngTestId, r]),
-    );
-
-    for (const result of results) {
-      const overall =
-        result.overallScore != null && result.overallScore > 0
-          ? String(result.overallScore)
-          : undefined;
-      if (overall == null) continue;
-
-      const existing = existingByTestId.get(result.testId);
-      const testDateVal = result.testDate
-        ? new Date(result.testDate)
-        : undefined;
-
-      if (existing) {
-        await testRepo.update(existing.id, {
-          overallScore: overall,
-          testDate: testDateVal,
-        });
-        await this.upsertEnglishTestSections(
-          sectionRepo,
-          existing.id,
-          result.sections ?? [],
-        );
-      } else {
-        const savedTest = await testRepo.save(
-          testRepo.create({
-            leadId,
-            sysEngTestId: result.testId,
-            overallScore: overall,
-            testDate: testDateVal,
-          }),
-        );
-        const sections = result.sections ?? [];
-        if (sections.length > 0) {
-          await sectionRepo.save(
-            sections.map((s) =>
-              sectionRepo.create({
-                resultId: savedTest.id,
-                sysEngTestSectionId: s.id,
-                sectionScore: String(s.score),
-              }),
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  /**
-   * Upsert English test sections (keyed by id)
-   * - Empty array = skip (no changes to sections)
-   * - Values provided = upsert (update existing by id, insert new)
-   */
-  private async upsertEnglishTestSections(
-    repo: Repository<LeadEnglishTestSectionResults>,
-    resultId: string,
-    sections: { id: string; score: number }[],
-  ): Promise<void> {
-    if (!sections || sections.length === 0) {
-      // Empty = skip, don't touch existing sections
-      return;
-    }
-
-    const existingSections = await repo.find({ where: { resultId } });
-    const existingBySectionId = new Map(
-      existingSections.map((s) => [s.sysEngTestSectionId, s]),
-    );
-
-    // Upsert each section (update existing, insert new)
-    for (const section of sections) {
-      const existing = existingBySectionId.get(section.id);
-      if (existing) {
-        // Update existing
-        await repo.update(existing.id, {
-          sectionScore: section.score.toString(),
-        });
-      } else {
-        // Insert new
-        await repo.save(
-          repo.create({
-            resultId,
-            sysEngTestSectionId: section.id,
-            sectionScore: section.score.toString(),
-          }),
-        );
-      }
     }
   }
 

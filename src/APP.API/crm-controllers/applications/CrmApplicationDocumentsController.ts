@@ -7,11 +7,13 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@api/common/decorators/CurrentUser.decorator';
 import { RequireRole } from '@api/common/decorators/RequireRole.decorator';
 import { JwtAuthGuard } from '@api/common/guards/JwtAuthGuard.guard';
 import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
+import { AddSwaggerDoc } from '@api/common/swagger/add-swagger-doc.decorator';
+import '../common/swagger/applications/swagger.doc';
 import { CrmApplicationDocumentService } from '@bll/crm-services/applications/CrmApplicationDocumentService';
 import { CrmApplicationDocumentReviewService } from '@bll/crm-services/applications/CrmApplicationDocumentReviewService';
 import { ChangeCrmApplicationDocumentStatusRequestDto } from '@shared/dtos/applications/ChangeCrmApplicationDocumentStatusRequestDto';
@@ -23,11 +25,22 @@ import { ConfirmApplicationDocumentUploadResponseDto } from '@shared/dtos/applic
 import { GenerateApplicationDocumentDownloadResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentDownloadResponseDto';
 import { GenerateApplicationDocumentUploadUrlRequestDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlRequestDto';
 import { GenerateApplicationDocumentUploadUrlResponseDto } from '@shared/dtos/applications/GenerateApplicationDocumentUploadUrlResponseDto';
+import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
+import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 import { Role } from '@shared/enums/Role.enum';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 
 @ApiTags('CRM Application Documents')
 @ApiBearerAuth('JWT-auth')
+@ApiExtraModels(
+  SuccessResponseDto,
+  ErrorResponseDto,
+  GenerateApplicationDocumentUploadUrlResponseDto,
+  ConfirmApplicationDocumentUploadResponseDto,
+  GenerateApplicationDocumentDownloadResponseDto,
+  ChangeCrmApplicationDocumentStatusResponseDto,
+  ChangeCrmApplicationRequirementStatusResponseDto,
+)
 @UseGuards(JwtAuthGuard, RoleGuard)
 @RequireRole(Role.ADMIN, Role.COUNSELLOR)
 @Controller('crm/leads/:leadId/applications/:applicationId')
@@ -38,6 +51,7 @@ export class CrmApplicationDocumentsController {
   ) {}
 
   @Post('document-types/:documentTypeId/upload-url')
+  @AddSwaggerDoc('crmApplicationDocuments', 'generateUploadUrl')
   async generateUploadUrl(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -55,6 +69,7 @@ export class CrmApplicationDocumentsController {
   }
 
   @Post('document-types/:documentTypeId/confirm-upload')
+  @AddSwaggerDoc('crmApplicationDocuments', 'confirmUpload')
   async confirmUpload(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -72,6 +87,7 @@ export class CrmApplicationDocumentsController {
   }
 
   @Get('documents/:documentId/download')
+  @AddSwaggerDoc('crmApplicationDocuments', 'downloadDocument')
   async downloadDocument(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -87,6 +103,7 @@ export class CrmApplicationDocumentsController {
   }
 
   @Post('documents/:documentId/status-changes')
+  @AddSwaggerDoc('crmApplicationDocuments', 'changeDocumentStatus')
   async changeDocumentStatus(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -104,6 +121,7 @@ export class CrmApplicationDocumentsController {
   }
 
   @Post('document-types/:documentTypeId/status-changes')
+  @AddSwaggerDoc('crmApplicationDocuments', 'changeRequirementStatus')
   async changeRequirementStatus(
     @CurrentUser() user: ICurrentUser,
     @Param('leadId', ParseUUIDPipe) leadId: string,

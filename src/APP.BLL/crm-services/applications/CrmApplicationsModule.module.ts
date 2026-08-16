@@ -6,6 +6,7 @@ import { CrmApplicationQueryService } from './CrmApplicationQueryService';
 import { CrmApplicationDocumentService } from './CrmApplicationDocumentService';
 import { CrmApplicationDocumentReviewService } from './CrmApplicationDocumentReviewService';
 import { CrmApplicationDocumentReviewPolicy } from './helpers/CrmApplicationDocumentReviewPolicy';
+import { CrmLeadScopedDocumentStatusApplier } from './helpers/CrmLeadScopedDocumentStatusApplier';
 import { CrmApplicationWorkflowPolicy } from './helpers/CrmApplicationWorkflowPolicy';
 import { CrmApplicationWorkflowService } from './CrmApplicationWorkflowService';
 import { CrmApplicationActivityMapper } from './helpers/CrmApplicationActivityMapper';
@@ -23,6 +24,7 @@ import { CrmApplicationNoteMapper } from './helpers/CrmApplicationNoteMapper';
     CrmApplicationNoteMapper,
     CrmApplicationDocumentService,
     CrmApplicationDocumentReviewPolicy,
+    CrmLeadScopedDocumentStatusApplier,
     CrmApplicationDocumentReviewService,
     CrmApplicationWorkflowPolicy,
     CrmApplicationWorkflowService,
@@ -33,6 +35,8 @@ import { CrmApplicationNoteMapper } from './helpers/CrmApplicationNoteMapper';
     CrmApplicationNoteService,
     CrmApplicationDocumentService,
     CrmApplicationDocumentReviewService,
+    CrmApplicationDocumentReviewPolicy,
+    CrmLeadScopedDocumentStatusApplier,
     CrmApplicationWorkflowService,
   ],
 })

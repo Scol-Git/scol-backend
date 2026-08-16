@@ -12,6 +12,8 @@ import { EnglishTestSectionItemDto } from '@shared/dtos/leads/EnglishTestSection
 import { PreferredCountryItemDto } from '@shared/dtos/leads/PreferredCountryItemDto';
 import { PreferredProgrammeItemDto } from '@shared/dtos/leads/PreferredProgrammeItemDto';
 import { LeadProfileService } from './LeadProfileService';
+import { CrmAcademicResultItemDto } from '@shared/dtos/crm/leads/CrmAcademicResultItemDto';
+import { CrmEnglishTestResultItemDto } from '@shared/dtos/crm/leads/CrmEnglishTestResultItemDto';
 
 // ---------------------------------------------------------------------------
 // Extended entity types (sections are loaded at runtime via relations)
@@ -81,6 +83,48 @@ export class AcademicFormMapper {
       preferredCountries,
       preferredProgrammes,
     };
+  }
+
+  toCrmAcademicResults(
+    leadProfile: SysLeadProfiles | null,
+    systemDegrees: SysAcademicDegrees[],
+  ): CrmAcademicResultItemDto[] {
+    return this.mapAcademicResults(leadProfile, systemDegrees).map((item) => {
+      const result = leadProfile?.LeadAcademicResult?.find(
+        (row) => row.degreeId === item.degreeId,
+      );
+      return {
+        degreeId: item.degreeId,
+        degreeName: item.degreeName,
+        gpa: item.gpa,
+        institute: item.institute,
+        passingDate: item.passingDate,
+        isVerified: result?.isVerified === true,
+        validation: item.validation,
+      };
+    });
+  }
+
+  toCrmEnglishTestResults(
+    leadProfile: SysLeadProfiles | null,
+    systemEnglishTests: SysEnglishTests[],
+  ): CrmEnglishTestResultItemDto[] {
+    return this.mapEnglishTestResults(leadProfile, systemEnglishTests).map(
+      (item) => {
+        const result = leadProfile?.LeadEnglishTestResult?.find(
+          (row) => row.sysEngTestId === item.testId,
+        );
+        return {
+          testId: item.testId,
+          testName: item.testName,
+          overallScore: item.overallScore,
+          testDate: item.testDate,
+          isVerified: result?.isVerified === true,
+          sections: item.sections,
+          validation: item.validation,
+        };
+      },
+    );
   }
 
   private mapAcademicResults(

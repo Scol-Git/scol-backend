@@ -28,9 +28,9 @@ export class AcademicFormValidator {
     const errors: string[] = [];
 
     
-    await this.validateAcademicResults(dto, errors);
+    await this.validateAcademicResults(dto.academicResults, errors);
     await this.validateLastAcademicInstitute(dto, leadId, errors);
-    await this.validateEnglishTestResults(dto, errors);
+    await this.validateEnglishTestResults(dto.englishTestResults, errors);
     await this.validatePreferredIds(
       'country',
       dto.preferredCountryIds,
@@ -55,6 +55,26 @@ export class AcademicFormValidator {
       errors,
     );
     
+    if (errors.length) {
+      throw new BadRequestException(errors);
+    }
+  }
+
+  async validateAcademicResultsOrThrow(
+    academicResults: AcademicFormRequestDto['academicResults'],
+  ): Promise<void> {
+    const errors: string[] = [];
+    await this.validateAcademicResults(academicResults, errors);
+    if (errors.length) {
+      throw new BadRequestException(errors);
+    }
+  }
+
+  async validateEnglishTestResultsOrThrow(
+    englishTestResults: AcademicFormRequestDto['englishTestResults'],
+  ): Promise<void> {
+    const errors: string[] = [];
+    await this.validateEnglishTestResults(englishTestResults, errors);
     if (errors.length) {
       throw new BadRequestException(errors);
     }
@@ -87,12 +107,12 @@ export class AcademicFormValidator {
    * each entry must have gpa not null, > 0, and within degree gpaScale.
    */
   private async validateAcademicResults(
-    dto: AcademicFormRequestDto,
+    academicResults: AcademicFormRequestDto['academicResults'],
     errors: string[],
   ): Promise<void> {
-    if (!dto.academicResults?.length) return;
+    if (!academicResults?.length) return;
 
-     const degreeIds = dto.academicResults.map((r) => r.degreeId);
+     const degreeIds = academicResults.map((r) => r.degreeId);
 
 
      // 1. duplicates
@@ -123,25 +143,28 @@ export class AcademicFormValidator {
     
     const degreeMap = new Map(degrees.map((d) => [d.id, d]));
 
-   
-   
-
-    // Validate GPA per degree
-
-    for (const r of dto.academicResults) {
+    for (const r of academicResults) {
       const degree = degreeMap.get(r.degreeId);
       if (!degree) continue;
-  
+
+      const levelOrder = Number(degree.levelOrder);
+      if (!VALID_LEVEL_ORDERS.has(levelOrder)) {
+        errors.push(
+          `Academic degree ${degree.degreeName} is not in the allowed level range`,
+        );
+        continue;
+      }
+
       const gpa = r.gpa;
-  
+
       // GPA must be valid number > 0
       if (typeof gpa !== 'number' || gpa <= 0) {
         errors.push(`Invalid GPA for ${degree.degreeName}`);
         continue;
       }
-  
+
       const max = Number(degree.gpaScale);
-  
+
       // GPA must not exceed scale
       if (!isNaN(max) && gpa > max) {
         errors.push(`GPA exceeds max scale ${degree.gpaScale} for ${degree.degreeName}`);
@@ -155,12 +178,12 @@ export class AcademicFormValidator {
    * when test has sections in DB, all section ids must be present with score > 0 and within section maxScore when configured.
    */
   private async validateEnglishTestResults(
-    dto: AcademicFormRequestDto,
+    englishTestResults: AcademicFormRequestDto['englishTestResults'],
     errors: string[],
   ): Promise<void> {
-    if (!dto.englishTestResults?.length) return;
+    if (!englishTestResults?.length) return;
 
-     const testIds = dto.englishTestResults.map((r) => r.testId);
+     const testIds = englishTestResults.map((r) => r.testId);
 
 
     // 1. duplicates
@@ -211,7 +234,7 @@ export class AcademicFormValidator {
     // Validate test scores
     // ---------------------------------------------------
 
-    for (const result of dto.englishTestResults) {
+    for (const result of englishTestResults) {
       const test = testMap.get(result.testId);
       if (!test) continue;
 

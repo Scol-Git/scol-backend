@@ -60,6 +60,20 @@ export class CrmApplicationListItemDto {
   lastupdateDate!: string;
 }
 
+export class CrmApplicationListStatisticsDto {
+  @ApiProperty({ example: 120 })
+  totalApplications!: number;
+
+  @ApiProperty({ example: 15 })
+  pendingReview!: number;
+
+  @ApiProperty({ example: 80 })
+  applicationSubmitted!: number;
+
+  @ApiProperty({ example: 25 })
+  pendingDocuments!: number;
+}
+
 export class CrmApplicationListResponseDto {
   @ApiProperty({ example: true })
   success!: boolean;
@@ -69,6 +83,9 @@ export class CrmApplicationListResponseDto {
 
   @ApiProperty({ type: CursorPaginationResponseDto })
   pagination!: CursorPaginationResponseDto;
+
+  @ApiProperty({ type: CrmApplicationListStatisticsDto })
+  statistics!: CrmApplicationListStatisticsDto;
 
   @ApiProperty({ type: [CrmApplicationListItemDto] })
   applications!: CrmApplicationListItemDto[];
