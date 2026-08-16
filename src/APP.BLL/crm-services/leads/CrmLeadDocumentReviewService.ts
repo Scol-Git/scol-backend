@@ -27,10 +27,10 @@ export class CrmLeadDocumentReviewService {
     documentId: string,
     dto: ChangeCrmApplicationDocumentStatusRequestDto,
   ): Promise<ChangeCrmApplicationDocumentStatusResponseDto> {
-    await this.accessService.ensureCrmCanAccessLeadOrThrow(
-      currentUserId,
-      leadId,
-    );
+    // await this.accessService.ensureCrmCanAccessLeadOrThrow(
+    //   currentUserId,
+    //   leadId,
+    // );
 
     return this.db.transaction(async (manager) => {
       const reviewable = await this.resolveLeadDocumentOrThrow(

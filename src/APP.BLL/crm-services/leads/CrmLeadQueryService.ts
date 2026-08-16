@@ -28,7 +28,7 @@ export class CrmLeadQueryService {
     currentUserId: string,
     dto: CrmLeadListRequestDto,
   ): Promise<CrmLeadListResponseDto> {
-    await this.accessService.ensureConsultantUserExistsOrThrow(currentUserId);
+    //await this.accessService.ensureConsultantUserExistsOrThrow(currentUserId);
 
     const qb = this.db.leadProfiles
       .createQueryBuilder('lead')

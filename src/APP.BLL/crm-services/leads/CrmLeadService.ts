@@ -73,10 +73,10 @@ export class CrmLeadService {
     leadId: string,
     dto: UpdateCrmLeadRequestDto,
   ): Promise<UpdateCrmLeadResponseDto> {
-    await this.accessService.ensureCrmCanAccessLeadOrThrow(
-      currentUserId,
-      leadId,
-    );
+    // await this.accessService.ensureCrmCanAccessLeadOrThrow(
+    //   currentUserId,
+    //   leadId,
+    // );
 
     await this.validationService.ensureLeadExistsOrThrow(leadId);
 

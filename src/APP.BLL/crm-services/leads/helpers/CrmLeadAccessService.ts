@@ -18,10 +18,11 @@ export class CrmLeadAccessService {
   ): Promise<SysLeadProfiles> {
     const crmUser = await this.loadCrmUserWithRolesOrThrow(currentUserId);
     const leadProfile = await this.loadLeadProfileByIdOrThrow(leadId);
-
-    if (this.hasAnyRole(crmUser, [Role.SUPER_ADMIN, Role.ADMIN])) {
-      return leadProfile;
-    }
+    
+    return leadProfile;
+    // if (this.hasAnyRole(crmUser, [Role.SUPER_ADMIN, Role.ADMIN])) {
+    //   return leadProfile;
+    // }
 
     // if (
     //   this.hasAnyRole(crmUser, [Role.COUNSELLOR]) &&

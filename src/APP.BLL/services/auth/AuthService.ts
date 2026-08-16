@@ -710,6 +710,7 @@ export class AuthService {
       user: {
         userId: session.SysUser.id,
         academicFormStatus,
+        userRole: session.SysUser.roles?.map((role) => role.name) ?? [],
       },
       accessToken: newAccessToken,
     };

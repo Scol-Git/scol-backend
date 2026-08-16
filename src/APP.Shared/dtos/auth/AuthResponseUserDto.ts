@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AcademicFormStatus } from '@shared/enums/AcademicFormStatus.enum';
+import { Role } from '@shared/enums/Role.enum';
 
 /**
  * User slice in auth responses (login, verify-OTP, refresh).
@@ -18,6 +19,14 @@ export class AuthResponseUserDto {
     enum: AcademicFormStatus,
   })
   academicFormStatus!: AcademicFormStatus;
+
+  @ApiProperty({
+    description: 'Authorization roles assigned to the user',
+    enum: Role,
+    isArray: true,
+    example: [Role.LEAD],
+  })
+  userRole!: Role[];
 
   @ApiProperty({
     description: 'User full name',

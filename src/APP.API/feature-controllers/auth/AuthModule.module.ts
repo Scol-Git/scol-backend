@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './AuthController.controller';
+import { AuthV2Controller } from './AuthV2Controller.controller';
 import { AuthModule as AuthBllModule } from '@bll/services/auth/AuthModule.module';
 import { OtpJwtGuard } from '@api/common/guards/OtpJwtGuard.guard';
+import { OtpJwtBodyGuard } from '@api/common/guards/OtpJwtBodyGuard.guard';
 
 /**
  * Auth API Module
@@ -11,7 +13,7 @@ import { OtpJwtGuard } from '@api/common/guards/OtpJwtGuard.guard';
  */
 @Module({
   imports: [AuthBllModule],
-  controllers: [AuthController],
-  providers: [OtpJwtGuard],
+  controllers: [AuthController, AuthV2Controller],
+  providers: [OtpJwtGuard, OtpJwtBodyGuard],
 })
 export class AuthModule {}
