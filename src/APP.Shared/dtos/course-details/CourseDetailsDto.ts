@@ -113,20 +113,12 @@ export class CampusLifeMediaDto {
   media!: CampusLifeDto | null;
 }
 
-export class CourseDetailsDto {
+/**
+ * Shared course-details fields (public + CRM). Lead-specific flags live on CourseDetailsDto.
+ */
+export class CourseDetailsBaseDto {
   @ApiProperty() courseId!: string;
   @ApiProperty() courseName!: string;
-
-  @ApiProperty({
-    description: 'True when the authenticated lead is eligible',
-  })
-  isEligible!: boolean;
-
-  @ApiProperty({
-    description:
-      'True when the authenticated lead already has an application for this intake',
-  })
-  alreadyApplied!: boolean;
 
   @ApiProperty({ type: RankingDto })
   ranking!: RankingDto;
@@ -154,4 +146,17 @@ export class CourseDetailsDto {
 
   @ApiProperty({ type: IntakeDatesSectionDto })
   intakeDates!: IntakeDatesSectionDto;
+}
+
+export class CourseDetailsDto extends CourseDetailsBaseDto {
+  @ApiProperty({
+    description: 'True when the authenticated lead is eligible',
+  })
+  isEligible!: boolean;
+
+  @ApiProperty({
+    description:
+      'True when the authenticated lead already has an application for this intake',
+  })
+  alreadyApplied!: boolean;
 }

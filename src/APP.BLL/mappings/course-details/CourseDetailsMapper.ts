@@ -3,7 +3,7 @@ import type { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity'
 import type { SysUniversities } from '@entity/entities/SysUniversities.entity';
 import { CourseDetailsResponseDto } from '@shared/dtos/course-details/CourseDetailsResponseDto';
 import {
-  CourseDetailsDto,
+  CourseDetailsBaseDto,
   RankingDto,
   UniversityDetailsDto,
   LocationDto,
@@ -18,6 +18,12 @@ import {
 } from '@shared/dtos/course-details/CourseDetailsDto';
 import { MetaItemDto } from '@shared/dtos/course-details/MetaItemDto';
 import type { CourseDetailsLeadFlags } from '@bll/services/CourseService/CourseDetailsLeadFlagsResolver';
+
+/** CRM course-details response (no lead eligibility flags). */
+export interface CrmCourseDetailsMappedResponse {
+  courseDetails: CourseDetailsBaseDto;
+  meta: MetaItemDto[];
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -106,8 +112,24 @@ export class CourseDetailsMapper {
     leadFlags: CourseDetailsLeadFlags,
   ): CourseDetailsResponseDto {
     const sections = this.buildSections(intake, currentYearIntakes);
+    const base = this.buildCourseDetailsBase(intake, sections);
     return {
-      courseDetails: this.buildCourseDetails(intake, sections, leadFlags),
+      courseDetails: {
+        ...base,
+        isEligible: leadFlags.isEligible,
+        alreadyApplied: leadFlags.alreadyApplied,
+      },
+      meta: this.buildMeta(intake, sections),
+    };
+  }
+
+  toCrmCourseDetailsResponse(
+    intake: UniCourseIntakes,
+    currentYearIntakes: UniCourseIntakes[],
+  ): CrmCourseDetailsMappedResponse {
+    const sections = this.buildSections(intake, currentYearIntakes);
+    return {
+      courseDetails: this.buildCourseDetailsBase(intake, sections),
       meta: this.buildMeta(intake, sections),
     };
   }
@@ -127,18 +149,15 @@ export class CourseDetailsMapper {
     };
   }
 
-  private buildCourseDetails(
+  private buildCourseDetailsBase(
     intake: UniCourseIntakes,
     sections: CourseDetailSections,
-    leadFlags: CourseDetailsLeadFlags,
-  ): CourseDetailsDto {
+  ): CourseDetailsBaseDto {
     const uni = intake.UniCourse?.SysUniversity;
 
     return {
       courseId: intake.uniCourseId,
       courseName: intake.UniCourse?.courseName ?? '',
-      isEligible: leadFlags.isEligible,
-      alreadyApplied: leadFlags.alreadyApplied,
       ranking: sections.ranking,
       university: this.buildUniversity(uni),
       tags: this.buildTags(uni),

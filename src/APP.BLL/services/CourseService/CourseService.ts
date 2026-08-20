@@ -1,37 +1,16 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { IsNull } from 'typeorm';
-import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ILogger } from '@shared/interfaces/logging';
 import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 import type { ICurrentUser } from '@shared/interfaces/domain';
 import { CourseDetailsResponseDto } from '@shared/dtos/course-details/CourseDetailsResponseDto';
 import { CourseDetailsMapper } from '@bll/mappings/course-details/CourseDetailsMapper';
 import { CourseDetailsLeadFlagsResolver } from './CourseDetailsLeadFlagsResolver';
-
-/** Relations needed to build course details + meta + eligibility from intake. */
-const COURSE_DETAILS_RELATIONS = {
-  UniCourse: {
-    SysUniversity: {
-      SysCountry: true,
-      SysState: true,
-      SysCity: true,
-    },
-    CourseEngReq: {
-      SysEnglishTest: {
-        SysEnglishTestSection: true,
-      },
-    },
-    SysProgramme: true,
-    SysAcademicDegree: true,
-    minSysAcademicDegree: true,
-    higherSysAcademicDegree: true,
-  },
-};
+import { CourseDetailsLoader } from './CourseDetailsLoader';
 
 @Injectable()
 export class CourseService {
   constructor(
-    private readonly db: AppDbContext,
+    private readonly courseDetailsLoader: CourseDetailsLoader,
     private readonly courseDetailsMapper: CourseDetailsMapper,
     private readonly leadFlagsResolver: CourseDetailsLeadFlagsResolver,
     @Inject(ILoggerToken) private readonly logger: ILogger,
@@ -45,14 +24,8 @@ export class CourseService {
     intakeId: string,
     user?: ICurrentUser,
   ): Promise<CourseDetailsResponseDto | null> {
-    const intake = await this.db.courseIntakes.findOne({
-      where: {
-        id: intakeId,
-        isActive: true,
-        deletedAt: IsNull(),
-      },
-      relations: COURSE_DETAILS_RELATIONS,
-    });
+    const intake =
+      await this.courseDetailsLoader.loadActiveIntakeOrNull(intakeId);
 
     if (!intake) {
       this.logger.LogDebug('Course details: intake not found or inactive', {
@@ -61,18 +34,8 @@ export class CourseService {
       return null;
     }
 
-    const currentYear = new Date().getFullYear();
-
     const [currentYearIntakes, leadFlags] = await Promise.all([
-      this.db.courseIntakes.find({
-        where: {
-          uniCourseId: intake.uniCourseId,
-          isActive: true,
-          deletedAt: IsNull(),
-          intakeYear: currentYear,
-        },
-        order: { intakeMonth: 'ASC' },
-      }),
+      this.courseDetailsLoader.loadCurrentYearIntakes(intake.uniCourseId),
       this.leadFlagsResolver.resolve(intake, user),
     ]);
 

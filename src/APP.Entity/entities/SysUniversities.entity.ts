@@ -16,6 +16,7 @@ import { SysCities } from './SysCities.entity';
 import { UniCourses } from './UniCourses.entity';
 import { UniAcademicReq } from './UniAcademicReq.entity';
 import { UniEngReq } from './UniEngReq.entity';
+import { UniApplicationStage } from './UniApplicationStage.entity';
 import { CommissionType } from '@shared/enums/CommissionType.enum';
 
 /**
@@ -225,4 +226,10 @@ export class SysUniversities extends BaseEntity {
    */
   @OneToMany(() => UniEngReq, (req) => req.SysUniversity)
   UniEngReq!: UniEngReq[];
+
+  /**
+   * One-to-Many: University-specific application stage display order
+   */
+  @OneToMany(() => UniApplicationStage, (stage) => stage.SysUniversity)
+  UniApplicationStage!: UniApplicationStage[];
 }
