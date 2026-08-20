@@ -3,7 +3,6 @@ import { AuthService } from './AuthService';
 import { AuthValidationService } from './AuthValidationService';
 import { OtpService } from './OtpService';
 import { TokenService } from './TokenService';
-import { OtpSessionCleanupService } from './OtpSessionCleanupService';
 import { MappingModule } from '@bll/mappings/MappingModule.module';
 import { LeadsModule } from '@bll/services/leads/LeadsModule.module';
 import { SmsModule } from '@infra/sms/SmsModule.module';
@@ -16,10 +15,9 @@ import { SmsModule } from '@infra/sms/SmsModule.module';
  * - AuthValidationService (business rule validation)
  * - OtpService (OTP management)
  * - TokenService (JWT token management)
- * - OtpSessionCleanupService (cleanup via HTTP endpoint for serverless)
  *
- * Note: ScheduleModule removed - @Cron doesn't work in serverless (Vercel).
- * OTP cleanup is triggered via /internal/cron/otp-sessions endpoint by Vercel Cron.
+ * OTP session cleanup is scheduled in APP.JOB (OtpSessionCleanupJob)
+ * and implemented in APP.BLL/job-services.
  */
 @Module({
   imports: [MappingModule, LeadsModule, SmsModule],
@@ -28,8 +26,7 @@ import { SmsModule } from '@infra/sms/SmsModule.module';
     AuthValidationService,
     OtpService,
     TokenService,
-    OtpSessionCleanupService,
   ],
-  exports: [AuthService, OtpSessionCleanupService],
+  exports: [AuthService],
 })
 export class AuthModule {}

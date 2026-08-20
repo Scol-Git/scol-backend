@@ -18,10 +18,8 @@ import { CrmControllersModule } from './crm-controllers/CrmControllersModule.mod
 
 // Standalone controllers
 import { HealthController } from './feature-controllers/health/HealthController.controller';
-import { InternalCronController } from './feature-controllers/internal/InternalCronController.controller';
 
 // BLL modules for controller dependencies
-import { AuthModule as AuthBllModule } from '@bll/services/auth/AuthModule.module';
 import { HealthCheckModule } from '@bll/services/health/HealthCheckModule.module';
 
 /**
@@ -50,10 +48,9 @@ import { HealthCheckModule } from '@bll/services/health/HealthCheckModule.module
     CrmControllersModule,
 
     // BLL modules for standalone controllers
-    AuthBllModule, // For InternalCronController
     HealthCheckModule, // For HealthController
   ],
-  controllers: [HealthController, InternalCronController],
+  controllers: [HealthController],
   providers: [HttpExceptionFilter, RequestLoggingMiddleware],
 })
 export class ApiModule implements NestModule {

@@ -44,14 +44,14 @@ export const AppEnvSchema = Joi.object({
   CORS_ENABLED: Joi.string().valid('true', 'false').default('true'),
   CORS_ORIGINS: Joi.string().default('*'),
 
-  // Cron Job Security (required in qa/prod for Vercel Cron)
-  CRON_SECRET: Joi.string()
-    .min(16)
-    .when('APP_STAGE', {
-      is: Joi.valid('qa', 'prod'),
-      then: Joi.required(),
-      otherwise: Joi.optional(),
-    }),
+  // Cron Jobs (APP.JOB) - require a persistent process
+  JOBS_ENABLED: Joi.string().valid('true', 'false').default('true'),
+  OTP_SESSION_CLEANUP_CRON: Joi.string().optional(),
+  OTP_SESSION_CLEANUP_ENABLED: Joi.string()
+    .valid('true', 'false')
+    .default('true'),
+  DB_PING_CRON: Joi.string().optional(),
+  DB_PING_ENABLED: Joi.string().valid('true', 'false').default('true'),
 
   // Rate Limiting Configuration
   RATE_LIMIT_ENABLED: Joi.string().valid('true', 'false').default('false'),

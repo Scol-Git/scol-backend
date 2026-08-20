@@ -155,3 +155,15 @@ export const ISecurityConfig = Symbol('ISecurityConfig');
  * Provides API/presentation layer configuration (CORS, rate limiting)
  */
 export const IApiConfig = Symbol('IApiConfig');
+
+/**
+ * Token for IJobConfig
+ * Provides APP.JOB scheduling configuration (enabled flag, cron expressions)
+ */
+export const IJobConfig = Symbol('IJobConfig');
+
+/**
+ * Token for the aggregated ICronJob[] array.
+ * CronJobRegistrar injects this to register all jobs from config.
+ */
+export const ICronJobs = Symbol('ICronJobs');

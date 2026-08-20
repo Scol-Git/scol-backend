@@ -12,6 +12,7 @@ import { ApplicationRequiredDocuments } from './ApplicationRequiredDocuments.ent
 import { Applications } from './Applications.entity';
 import { SysApplicationStage2Status } from './SysApplicationStage2Status.entity';
 import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
+import { UniApplicationStage } from './UniApplicationStage.entity';
 import { ApplicationActivities } from './ApplicationActivities.entity';
 
 /**
@@ -80,4 +81,10 @@ export class SysApplicationStage extends BaseEntity {
 
   @OneToMany(() => SysStageRequiredDocuments, (row) => row.SysApplicationStage)
   SysStageRequiredDocuments!: SysStageRequiredDocuments[];
+
+  @OneToMany(
+    () => UniApplicationStage,
+    (uniStage) => uniStage.SysApplicationStage,
+  )
+  UniApplicationStage!: UniApplicationStage[];
 }

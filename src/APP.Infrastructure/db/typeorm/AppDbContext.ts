@@ -58,6 +58,7 @@ import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.enti
 import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
 import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
+import { UniApplicationStage } from '@entity/entities/UniApplicationStage.entity';
 
 /**
  * AppDbContext - EF Core-style DbContext for TypeORM
@@ -149,6 +150,9 @@ export class AppDbContext {
     // Course/University repositories for search
     @InjectRepository(SysUniversities)
     public readonly universities: Repository<SysUniversities>,
+
+    @InjectRepository(UniApplicationStage)
+    public readonly uniApplicationStages: Repository<UniApplicationStage>,
 
     @InjectRepository(SysStates)
     public readonly states: Repository<SysStates>,

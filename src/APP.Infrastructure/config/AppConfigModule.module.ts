@@ -6,11 +6,13 @@ import { InfrastructureConfig } from './layer-configs/InfrastructureConfig.servi
 import { ApplicationConfig } from './layer-configs/ApplicationConfig.service';
 import { SecurityConfig } from './layer-configs/SecurityConfig.service';
 import { ApiConfig } from './layer-configs/ApiConfig.service';
+import { JobConfig } from './layer-configs/JobConfig.service';
 import {
   IInfrastructureConfig,
   IApplicationConfig,
   ISecurityConfig,
   IApiConfig,
+  IJobConfig,
 } from '@shared/tokens/injection.tokens';
 
 /**
@@ -24,6 +26,7 @@ import {
  * - IApplicationConfig: Auth, pagination, business rules
  * - ISecurityConfig: JWT, OAuth
  * - IApiConfig: CORS, rate limiting
+ * - IJobConfig: Cron schedules, job enable flag
  */
 @Global()
 @Module({
@@ -53,12 +56,17 @@ import {
       provide: IApiConfig,
       useClass: ApiConfig,
     },
+    {
+      provide: IJobConfig,
+      useClass: JobConfig,
+    },
   ],
   exports: [
     IInfrastructureConfig,
     IApplicationConfig,
     ISecurityConfig,
     IApiConfig,
+    IJobConfig,
   ],
 })
 export class AppConfigModule {}

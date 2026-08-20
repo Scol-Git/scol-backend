@@ -6,7 +6,6 @@
  *
  * Examples:
  * - SMS provider: 'console' in dev, 'api' in qa/prod
- * - Cron secret validation: skip in dev, required in qa/prod
  * - Sentry environment tag: use APP_STAGE
  */
 export type AppStage = 'dev' | 'qa' | 'prod';

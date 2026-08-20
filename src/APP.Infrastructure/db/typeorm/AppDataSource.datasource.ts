@@ -100,6 +100,7 @@ import { LeadFavouriteCourses } from '@entity/entities/LeadFavouriteCourses.enti
 import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
 import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
+import { UniApplicationStage } from '@entity/entities/UniApplicationStage.entity';
 
 /**
  * AppDataSource - TypeORM DataSource for migrations and CLI operations
@@ -164,6 +165,7 @@ const AppDataSource = new DataSource({
     LeadCrmInfos,
     SysConsultantProfiles,
     ConsultantCertifications,
+    UniApplicationStage,
   ],
 
   migrations: [migrationPath],
