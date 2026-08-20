@@ -38,6 +38,7 @@ scol-backend/
 | ------------------ | -------------------- | ------------------------------------------ |
 | **API**            | `APP.API`            | HTTP controllers, guards, filters, Swagger |
 | **BLL**            | `APP.BLL`            | Business logic, services, mappers          |
+| **JOB**            | `APP.JOB`            | Cron scheduling (`@nestjs/schedule`)       |
 | **Entity**         | `APP.Entity`         | Domain entities (TypeORM)                  |
 | **Infrastructure** | `APP.Infrastructure` | DB, Redis, JWT, SMS, config, logging       |
 | **Shared**         | `APP.Shared`         | DTOs, enums, interfaces, exceptions, utils |
@@ -66,11 +67,15 @@ src/
 │   │   ├── categories/     # CategoriesController (cities, countries, etc.)
 │   │   ├── health/         # HealthController
 │   │   ├── home/           # HomeController (home search)
-│   │   ├── internal/       # InternalCronController
 │   │   ├── leads/          # LeadsProfileController (lead/academic form)
 │   │   ├── applications/   # ApplicationsController (application documents)
 │   │   └── search/         # SearchController (course search)
 │   └── crm-controllers/
+│
+├── APP.JOB/                # ─── Job Layer (cron scheduling) ───────
+│   ├── JobModule.module.ts
+│   └── cron-jobs/
+│       └── otp/            # OtpSessionCleanupJob
 │
 ├── APP.BLL/                # ─── Business Logic Layer ──────────────
 │   ├── core/
@@ -81,12 +86,15 @@ src/
 │   │   ├── auth/           # AuthResponseMapper, UserResponseMapper
 │   │   ├── mappers/        # Shared mappers
 │   │   └── search/         # CourseResponseMapper
+│   ├── job-services/
+│   │   ├── JobServicesModule.module.ts
+│   │   └── otp/            # OtpSessionCleanupService
 │   └── services/
-│   │   ├── auth/           # AuthService, TokenService
-│   │   ├── categories/     # CategoriesService
-│   │   ├── health/         # Health checks
-│   │   ├── leads/          # LeadProfileService, AcademicFormValidator, AcademicFormMapper
-│   │   └── search/         # CourseSearchService, HomeSearchService, pipeline, cache, filters
+│       ├── auth/           # AuthService, TokenService
+│       ├── categories/     # CategoriesService
+│       ├── health/         # Health checks
+│       ├── leads/          # LeadProfileService, AcademicFormValidator, AcademicFormMapper
+│       └── search/         # CourseSearchService, HomeSearchService, pipeline, cache, filters
 │   └── crm-services/
 │
 ├── APP.Entity/             # ─── Domain / Data Layer ───────────────
@@ -135,8 +143,9 @@ src/
 
 1. **HTTP** → `APP.API` (controller + guards/filters)
 2. **Controller** → `APP.BLL` services
-3. **Services** → `APP.Entity` (via TypeORM) + `APP.Infrastructure` (Redis, JWT, SMS)
-4. **Shared** used by API, BLL, and Infra (DTOs, enums, interfaces)
+3. **Cron** → `APP.JOB` jobs → `APP.BLL/job-services`
+4. **Services** → `APP.Entity` (via TypeORM) + `APP.Infrastructure` (Redis, JWT, SMS)
+5. **Shared** used by API, BLL, JOB, and Infra (DTOs, enums, interfaces)
 
 ---
 

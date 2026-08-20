@@ -7,12 +7,8 @@ import { ILogger as ILoggerToken } from '@shared/tokens/injection.tokens';
 /**
  * OTP Session Cleanup Service
  *
- * Cleans up expired OTP sessions from the PostgreSQL database.
- *
- * NOTE: In serverless environments (Vercel), this is triggered via HTTP endpoint
- * at /internal/cron/otp-sessions by Vercel Cron Jobs.
- * The @Cron decorator does NOT work reliably in serverless environments
- * because there's no persistent process to schedule cron jobs.
+ * Deletes expired OTP sessions. Scheduling lives in APP.JOB
+ * (OtpSessionCleanupJob); this service stays trigger-agnostic.
  */
 @Injectable()
 export class OtpSessionCleanupService {
@@ -23,10 +19,6 @@ export class OtpSessionCleanupService {
 
   /**
    * Cleanup expired OTP sessions
-   *
-   * Called by:
-   * - Vercel Cron via /internal/cron/otp-sessions (production/qa)
-   * - Can be called manually for testing
    *
    * @returns Number of deleted sessions
    */

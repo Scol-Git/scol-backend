@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApiModule } from '@api/ApiModule.module';
+import { JobModule } from '@job/JobModule.module';
 
 // Import @Global modules ONCE at root - they're available everywhere
 import { LoggingModule } from '@infra/logging/LoggingModule.module';
@@ -15,6 +16,7 @@ import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModul
  *
  * Imports @Global modules once at root level - they're automatically available everywhere.
  * Imports ApiModule which contains all feature modules.
+ * Imports JobModule for cron scheduling (APP.JOB).
  */
 @Module({
   imports: [
@@ -27,8 +29,9 @@ import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModul
     CacheModule, // Provides ICacheService (Redis + in-memory fallback)
     RateLimitingModule, // Provides IRateLimitingStorage (Redis + in-memory fallback)
 
-    // Application module
+    // Application modules
     ApiModule,
+    JobModule,
   ],
 })
 export class AppModule {}

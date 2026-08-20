@@ -12,6 +12,7 @@
     "paths": {
       "@api/*": ["src/APP.API/*"],
       "@bll/*": ["src/APP.BLL/*"],
+      "@job/*": ["src/APP.JOB/*"],
       "@infra/*": ["src/APP.Infrastructure/*"],
       "@entity/*": ["src/APP.Entity/*"],
       "@shared/*": ["src/APP.Shared/*"]
