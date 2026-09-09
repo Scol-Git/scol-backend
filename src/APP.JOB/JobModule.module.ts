@@ -4,6 +4,8 @@ import { JobServicesModule } from '@bll/job-services/JobServicesModule.module';
 import { CronJobRegistrar } from './core/CronJobRegistrar';
 import { OtpSessionCleanupJob } from './cron-jobs/otp/OtpSessionCleanupJob';
 import { DatabasePingJob } from './cron-jobs/health/DatabasePingJob';
+import { UserSessionCleanupJob } from './cron-jobs/auth/UserSessionCleanupJob';
+import { AccountLockoutMaintenanceJob } from './cron-jobs/auth/AccountLockoutMaintenanceJob';
 import type { ICronJob } from '@shared/interfaces/jobs/ICronJob.interface';
 import { ICronJobs as ICronJobsToken } from '@shared/tokens/injection.tokens';
 
@@ -19,10 +21,17 @@ import { ICronJobs as ICronJobsToken } from '@shared/tokens/injection.tokens';
   providers: [
     OtpSessionCleanupJob,
     DatabasePingJob,
+    UserSessionCleanupJob,
+    AccountLockoutMaintenanceJob,
     {
       provide: ICronJobsToken,
       useFactory: (...jobs: ICronJob[]) => jobs,
-      inject: [OtpSessionCleanupJob, DatabasePingJob],
+      inject: [
+        OtpSessionCleanupJob,
+        DatabasePingJob,
+        UserSessionCleanupJob,
+        AccountLockoutMaintenanceJob,
+      ],
     },
     CronJobRegistrar,
   ],

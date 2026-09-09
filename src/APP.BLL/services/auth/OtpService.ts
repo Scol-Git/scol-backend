@@ -1,4 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
+import { randomInt } from 'crypto';
 import { randomUUID } from 'crypto';
 import { ICacheService } from '@shared/interfaces/infrastructure';
 import { ICacheService as ICacheServiceToken } from '@shared/tokens/injection.tokens';
@@ -88,7 +89,7 @@ export class OtpService {
   public generateOtp(): string {
     const min = Math.pow(10, this.otpLength - 1);
     const max = Math.pow(10, this.otpLength) - 1;
-    return Math.floor(Math.random() * (max - min + 1) + min).toString();
+    return randomInt(min, max + 1).toString();
   }
 
   /**

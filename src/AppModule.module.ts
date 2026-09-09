@@ -21,11 +21,11 @@ import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModul
 @Module({
   imports: [
     // @Global modules - imported once, available everywhere
+    LoggingModule, // Provides ILogger (before AppConfigModule for SecurityConfig boot log)
     AppConfigModule, // Provides IInfrastructureConfig, IApplicationConfig, ISecurityConfig, IApiConfig
-    LoggingModule, // Provides ILogger
-    SecurityModule, // Provides IJwtService, IPasswordHasher
     MappingModule, // Provides IMapper
-    TypeOrmModule, // Provides DbContext (via @InjectDataSource())
+    TypeOrmModule, // Provides DbContext (before SecurityModule for RevocationRegistry)
+    SecurityModule, // Provides IJwtService, IPasswordHasher, IRevocationRegistry
     CacheModule, // Provides ICacheService (Redis + in-memory fallback)
     RateLimitingModule, // Provides IRateLimitingStorage (Redis + in-memory fallback)
 

@@ -1,16 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isProd } from '@infra/config/getAppStage';
 import type { IApiConfig } from '@shared/interfaces/config/IApiConfig.interface';
 
-/**
- * API Configuration Service
- *
- * Provides type-safe access to API/presentation layer configuration.
- * Implements IApiConfig interface for dependency injection.
- *
- * @class ApiConfig
- * @implements {IApiConfig}
- */
 @Injectable()
 export class ApiConfig implements IApiConfig {
   cors = {
@@ -22,7 +14,9 @@ export class ApiConfig implements IApiConfig {
   };
 
   rateLimit = {
-    enabled: this._config.get<string>('RATE_LIMIT_ENABLED', 'false') === 'true',
+    enabled:
+      isProd() ||
+      this._config.get<string>('RATE_LIMIT_ENABLED', 'true') === 'true',
 
     global: {
       limit: this._config.get<number>('RATE_LIMIT_GLOBAL_LIMIT', 10000),
@@ -52,22 +46,19 @@ export class ApiConfig implements IApiConfig {
     exemptRoles: this._parseCommaSeparated('RATE_LIMIT_EXEMPT_ROLES'),
   };
 
+  trustProxyHops = this._config.get<number>('TRUST_PROXY_HOPS', 0);
+
   constructor(private readonly _config: ConfigService) {}
 
-  /**
-   * Parse comma-separated values from environment variable
-   */
   private _parseCommaSeparated(envKey: string): string[] | undefined {
     const value = this._config.get<string>(envKey);
     if (!value) {
       return undefined;
     }
-
     const items = value
       .split(',')
       .map((item) => item.trim())
       .filter((item) => item.length > 0);
-
     return items.length > 0 ? items : undefined;
   }
 }

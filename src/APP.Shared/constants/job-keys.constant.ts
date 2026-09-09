@@ -5,6 +5,8 @@
 export const JOB_KEYS = {
   otpSessionCleanup: 'otpSessionCleanup',
   databasePing: 'databasePing',
+  userSessionCleanup: 'userSessionCleanup',
+  accountLockoutMaintenance: 'accountLockoutMaintenance',
 } as const;
 
 export type JobKey = (typeof JOB_KEYS)[keyof typeof JOB_KEYS];

@@ -3,30 +3,27 @@ import { AuthService } from './AuthService';
 import { AuthValidationService } from './AuthValidationService';
 import { OtpService } from './OtpService';
 import { TokenService } from './TokenService';
+import { SessionService } from './SessionService';
+import { LoginService } from './LoginService';
+import { RegistrationService } from './RegistrationService';
+import { PasswordRecoveryService } from './PasswordRecoveryService';
 import { MappingModule } from '@bll/mappings/MappingModule.module';
 import { LeadsModule } from '@bll/services/leads/LeadsModule.module';
 import { SmsModule } from '@infra/sms/SmsModule.module';
+import { RateLimitingModule } from '@infra/redis/rate-limiting/RateLimitingModule.module';
 
-/**
- * Auth Module (BLL)
- *
- * Provides authentication services:
- * - AuthService (main service with all operations)
- * - AuthValidationService (business rule validation)
- * - OtpService (OTP management)
- * - TokenService (JWT token management)
- *
- * OTP session cleanup is scheduled in APP.JOB (OtpSessionCleanupJob)
- * and implemented in APP.BLL/job-services.
- */
 @Module({
-  imports: [MappingModule, LeadsModule, SmsModule],
+  imports: [MappingModule, LeadsModule, SmsModule, RateLimitingModule],
   providers: [
     AuthService,
     AuthValidationService,
     OtpService,
     TokenService,
+    SessionService,
+    LoginService,
+    RegistrationService,
+    PasswordRecoveryService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, SessionService],
 })
 export class AuthModule {}

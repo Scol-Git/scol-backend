@@ -3,25 +3,24 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  Inject,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Inject } from '@nestjs/common';
-import type { IJwtService } from '@shared/interfaces/security';
-import { IJwtService as IJwtServiceToken } from '@shared/tokens/injection.tokens';
+import type { IJwtService, IRevocationRegistry } from '@shared/interfaces/security';
+import {
+  IJwtService as IJwtServiceToken,
+  IRevocationRegistry as IRevocationRegistryToken,
+} from '@shared/tokens/injection.tokens';
 import { JwtPayloadToCurrentUserMapper } from '@shared/mappers/JwtPayloadToCurrentUser.mapper';
 import type { ICurrentUser } from '@shared/interfaces/domain';
+import { InvalidTokenException } from '@shared/exceptions/auth/InvalidTokenException';
 
-/**
- * JWT Authentication Guard
- *
- * Validates JWT tokens and attaches user information to the request.
- * Converts JwtPayload (infrastructure) to ICurrentUser (domain) at the boundary.
- * Follows .NET Core's authentication middleware pattern.
- */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     @Inject(IJwtServiceToken) private readonly _jwtService: IJwtService,
+    @Inject(IRevocationRegistryToken)
+    private readonly _revocation: IRevocationRegistry,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -33,34 +32,35 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload = this._jwtService.verifyToken(token);
+      const payload = this._jwtService.verifyToken(token, 'access');
 
-      // Reject OTP tokens - they should only be used with OtpJwtGuard
-      if ((payload as any).aud === 'otp') {
-        throw new UnauthorizedException(
-          'Invalid authentication token type',
-        );
+      if (payload.iat !== undefined) {
+        const revoked = this._revocation.isRevoked({
+          sessionId: payload.sid,
+          userId: payload.sub,
+          tokenIssuedAt: payload.iat,
+        });
+        if (revoked) {
+          throw new InvalidTokenException();
+        }
       }
 
-      // Convert JwtPayload (infrastructure) to ICurrentUser (domain) at boundary
       const currentUser = JwtPayloadToCurrentUserMapper.toCurrentUser(payload);
-
-      // Attach ICurrentUser (not JwtPayload) to request
       (request as Request & { user: ICurrentUser }).user = currentUser;
-
       return true;
     } catch (error) {
+      if (error instanceof InvalidTokenException) {
+        throw error;
+      }
       throw new UnauthorizedException('Token is invalid or expired');
     }
   }
 
   private _extractToken(request: Request): string | null {
     const authHeader = request.headers.authorization;
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return null;
     }
-
     return authHeader.substring(7);
   }
 }

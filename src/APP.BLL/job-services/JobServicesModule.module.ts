@@ -1,12 +1,10 @@
 import { Module } from '@nestjs/common';
 import { OtpJobServicesModule } from './otp/OtpJobServicesModule.module';
 import { HealthJobServicesModule } from './health/HealthJobServicesModule.module';
+import { AuthJobServicesModule } from './auth/AuthJobServicesModule.module';
 
-/**
- * Aggregates all BLL services consumed exclusively by APP.JOB cron jobs.
- */
 @Module({
-  imports: [OtpJobServicesModule, HealthJobServicesModule],
-  exports: [OtpJobServicesModule, HealthJobServicesModule],
+  imports: [OtpJobServicesModule, HealthJobServicesModule, AuthJobServicesModule],
+  exports: [OtpJobServicesModule, HealthJobServicesModule, AuthJobServicesModule],
 })
 export class JobServicesModule {}

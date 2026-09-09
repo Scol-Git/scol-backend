@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysUsers } from './SysUsers.entity';
@@ -7,6 +7,8 @@ import { SysUsers } from './SysUsers.entity';
  * @class UserSessions
  * @extends {BaseEntity}
  */
+@Index('IX_UserSessions_user_id', ['userId'])
+@Index('IX_UserSessions_expiresAt', ['expiresAt'])
 @Entity('UserSessions')
 export class UserSessions extends BaseEntity {
   @Column({
@@ -20,7 +22,7 @@ export class UserSessions extends BaseEntity {
   @Column({
     name: 'refreshTokenHash',
     type: 'varchar',
-    length: 255,
+    length: 64,
     nullable: false,
   })
   @AutoMap()
@@ -43,6 +45,23 @@ export class UserSessions extends BaseEntity {
   revokedAt?: Date;
 
   @Column({
+    name: 'revokedReason',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  @AutoMap()
+  revokedReason?: string;
+
+  @Column({
+    name: 'lastUsedAt',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  @AutoMap()
+  lastUsedAt?: Date;
+
+  @Column({
     name: 'ipAddress',
     type: 'varchar',
     length: 100,
@@ -60,14 +79,6 @@ export class UserSessions extends BaseEntity {
   @AutoMap()
   userAgent?: string;
 
-  // ========================================
-  // Navigation Properties (EF Core style)
-  // ========================================
-
-  /**
-   * Many-to-One: User
-   * Each session belongs to one user
-   */
   @ManyToOne(() => SysUsers, (user) => user.UserSession)
   @JoinColumn({ name: 'user_id' })
   SysUser!: SysUsers;

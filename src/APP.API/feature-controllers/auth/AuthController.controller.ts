@@ -5,9 +5,10 @@ import {
   Get,
   UseGuards,
   Headers,
-  Req,
-  BadRequestException,
+  Res,
+  UnauthorizedException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 
 // Swagger imports
 import { ApiExtraModels, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -31,7 +32,6 @@ import {
 // Types imports
 import type { ICurrentUser } from '@shared/interfaces/domain';
 import type { OtpUserPayload } from '@shared/interfaces/auth/OtpUserPayload.interface';
-import type { Request } from 'express';
 
 // Services imports
 import { AuthService } from '@bll/services/auth/AuthService';
@@ -102,8 +102,8 @@ export class AuthController {
    * For password reset (purpose=password_reset): Applies new password and returns auth tokens
    */
   @Post('verify-otp')
-  @UseGuards(OtpJwtGuard)
-  @RateLimit({ limit: 10, windowSeconds: 300 }) // 10 OTP attempts per 5 minutes
+  @UseGuards(RateLimitGuard, OtpJwtGuard)
+  @RateLimit({ limit: 10, windowSeconds: 300 })
   @ApiBearerAuth('OTP-auth')
   @AddSwaggerDoc('auth', 'verifyOtp')
   async verifyOtp(
@@ -125,7 +125,8 @@ export class AuthController {
    * Requires: OTP JWT token in Authorization header
    */
   @Get('resend-otp')
-  @UseGuards(OtpJwtGuard)
+  @UseGuards(RateLimitGuard, OtpJwtGuard)
+  @RateLimit({ limit: 10, windowSeconds: 300 })
   @ApiBearerAuth('OTP-auth')
   @AddSwaggerDoc('auth', 'resendOtp')
   async resendOtp(
@@ -157,17 +158,37 @@ export class AuthController {
    */
   @Get('refresh')
   @UseGuards(RateLimitGuard)
-  @RateLimit({ limit: 20, windowSeconds: 300 }) // 20 refresh requests per 5 minutes
+  @RateLimit({ limit: 20, windowSeconds: 300 })
   @ApiBearerAuth('JWT-auth')
   @AddSwaggerDoc('auth', 'refresh')
-  async refresh(
+  async refreshGet(
     @Headers('authorization') authHeader: string | undefined,
     @ReqInfo() reqInfo: ReqInfoPayload,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<TokenRefreshResponseDto> {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.refreshToken(authHeader, reqInfo);
+  }
+
+  @Post('refresh')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 20, windowSeconds: 300 })
+  @ApiBearerAuth('JWT-auth')
+  async refreshPost(
+    @Headers('authorization') authHeader: string | undefined,
+    @ReqInfo() reqInfo: ReqInfoPayload,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<TokenRefreshResponseDto> {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.refreshToken(authHeader, reqInfo);
+  }
+
+  private async refreshToken(
+    authHeader: string | undefined,
+    reqInfo: ReqInfoPayload,
   ): Promise<TokenRefreshResponseDto> {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new BadRequestException(
-        'Refresh token is required',
-      );
+      throw new UnauthorizedException('Refresh token is required');
     }
     const refreshToken = authHeader.substring(7);
     return await this.authService.refreshAccessToken(refreshToken, reqInfo.ip);
@@ -175,15 +196,33 @@ export class AuthController {
 
   /**
    * Logout current session
-   * GET /auth/logout
-   * Requires: Access JWT token in Authorization header
+   * GET /auth/logout (deprecated - use POST)
    */
   @Get('logout')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @AddSwaggerDoc('auth', 'logout')
-  async logout(
+  async logoutGet(
     @ReqInfo() reqInfo: ReqInfoPayload,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ message: string }> {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.logout(reqInfo);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  async logoutPost(
+    @ReqInfo() reqInfo: ReqInfoPayload,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ message: string }> {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.logout(reqInfo);
+  }
+
+  private async logout(
+    reqInfo: ReqInfoPayload,
   ): Promise<{ message: string }> {
     await this.authService.logout(reqInfo.ip, reqInfo.userAgent);
     return { message: 'Logged out successfully' };

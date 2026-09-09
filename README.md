@@ -59,7 +59,7 @@ Choose the setup that works best for you:
    JWT_REFRESH_TOKEN_EXPIRES_IN=7d
    
    # Redis (Docker)
-   REDIS_URL=redis://localhost:6379
+   REDIS_URL=redis://:redis123@localhost:6379
    
    # RabbitMQ (Docker)
    RABBITMQ_URL=amqp://admin:admin123@localhost:5672
@@ -123,7 +123,7 @@ REDIS_URL=redis://localhost:6379
 
 **If using local Redis:**
 ```env
-REDIS_URL=redis://localhost:6379  # Or your Redis URL
+REDIS_URL=redis://:redis123@localhost:6379  # Or your Redis URL
 ```
 
 **If using Docker RabbitMQ:**

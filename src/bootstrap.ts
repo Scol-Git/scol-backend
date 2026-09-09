@@ -10,6 +10,8 @@ import { HttpExceptionFilter } from '@api/common/filters/HttpExceptionFilter.fil
 import { UserContextInterceptor } from '@api/common/interceptors/UserContextInterceptor.interceptor';
 import { ResponseInterceptor } from '@api/common/interceptors/ResponseInterceptor.interceptor';
 import type { INestApplication } from '@nestjs/common';
+import type { IApiConfig } from '@shared/interfaces/config/IApiConfig.interface';
+import { IApiConfig as IApiConfigToken } from '@shared/tokens/injection.tokens';
 
 export interface CreateNestAppOptions {
   /**
@@ -36,6 +38,11 @@ export async function createNestApp(
     : await NestFactory.create(AppModule, { bufferLogs: true });
 
   app.useLogger(app.get(Logger));
+
+  const apiConfig = app.get<IApiConfig>(IApiConfigToken);
+  if (apiConfig.trustProxyHops > 0) {
+    app.getHttpAdapter().getInstance().set('trust proxy', apiConfig.trustProxyHops);
+  }
 
   app.enableCors({
     origin: '*',
