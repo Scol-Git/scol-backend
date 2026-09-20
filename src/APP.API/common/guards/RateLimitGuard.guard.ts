@@ -22,6 +22,7 @@ import {
   SKIP_RATE_LIMIT_KEY,
   RateLimitOptions,
 } from '../decorators/RateLimit.decorator';
+import { getClientIp } from '@shared/utils/clientIp.util';
 
 /**
  * Rate Limit Guard
@@ -82,8 +83,10 @@ export class RateLimitGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    // 5. Determine identifier (user ID or IP address)
-    const identifier = this._getIdentifier(request);
+    // 5. Determine identifier (custom key, user ID, or IP)
+    const identifier = endpointConfig?.keyGenerator
+      ? endpointConfig.keyGenerator(request)
+      : this._getIdentifier(request);
     const routePath = request.path;
 
     // 6. Resolve rate limit configuration
@@ -165,8 +168,7 @@ export class RateLimitGuard implements CanActivate {
       return `user:${request.user.userId}`;
     }
 
-    const ip = request.ip || request.socket.remoteAddress || 'unknown';
-    return `ip:${ip}`;
+    return `ip:${getClientIp(request)}`;
   }
 
   /**

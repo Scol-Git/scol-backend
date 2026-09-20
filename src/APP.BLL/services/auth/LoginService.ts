@@ -1,11 +1,7 @@
-import { Injectable, Inject, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { IPasswordHasher } from '@shared/interfaces/security';
-import {
-  IPasswordHasher as IPasswordHasherToken,
-  IRateLimitingStorage as IRateLimitingStorageToken,
-} from '@shared/tokens/injection.tokens';
-import type { IRateLimitingStorage } from '@shared/interfaces/infrastructure/IRateLimitingStorage.interface';
+import { IPasswordHasher as IPasswordHasherToken } from '@shared/tokens/injection.tokens';
 import { IApplicationConfig } from '@shared/interfaces/config/IApplicationConfig.interface';
 import { IApplicationConfig as IApplicationConfigToken } from '@shared/tokens/injection.tokens';
 import { ILogger } from '@shared/interfaces/logging';
@@ -36,8 +32,6 @@ export class LoginService {
     private readonly leadProfileService: LeadProfileService,
     @Inject(IApplicationConfigToken)
     private readonly appConfig: IApplicationConfig,
-    @Inject(IRateLimitingStorageToken)
-    private readonly rateLimitStorage: IRateLimitingStorage,
     @Inject(ILoggerToken) private readonly logger: ILogger,
   ) {}
 
@@ -49,7 +43,6 @@ export class LoginService {
     this.validation.validateLoginRequest(dto);
 
     const identifier = dto.phone || dto.email!;
-    await this.enforceAccountRateLimit(identifier);
 
     this.logger.LogInfo('Login attempt', {
       context: 'LoginService.login',
@@ -190,27 +183,6 @@ export class LoginService {
               this.appConfig.auth.accountLockoutDurationMinutes * 60 * 1000,
           ),
         },
-      );
-    }
-  }
-
-  private async enforceAccountRateLimit(identifier: string): Promise<void> {
-    const key = `account:${identifier}:/auth/login`;
-    const limit = 10;
-    const windowSeconds = 900;
-    const result = await this.rateLimitStorage.increment(
-      key,
-      windowSeconds,
-      limit,
-    );
-    if (result.count > limit) {
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: 'Too many requests, please try again later',
-          retryAfter: result.reset - Math.floor(Date.now() / 1000),
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
   }
