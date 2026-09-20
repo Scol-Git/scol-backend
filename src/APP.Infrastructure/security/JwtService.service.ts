@@ -1,23 +1,24 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
-import type { SignOptions } from 'jsonwebtoken';
-import type { IJwtService, JwtPayload } from '@shared/interfaces/security';
+import type { SignOptions, JwtPayload as JsonJwtPayload } from 'jsonwebtoken';
+import type {
+  IJwtService,
+  AccessTokenClaims,
+  RefreshTokenClaims,
+  VerifiedJwtPayload,
+} from '@shared/interfaces/security';
 import type { ISecurityConfig } from '@shared/interfaces/config/ISecurityConfig.interface';
 import { ISecurityConfig as ISecurityConfigToken } from '@shared/tokens/injection.tokens';
+import { InvalidTokenException } from '@shared/exceptions/auth/InvalidTokenException';
 
-/**
- * JWT Service
- *
- * Provides JWT token generation and validation.
- * Supports both access/refresh tokens and OTP verification tokens.
- *
- * @class JwtService
- * @implements {IJwtService}
- */
+const ALGORITHM = 'HS256' as const;
+
 @Injectable()
-export class JwtService implements IJwtService {
+export class JwtService implements IJwtService, OnModuleInit, OnModuleDestroy {
   private readonly accessSecret: string;
   private readonly refreshSecret: string;
+  private readonly otpSecret: string;
+  private readonly issuer: string;
   private readonly accessTokenExpiresIn: string;
   private readonly refreshTokenExpiresIn: string;
   private readonly otpTtl: number;
@@ -25,90 +26,130 @@ export class JwtService implements IJwtService {
   constructor(
     @Inject(ISecurityConfigToken) private readonly _config: ISecurityConfig,
   ) {
-    this.accessSecret = _config.jwt.accessSecret || _config.jwt.secret;
-    this.refreshSecret = _config.jwt.refreshSecret || _config.jwt.secret;
+    this.accessSecret = _config.jwt.accessSecret;
+    this.refreshSecret = _config.jwt.refreshSecret;
+    this.otpSecret = _config.jwt.otpSecret;
+    this.issuer = _config.jwt.issuer;
     this.accessTokenExpiresIn = _config.jwt.accessTokenExpiresIn;
     this.refreshTokenExpiresIn = _config.jwt.refreshTokenExpiresIn;
     this.otpTtl = _config.otp.ttlSeconds;
   }
 
-  generateAccessToken(payload: JwtPayload): string {
-    const tokenPayload: Record<string, any> = {
+  onModuleInit(): void {
+    // no-op; SecurityConfig logs lifetimes
+  }
+
+  onModuleDestroy(): void {
+    // no-op
+  }
+
+  generateAccessToken(payload: AccessTokenClaims): string {
+    const tokenPayload: Record<string, unknown> = {
       sub: payload.sub,
+      sid: payload.sid,
+      jti: payload.jti,
       orgId: payload.orgId,
       email: payload.email,
       roles: payload.roles,
       permissions: payload.permissions,
-      isSuperAdmin: payload.isSuperAdmin || false,
-      aud: 'access', // Audience for access tokens
+      isSuperAdmin: payload.isSuperAdmin ?? false,
+      aud: 'access',
+      iss: this.issuer,
     };
 
     return jwt.sign(tokenPayload, this.accessSecret, {
       expiresIn: this.accessTokenExpiresIn,
+      algorithm: ALGORITHM,
     } as SignOptions);
   }
 
-  generateRefreshToken(payload: JwtPayload): string {
-    const tokenPayload: Record<string, any> = {
+  generateRefreshToken(payload: RefreshTokenClaims): string {
+    const tokenPayload: Record<string, unknown> = {
       sub: payload.sub,
-      orgId: payload.orgId,
-      email: payload.email,
-      aud: 'refresh', // Audience for refresh tokens
+      sid: payload.sid,
+      aud: 'refresh',
+      iss: this.issuer,
     };
 
     return jwt.sign(tokenPayload, this.refreshSecret, {
       expiresIn: this.refreshTokenExpiresIn,
+      algorithm: ALGORITHM,
     } as SignOptions);
   }
 
   verifyToken(
     token: string,
     type: 'access' | 'refresh' = 'access',
-  ): JwtPayload {
+  ): VerifiedJwtPayload {
     const secret = type === 'access' ? this.accessSecret : this.refreshSecret;
     try {
-      const decoded = jwt.verify(token, secret) as jwt.JwtPayload;
+      const decoded = jwt.verify(token, secret, {
+        algorithms: [ALGORITHM],
+        issuer: this.issuer,
+      }) as JsonJwtPayload;
 
-      // Validate audience
       const expectedAud = type;
-      if (decoded.aud && decoded.aud !== expectedAud) {
-        throw new Error(
-          `Invalid token type. Expected ${expectedAud}, got ${decoded.aud}`,
-        );
+      if (decoded.aud !== expectedAud) {
+        throw new InvalidTokenException('Invalid token type');
+      }
+
+      if (!decoded.sub || typeof decoded.sub !== 'string') {
+        throw new InvalidTokenException('Token missing subject');
+      }
+
+      if (!decoded.sid || typeof decoded.sid !== 'string') {
+        throw new InvalidTokenException('Token missing session identifier');
+      }
+
+      if (type === 'access') {
+        if (!decoded.jti || typeof decoded.jti !== 'string') {
+          throw new InvalidTokenException('Token missing jti');
+        }
+      }
+
+      if (decoded.exp === undefined || decoded.iat === undefined) {
+        throw new InvalidTokenException('Token missing expiration');
       }
 
       return {
-        sub: decoded.sub as string,
-        orgId: decoded.orgId as string,
-        email: decoded.email as string,
-        roles: (decoded.roles as string[]) || [],
-        permissions: (decoded.permissions as string[]) || [],
+        sub: decoded.sub,
+        sid: decoded.sid as string,
+        jti: decoded.jti as string | undefined,
+        orgId: decoded.orgId as string | undefined,
+        email: decoded.email as string | undefined,
+        roles: (decoded.roles as string[]) ?? [],
+        permissions: (decoded.permissions as string[]) ?? [],
         isSuperAdmin: decoded.isSuperAdmin as boolean | undefined,
+        iss: decoded.iss as string | undefined,
+        aud: decoded.aud as string | undefined,
         iat: decoded.iat,
         exp: decoded.exp,
       };
     } catch (error) {
-      throw new Error(
-        `Invalid token: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      if (error instanceof InvalidTokenException) {
+        throw error;
+      }
+      throw new InvalidTokenException();
     }
   }
 
-  decodeToken(token: string): JwtPayload | null {
+  decodeToken(token: string): VerifiedJwtPayload | null {
     try {
-      const decoded = jwt.decode(token) as jwt.JwtPayload | null;
-
-      if (!decoded) {
+      const decoded = jwt.decode(token) as JsonJwtPayload | null;
+      if (!decoded || !decoded.sub) {
         return null;
       }
-
       return {
-        sub: decoded.sub as string,
-        orgId: decoded.orgId as string,
-        email: decoded.email as string,
-        roles: (decoded.roles as string[]) || [],
-        permissions: (decoded.permissions as string[]) || [],
+        sub: decoded.sub,
+        sid: decoded.sid as string | undefined,
+        jti: decoded.jti as string | undefined,
+        orgId: decoded.orgId as string | undefined,
+        email: decoded.email as string | undefined,
+        roles: (decoded.roles as string[]) ?? [],
+        permissions: (decoded.permissions as string[]) ?? [],
         isSuperAdmin: decoded.isSuperAdmin as boolean | undefined,
+        iss: decoded.iss as string | undefined,
+        aud: decoded.aud as string | undefined,
         iat: decoded.iat,
         exp: decoded.exp,
       };
@@ -117,63 +158,49 @@ export class JwtService implements IJwtService {
     }
   }
 
-  /**
-   * Generate OTP verification token
-   * Short-lived token used for phone verification flow or password reset
-   *
-   * @param payload OTP token payload
-   * @returns JWT token string
-   */
   generateOtpToken(payload: {
     sessionId?: string;
     userId?: string;
     phone: string;
     purpose: 'phone_verify' | 'password_reset';
-    newPasswordHash?: string;
   }): string {
-    const tokenPayload: Record<string, any> = {
-      sub: payload.sessionId || payload.userId, // Use sessionId for registration, userId for password reset
+    const tokenPayload: Record<string, unknown> = {
+      sub: payload.sessionId || payload.userId,
       phone: payload.phone,
       purpose: payload.purpose,
-      aud: 'otp', // Audience for OTP tokens
-      ...(payload.newPasswordHash && { newPasswordHash: payload.newPasswordHash }),
+      aud: 'otp',
+      iss: this.issuer,
     };
 
-    return jwt.sign(tokenPayload, this.accessSecret, {
-      expiresIn: this.otpTtl, // Use OTP TTL in seconds
+    return jwt.sign(tokenPayload, this.otpSecret, {
+      expiresIn: this.otpTtl,
+      algorithm: ALGORITHM,
     } as SignOptions);
   }
 
-  /**
-   * Verify OTP token
-   *
-   * @param token OTP JWT token
-   * @returns Decoded OTP payload
-   * @throws Error if token is invalid or not an OTP token
-   */
   verifyOtpToken(token: string): {
     pendingId?: string;
     userId?: string;
     phone: string;
     purpose: string;
     aud: string;
-    newPasswordHash?: string;
   } {
     try {
-      const decoded = jwt.verify(token, this.accessSecret) as jwt.JwtPayload;
+      const decoded = jwt.verify(token, this.otpSecret, {
+        algorithms: [ALGORITHM],
+        issuer: this.issuer,
+      }) as JsonJwtPayload;
 
-      // Validate audience
       if (decoded.aud !== 'otp') {
-        throw new Error('Invalid token type. Expected OTP token.');
+        throw new InvalidTokenException('Invalid OTP token type');
       }
 
-      // Validate purpose
       const validPurposes = ['phone_verify', 'password_reset'];
       if (
         !decoded.purpose ||
         !validPurposes.includes(decoded.purpose as string)
       ) {
-        throw new Error('Invalid OTP token purpose.');
+        throw new InvalidTokenException('Invalid OTP token purpose');
       }
 
       const result: {
@@ -182,17 +209,12 @@ export class JwtService implements IJwtService {
         phone: string;
         purpose: string;
         aud: string;
-        newPasswordHash?: string;
       } = {
         phone: decoded.phone as string,
         purpose: decoded.purpose as string,
         aud: decoded.aud as string,
-        ...(decoded.newPasswordHash && {
-          newPasswordHash: decoded.newPasswordHash as string,
-        }),
       };
 
-      // Set pendingId or userId based on purpose
       if (decoded.purpose === 'phone_verify') {
         result.pendingId = decoded.sub as string;
       } else if (decoded.purpose === 'password_reset') {
@@ -201,9 +223,10 @@ export class JwtService implements IJwtService {
 
       return result;
     } catch (error) {
-      throw new Error(
-        `Invalid OTP token: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      if (error instanceof InvalidTokenException) {
+        throw error;
+      }
+      throw new InvalidTokenException('Invalid OTP verification token');
     }
   }
 }

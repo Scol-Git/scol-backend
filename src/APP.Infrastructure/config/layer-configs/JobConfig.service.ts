@@ -30,6 +30,14 @@ export class JobConfig implements IJobConfig {
       'DB_PING',
       CronExpression.EVERY_5_MINUTES,
     ),
+    [JOB_KEYS.userSessionCleanup]: this.readJobSchedule(
+      'USER_SESSION_CLEANUP',
+      CronExpression.EVERY_DAY_AT_3AM,
+    ),
+    [JOB_KEYS.accountLockoutMaintenance]: this.readJobSchedule(
+      'ACCOUNT_LOCKOUT_MAINTENANCE',
+      CronExpression.EVERY_10_MINUTES,
+    ),
   };
 
   constructor(private readonly _config: ConfigService) {}

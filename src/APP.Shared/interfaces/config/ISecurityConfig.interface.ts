@@ -12,16 +12,20 @@ export interface ISecurityConfig {
    * JWT configuration
    */
   jwt: {
-    /** Shared secret (legacy fallback) */
-    secret: string;
-    /** Access token secret (preferred; falls back to secret) */
+    /** Access token secret */
     accessSecret: string;
-    /** Refresh token secret (preferred; falls back to secret) */
+    /** Refresh token secret */
     refreshSecret: string;
-    /** Access token expiration time (e.g., '15m', '1h') */
+    /** OTP token secret */
+    otpSecret: string;
+    /** Token issuer (iss claim) */
+    issuer: string;
+    /** Access token expiration time (e.g., '10m', '1h') */
     accessTokenExpiresIn: string;
     /** Refresh token expiration time (e.g., '7d', '30d') */
     refreshTokenExpiresIn: string;
+    /** Absolute session cap (e.g. '30d') */
+    sessionAbsoluteMax: string;
   };
 
   /**

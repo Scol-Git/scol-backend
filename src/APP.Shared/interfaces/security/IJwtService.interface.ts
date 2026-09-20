@@ -1,101 +1,61 @@
 /**
  * Interface for JWT token service.
- *
- * Provides abstraction for JWT token generation and validation.
- *
- * @interface IJwtService
  */
 export interface IJwtService {
-  /**
-   * Generate an access token.
-   *
-   * @param payload - Token payload (user ID, org ID, roles, permissions, claims)
-   * @returns JWT access token
-   */
-  generateAccessToken(payload: JwtPayload): string;
+  generateAccessToken(payload: AccessTokenClaims): string;
 
-  /**
-   * Generate a refresh token.
-   *
-   * @param payload - Token payload
-   * @returns JWT refresh token
-   */
-  generateRefreshToken(payload: JwtPayload): string;
+  generateRefreshToken(payload: RefreshTokenClaims): string;
 
-  /**
-   * Verify and decode a token.
-   *
-   * @param token - JWT token
-   * @param type - Token type ('access' or 'refresh')
-   * @returns Decoded token payload
-   * @throws Error if token is invalid or expired
-   */
-  verifyToken(token: string, type?: 'access' | 'refresh'): JwtPayload;
+  verifyToken(token: string, type?: 'access' | 'refresh'): VerifiedJwtPayload;
 
-  /**
-   * Generate an OTP verification token (short-lived).
-   *
-   * @param payload - OTP token payload (pendingId for phone_verify, userId for password_reset, phone, purpose)
-   * @returns JWT OTP token
-   */
   generateOtpToken(payload: {
     sessionId?: string;
     userId?: string;
     phone: string;
     purpose: 'phone_verify' | 'password_reset';
-    newPasswordHash?: string;
   }): string;
 
-  /**
-   * Verify and decode an OTP token.
-   *
-   * @param token - JWT OTP token
-   * @returns Decoded OTP token payload
-   * @throws Error if token is invalid or expired
-   */
   verifyOtpToken(token: string): {
     pendingId?: string;
     userId?: string;
     phone: string;
     purpose: string;
     aud: string;
-    newPasswordHash?: string;
   };
 
-  /**
-   * Decode token without verification (for inspection only).
-   *
-   * @param token - JWT token
-   * @returns Decoded token payload or null if invalid
-   */
-  decodeToken(token: string): JwtPayload | null;
+  decodeToken(token: string): VerifiedJwtPayload | null;
 }
 
-/**
- * JWT Token Payload
- */
-export interface JwtPayload {
-  /** User ID */
-  sub: string; // Standard JWT claim for subject (user ID)
-
-  /** Organization ID */
+export interface AccessTokenClaims {
+  sub: string;
+  sid: string;
+  jti: string;
   orgId: string;
-
-  /** User email */
   email: string;
-
-  /** User roles */
   roles: string[];
-
-  /** User permissions (from roles) */
   permissions: string[];
-
-  /** Whether user is super admin */
   isSuperAdmin?: boolean;
+}
 
-  /** Issued at timestamp */
+export interface RefreshTokenClaims {
+  sub: string;
+  sid: string;
+}
+
+export interface VerifiedJwtPayload {
+  sub: string;
+  sid?: string;
+  jti?: string;
+  orgId?: string;
+  email?: string;
+  roles?: string[];
+  permissions?: string[];
+  isSuperAdmin?: boolean;
+  iss?: string;
+  aud?: string;
   iat?: number;
-
-  /** Expiration timestamp */
   exp?: number;
 }
+
+/** @deprecated Use AccessTokenClaims / VerifiedJwtPayload */
+export type JwtPayload = VerifiedJwtPayload;

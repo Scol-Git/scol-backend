@@ -1,5 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
+import { getClientIp } from '@shared/utils/clientIp.util';
 
 export interface ReqInfoPayload {
   ip: string;
@@ -17,7 +18,7 @@ export const ReqInfo = createParamDecorator(
         : userAgentHeader?.[0];
 
     return {
-      ip: req.ip || '',
+      ip: getClientIp(req),
       userAgent,
     };
   },

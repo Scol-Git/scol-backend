@@ -1,4 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
+import type { Request } from 'express';
 
 /**
  * Metadata key for rate limit configuration
@@ -20,8 +21,11 @@ export interface RateLimitOptions {
   /** Time window in seconds */
   windowSeconds: number;
 
-  /** Optional custom key generator function */
-  keyGenerator?: (request: any) => string;
+  /**
+   * Optional custom bucket identifier (e.g. account:phone).
+   * Combined with the route path as `{id}:{path}`.
+   */
+  keyGenerator?: (request: Request) => string;
 }
 
 /**
@@ -29,25 +33,6 @@ export interface RateLimitOptions {
  *
  * Configures rate limiting for a specific endpoint or controller.
  * Overrides global rate limit settings for the decorated route.
- *
- * @param options - Rate limit configuration options
- *
- * @example
- * ```typescript
- * @Get('/organizations')
- * @UseGuards(RateLimitGuard)
- * @RateLimit({ limit: 50, windowSeconds: 60 })
- * getOrganizations() {
- *   // Maximum 50 requests per minute
- * }
- *
- * @Post('/auth/login')
- * @UseGuards(RateLimitGuard)
- * @RateLimit({ limit: 5, windowSeconds: 60 })
- * login() {
- *   // Maximum 5 requests per minute (brute force protection)
- * }
- * ```
  */
 export const RateLimit = (options: RateLimitOptions) =>
   SetMetadata(RATE_LIMIT_KEY, options);
@@ -56,16 +41,5 @@ export const RateLimit = (options: RateLimitOptions) =>
  * Skip Rate Limiting Decorator
  *
  * Exempts a specific endpoint or controller from rate limiting.
- * When applied, the route will bypass all rate limit checks.
- *
- * @example
- * ```typescript
- * @Get('/health')
- * @UseGuards(RateLimitGuard)
- * @SkipRateLimiting()
- * healthCheck() {
- *   // This endpoint will not be rate limited
- * }
- * ```
  */
 export const SkipRateLimiting = () => SetMetadata(SKIP_RATE_LIMIT_KEY, true);

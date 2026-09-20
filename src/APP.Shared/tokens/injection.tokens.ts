@@ -117,6 +117,12 @@ export const IJwtService = Symbol('IJwtService');
 export const IPasswordHasher = Symbol('IPasswordHasher');
 
 /**
+ * Token for IRevocationRegistry
+ * In-process revocation denylist with Redis durability
+ */
+export const IRevocationRegistry = Symbol('IRevocationRegistry');
+
+/**
  * Token for ISmsService
  * Provides SMS sending abstraction (external provider implementation)
  */

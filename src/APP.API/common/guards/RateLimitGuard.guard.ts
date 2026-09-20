@@ -22,6 +22,7 @@ import {
   SKIP_RATE_LIMIT_KEY,
   RateLimitOptions,
 } from '../decorators/RateLimit.decorator';
+import { getClientIp } from '@shared/utils/clientIp.util';
 
 /**
  * Rate Limit Guard
@@ -82,8 +83,10 @@ export class RateLimitGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    // 5. Determine identifier (user ID or IP address)
-    const identifier = this._getIdentifier(request);
+    // 5. Determine identifier (custom key, user ID, or IP)
+    const identifier = endpointConfig?.keyGenerator
+      ? endpointConfig.keyGenerator(request)
+      : this._getIdentifier(request);
     const routePath = request.path;
 
     // 6. Resolve rate limit configuration
@@ -161,25 +164,11 @@ export class RateLimitGuard implements CanActivate {
    * Get identifier for rate limiting (user ID or IP address)
    */
   private _getIdentifier(request: Request & { user?: ICurrentUser }): string {
-    // Prefer user ID if authenticated
     if (request.user) {
       return `user:${request.user.userId}`;
     }
 
-    // Fallback to IP address
-    // Try X-Forwarded-For header (for proxies/load balancers)
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-      // X-Forwarded-For can contain multiple IPs, take the first one
-      const firstIp = Array.isArray(forwardedFor)
-        ? forwardedFor[0]
-        : forwardedFor.split(',')[0];
-      return `ip:${firstIp.trim()}`;
-    }
-
-    // Fallback to connection remote address
-    const ip = request.ip || request.socket.remoteAddress || 'unknown';
-    return `ip:${ip}`;
+    return `ip:${getClientIp(request)}`;
   }
 
   /**

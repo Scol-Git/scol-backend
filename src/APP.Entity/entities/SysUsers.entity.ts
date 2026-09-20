@@ -75,23 +75,6 @@ export class SysUsers extends BaseEntity {
   userType!: UserType;
 
   @Column({
-    name: 'passResetTokenHash',
-    type: 'varchar',
-    length: 255,
-    nullable: true,
-  })
-  @AutoMap()
-  passResetTokenHash?: string;
-
-  @Column({
-    name: 'passResetTokenExpiredAt',
-    type: 'timestamptz',
-    nullable: true,
-  })
-  @AutoMap()
-  passResetTokenExpiredAt?: Date;
-
-  @Column({
     name: 'isPhoneVerified',
     type: 'boolean',
     nullable: false,
@@ -116,6 +99,14 @@ export class SysUsers extends BaseEntity {
   })
   @AutoMap()
   lockedUntil?: Date;
+
+  @Column({
+    name: 'lastFailedLoginAt',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  @AutoMap()
+  lastFailedLoginAt?: Date;
 
   // ========================================
   // Navigation Properties (EF Core style)
