@@ -22,6 +22,7 @@ import {
   SKIP_RATE_LIMIT_KEY,
   RateLimitOptions,
 } from '../decorators/RateLimit.decorator';
+import { getClientUaHash } from '@shared/utils/clientDevice.util';
 import { getClientIp } from '@shared/utils/clientIp.util';
 
 /**
@@ -161,14 +162,14 @@ export class RateLimitGuard implements CanActivate {
   }
 
   /**
-   * Get identifier for rate limiting (user ID or IP address)
+   * Get identifier for rate limiting (user ID, or IP + User-Agent for anonymous)
    */
   private _getIdentifier(request: Request & { user?: ICurrentUser }): string {
     if (request.user) {
       return `user:${request.user.userId}`;
     }
 
-    return `ip:${getClientIp(request)}`;
+    return `ip:${getClientIp(request)}:ua:${getClientUaHash(request)}`;
   }
 
   /**
@@ -209,7 +210,7 @@ export class RateLimitGuard implements CanActivate {
    */
   private _generateRateLimitKey(identifier: string, routePath: string): string {
     // Format: identifier:routePath
-    // Example: "user:123:/api/organizations" or "ip:192.168.1.1:/api/auth/login"
+    // Example: "user:123:/api/organizations" or "ip:192.168.1.1:ua:abc123:/api/auth/login"
     // Redis implementation will prefix with 'ratelimit:' automatically
     return `${identifier}:${routePath}`;
   }
