@@ -81,8 +81,9 @@ export class AcademicFormValidator {
   }
 
   /**
-   * When lastAcademicInstitute is sent, there must be a degree row in the DB
-   * to receive the institute (highest levelOrder row), or academicResults in the same request.
+   * When lastAcademicInstitute is sent, there must be an academic result in the DB
+   * or academicResults on the same request (so a first-save bundle is allowed).
+   * Reject only when neither source has a degree row to attach the institute to.
    */
   private async validateLastAcademicInstitute(
     dto: AcademicFormRequestDto,
@@ -90,11 +91,14 @@ export class AcademicFormValidator {
     errors: string[],
   ) {
     if (!dto.lastAcademicInstitute?.trim()) return;
-  
+
+    const hasAcademicInRequest = (dto.academicResults?.length ?? 0) > 0;
+    if (hasAcademicInRequest) return;
+
     const hasAcademicInDb = await this.db.leadAcademicResults.findOne({
       where: { leadId },
     });
-  
+
     if (!hasAcademicInDb) {
       errors.push(
         'At least one academic degree must exist before setting lastAcademicInstitute',
