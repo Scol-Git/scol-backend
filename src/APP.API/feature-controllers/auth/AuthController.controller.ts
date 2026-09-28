@@ -41,6 +41,7 @@ import { RegisterLeadRequestDto } from '@shared/dtos/auth/RegisterLeadRequestDto
 import { LoginRequestDto } from '@shared/dtos/auth/LoginRequestDto';
 import { VerifyOtpRequestDto } from '@shared/dtos/auth/VerifyOtpRequestDto';
 import { ForgotPasswordRequestDto } from '@shared/dtos/auth/ForgotPasswordRequestDto';
+import { RefreshTokenRequestDto } from '@shared/dtos/auth/RefreshTokenRequestDto';
 
 // Response DTOs imports
 import { AuthResponseDto } from '@shared/dtos/auth/AuthResponseDto';
@@ -74,6 +75,7 @@ import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
   SuccessResponseDto,
   ErrorResponseDto,
   ForgotPasswordRequestDto,
+  RefreshTokenRequestDto,
 )
 @Controller('auth')
 export class AuthController {
@@ -167,30 +169,28 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<TokenRefreshResponseDto> {
     res.setHeader('Cache-Control', 'no-store');
-    return this.refreshToken(authHeader, reqInfo);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+    return this.refreshToken(authHeader.substring(7), reqInfo);
   }
 
   @Post('refresh')
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 20, windowSeconds: 300 })
-  @ApiBearerAuth('JWT-auth')
   async refreshPost(
-    @Headers('authorization') authHeader: string | undefined,
+    @Body() body: RefreshTokenRequestDto,
     @ReqInfo() reqInfo: ReqInfoPayload,
     @Res({ passthrough: true }) res: Response,
   ): Promise<TokenRefreshResponseDto> {
     res.setHeader('Cache-Control', 'no-store');
-    return this.refreshToken(authHeader, reqInfo);
+    return this.refreshToken(body.refreshToken, reqInfo);
   }
 
   private async refreshToken(
-    authHeader: string | undefined,
+    refreshToken: string,
     reqInfo: ReqInfoPayload,
   ): Promise<TokenRefreshResponseDto> {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Refresh token is required');
-    }
-    const refreshToken = authHeader.substring(7);
     return await this.authService.refreshAccessToken(refreshToken, reqInfo.ip);
   }
 
