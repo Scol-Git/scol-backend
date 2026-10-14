@@ -202,15 +202,27 @@ export class CrmApplicationQueryService {
       });
     }
 
-    const defaultRange = this.getDefaultApplicationDateRange();
-    const startDate =
-      ranges?.dateRange?.startDate ?? defaultRange.startDate;
-    const endDate = ranges?.dateRange?.endDate ?? defaultRange.endDate;
+    if (ranges?.dateRange?.startDate) {
+      qb.andWhere('"app"."createdAt" >= :startDate', {
+        startDate: ranges.dateRange.startDate,
+      });
+    }
 
-    qb.andWhere('"app"."createdAt" >= :startDate', { startDate });
-    qb.andWhere('"app"."createdAt" <= :endDate', {
-      endDate: this.toEndOfDay(endDate),
-    });
+    if (ranges?.dateRange?.endDate) {
+      qb.andWhere('"app"."createdAt" <= :endDate', {
+        endDate: this.toEndOfDay(ranges.dateRange.endDate),
+      });
+    }
+
+    // const defaultRange = this.getDefaultApplicationDateRange();
+    // const startDate =
+    //   ranges?.dateRange?.startDate ?? defaultRange.startDate;
+    // const endDate = ranges?.dateRange?.endDate ?? defaultRange.endDate;
+    //
+    // qb.andWhere('"app"."createdAt" >= :startDate', { startDate });
+    // qb.andWhere('"app"."createdAt" <= :endDate', {
+    //   endDate: this.toEndOfDay(endDate),
+    // });
   }
 
   private async countPendingRequiredDocuments(
