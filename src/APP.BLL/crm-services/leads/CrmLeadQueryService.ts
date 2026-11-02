@@ -90,12 +90,24 @@ export class CrmLeadQueryService {
       });
     }
 
-    const defaultRange = this.getDefaultRegisterDateRange();
+    if (ranges?.startDate) {
+      qb.andWhere('crm.registerDate >= :startDate', {
+        startDate: ranges.startDate,
+      });
+    }
+
+    if (ranges?.endDate) {
+      qb.andWhere('crm.registerDate <= :endDate', {
+        endDate: ranges.endDate,
+      });
+    }
+
+    /* const defaultRange = this.getDefaultRegisterDateRange();
     const startDate = ranges?.startDate ?? defaultRange.startDate;
     const endDate = ranges?.endDate ?? defaultRange.endDate;
 
     qb.andWhere('crm.registerDate >= :startDate', { startDate });
-    qb.andWhere('crm.registerDate <= :endDate', { endDate });
+    qb.andWhere('crm.registerDate <= :endDate', { endDate });*/
 
     if (dto.flags?.hasPassedEnglishTest !== undefined) {
       qb.andWhere('crm.hasPassedEnglishTest = :value', {
