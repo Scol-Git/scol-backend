@@ -8,6 +8,7 @@ import { SysCities } from './SysCities.entity';
  * @class SysStates
  * @extends {BaseEntity}
  */
+// Natural-key unique index lives in migration bulk-import-indexes (expression index).
 @Entity('sys_States')
 export class SysStates extends BaseEntity {
   @Column({
@@ -26,6 +27,26 @@ export class SysStates extends BaseEntity {
   })
   @AutoMap()
   stateName!: string;
+
+  // ========================================
+  // Publish / import tracking (bulk import draft -> publish)
+  // ========================================
+
+  @Column({ name: 'isPublished', type: 'boolean', nullable: false, default: true })
+  @AutoMap()
+  isPublished!: boolean;
+
+  @Column({ name: 'publishedAt', type: 'timestamptz', nullable: true })
+  @AutoMap()
+  publishedAt?: Date | null;
+
+  @Column({ name: 'publishedBy', type: 'uuid', nullable: true })
+  @AutoMap()
+  publishedBy?: string | null;
+
+  @Column({ name: 'importBatchId', type: 'uuid', nullable: true })
+  @AutoMap()
+  importBatchId?: string | null;
 
   // ========================================
   // Navigation Properties (EF Core style)

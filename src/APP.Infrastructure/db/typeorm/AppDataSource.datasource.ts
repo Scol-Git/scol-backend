@@ -103,6 +103,7 @@ import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
 import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
 import { UniApplicationStage } from '@entity/entities/UniApplicationStage.entity';
+import { BulkImportBatches } from '@entity/entities/BulkImportBatches.entity';
 
 /**
  * AppDataSource - TypeORM DataSource for migrations and CLI operations
@@ -168,6 +169,7 @@ const AppDataSource = new DataSource({
     SysConsultantProfiles,
     ConsultantCertifications,
     UniApplicationStage,
+    BulkImportBatches,
   ],
 
   migrations: [migrationPath],

@@ -30,6 +30,7 @@ import { CommissionType } from '@shared/enums/CommissionType.enum';
  * - uniName: Text search
  * - commission: Business ranking (DB-level commission sorting)
  */
+// Natural-key unique index lives in migration bulk-import-indexes (expression index).
 @Entity('sys_Universities')
 @Index('IX_SysUniversities_sysCountryId', ['sysCountryId'])
 @Index('IX_SysUniversities_sysCityId', ['sysCityId'])
@@ -177,6 +178,26 @@ export class SysUniversities extends BaseEntity {
   @Column({ name: 'rankingMetaData', type: 'jsonb', nullable: true })
   @AutoMap()
   rankingMetaData?: MetaDataItem[];
+
+  // ========================================
+  // Publish / import tracking (bulk import draft -> publish)
+  // ========================================
+
+  @Column({ name: 'isPublished', type: 'boolean', nullable: false, default: true })
+  @AutoMap()
+  isPublished!: boolean;
+
+  @Column({ name: 'publishedAt', type: 'timestamptz', nullable: true })
+  @AutoMap()
+  publishedAt?: Date | null;
+
+  @Column({ name: 'publishedBy', type: 'uuid', nullable: true })
+  @AutoMap()
+  publishedBy?: string | null;
+
+  @Column({ name: 'importBatchId', type: 'uuid', nullable: true })
+  @AutoMap()
+  importBatchId?: string | null;
 
   // ========================================
   // Navigation Properties (EF Core style)

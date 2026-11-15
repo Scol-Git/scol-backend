@@ -10,6 +10,7 @@ import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
  * **Search Indexes:**
  * - name: Search pipeline ILIKE searchText (programme name)
  */
+// Natural-key unique index lives in migration bulk-import-indexes (expression index).
 @Entity('sys_Programmes')
 @Index('IX_SysProgrammes_name', ['name'])
 export class SysProgrammes extends BaseEntity {
@@ -21,6 +22,26 @@ export class SysProgrammes extends BaseEntity {
   })
   @AutoMap()
   name!: string;
+
+  // ========================================
+  // Publish / import tracking (bulk import draft -> publish)
+  // ========================================
+
+  @Column({ name: 'isPublished', type: 'boolean', nullable: false, default: true })
+  @AutoMap()
+  isPublished!: boolean;
+
+  @Column({ name: 'publishedAt', type: 'timestamptz', nullable: true })
+  @AutoMap()
+  publishedAt?: Date | null;
+
+  @Column({ name: 'publishedBy', type: 'uuid', nullable: true })
+  @AutoMap()
+  publishedBy?: string | null;
+
+  @Column({ name: 'importBatchId', type: 'uuid', nullable: true })
+  @AutoMap()
+  importBatchId?: string | null;
 
   // ========================================
   // Navigation Properties (EF Core style)

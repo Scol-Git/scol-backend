@@ -58,6 +58,7 @@ import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
 import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
 import { UniApplicationStage } from '@entity/entities/UniApplicationStage.entity';
+import { BulkImportBatches } from '@entity/entities/BulkImportBatches.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -123,6 +124,7 @@ import { AppDbContext } from './AppDbContext';
             SysConsultantProfiles,
             ConsultantCertifications,
             UniApplicationStage,
+            BulkImportBatches,
           ],
           synchronize: false,
           logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
@@ -186,6 +188,7 @@ import { AppDbContext } from './AppDbContext';
       SysConsultantProfiles,
       ConsultantCertifications,
       UniApplicationStage,
+      BulkImportBatches,
     ]),
   ],
   providers: [AppDbContext],

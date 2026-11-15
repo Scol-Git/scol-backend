@@ -59,6 +59,7 @@ import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
 import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
 import { UniApplicationStage } from '@entity/entities/UniApplicationStage.entity';
+import { BulkImportBatches } from '@entity/entities/BulkImportBatches.entity';
 
 /**
  * AppDbContext - EF Core-style DbContext for TypeORM
@@ -153,6 +154,9 @@ export class AppDbContext {
 
     @InjectRepository(UniApplicationStage)
     public readonly uniApplicationStages: Repository<UniApplicationStage>,
+
+    @InjectRepository(BulkImportBatches)
+    public readonly bulkImportBatches: Repository<BulkImportBatches>,
 
     @InjectRepository(SysStates)
     public readonly states: Repository<SysStates>,
