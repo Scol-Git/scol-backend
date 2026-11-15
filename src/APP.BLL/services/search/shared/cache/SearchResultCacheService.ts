@@ -5,13 +5,24 @@ import {
   SearchCacheKeyBuilder,
   SearchResultsKeyParams,
 } from './SearchCacheKeyBuilder';
-import type { PipelineParams } from '../pipeline/SearchPipelineTypes';
+import {
+  SearchExecutionSource,
+  type PipelineParams,
+} from '../pipeline/SearchPipelineTypes';
+import { PublishStatus } from '@shared/enums/crm/PublishStatus.enum';
 
 @Injectable()
 export class SearchResultCacheService {
   constructor(@Inject(ICacheToken) private readonly cache: ICacheService) {}
 
   getOrSet<T>(params: PipelineParams, factory: () => Promise<T>): Promise<T> {
+    // CRM draft / all views are never cached (publish params are not part of the key).
+    if (
+      params.source === SearchExecutionSource.CRM &&
+      (params.publishStatus ?? PublishStatus.PUBLISHED) !== PublishStatus.PUBLISHED
+    ) {
+      return factory();
+    }
     const cacheKeyParams: SearchResultsKeyParams = {
       userContext: SearchCacheKeyBuilder.fromSearchContext(params.context),
       searchText: params.searchText,

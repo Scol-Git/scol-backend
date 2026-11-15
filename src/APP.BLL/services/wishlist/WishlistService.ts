@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
+import { LIVE_INTAKE_WHERE } from '@bll/services/shared/LiveIntakeFilter';
 
 import { AddWishlistDto } from '@shared/dtos/wishlists/AddWishlistDto';
 import { WishlistListResponseDto } from '@shared/dtos/wishlists/WishlistListResponseDto';
@@ -36,6 +37,7 @@ export class WishlistService {
     const intake = await this.dbContext.courseIntakes.findOne({
       where: {
         id: dto.courseId,
+        ...LIVE_INTAKE_WHERE,
       },
       select: {
         id: true,

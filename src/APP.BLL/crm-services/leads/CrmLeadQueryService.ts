@@ -171,7 +171,7 @@ export class CrmLeadQueryService {
 
   async getDropdownData(): Promise<CrmLeadDropdownDataResponseDto> {
     const [countries, consultants] = await Promise.all([
-      this.db.countries.find(),
+      this.db.countries.find({ where: { isPublished: true } }),
       this.db.consultantProfiles.find({
         where: {
           isPublished: true,

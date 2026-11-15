@@ -21,12 +21,12 @@ export class SearchFilterOptionsService {
         const [countries, programmes] = await Promise.all([
           this.db.countries.find({
             select: ['id', 'countryName'],
-            where: { deletedAt: IsNull() },
+            where: { deletedAt: IsNull(), isPublished: true },
             order: { countryName: 'ASC' },
           }),
           this.db.programmes.find({
             select: ['id', 'name'],
-            where: { deletedAt: IsNull() },
+            where: { deletedAt: IsNull(), isPublished: true },
             order: { name: 'ASC' },
           }),
         ]);
