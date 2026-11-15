@@ -7,6 +7,7 @@ export const JOB_KEYS = {
   databasePing: 'databasePing',
   userSessionCleanup: 'userSessionCleanup',
   accountLockoutMaintenance: 'accountLockoutMaintenance',
+  bulkImportProcessor: 'bulkImportProcessor',
 } as const;
 
 export type JobKey = (typeof JOB_KEYS)[keyof typeof JOB_KEYS];

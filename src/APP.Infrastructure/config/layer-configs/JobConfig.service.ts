@@ -38,6 +38,10 @@ export class JobConfig implements IJobConfig {
       'ACCOUNT_LOCKOUT_MAINTENANCE',
       CronExpression.EVERY_10_MINUTES,
     ),
+    [JOB_KEYS.bulkImportProcessor]: this.readJobSchedule(
+      'BULK_IMPORT_PROCESSOR',
+      '*/2 * * * *',
+    ),
   };
 
   constructor(private readonly _config: ConfigService) {}

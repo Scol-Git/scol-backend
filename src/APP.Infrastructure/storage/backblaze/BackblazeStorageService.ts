@@ -80,6 +80,40 @@ export class BackblazeStorageService implements IStorageService {
     }
   }
 
+  async getObjectBytes(key: string): Promise<Uint8Array> {
+    const res = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    if (!res.Body) throw new Error(`Empty object body for ${key}`);
+    return res.Body.transformToByteArray();
+  }
+
+  async putObject(key: string, body: Buffer, mimeType: string): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: body,
+        ContentType: mimeType,
+      }),
+    );
+  }
+
+  async getObjectSize(key: string): Promise<number | null> {
+    try {
+      const res = await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return res.ContentLength ?? 0;
+    } catch (err: unknown) {
+      const code = (err as { name?: string })?.name;
+      if (code === 'NotFound' || code === 'NoSuchKey') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
   async deleteObject(key: string): Promise<void> {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),

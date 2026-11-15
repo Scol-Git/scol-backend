@@ -6,6 +6,7 @@ import { OtpSessionCleanupJob } from './cron-jobs/otp/OtpSessionCleanupJob';
 import { DatabasePingJob } from './cron-jobs/health/DatabasePingJob';
 import { UserSessionCleanupJob } from './cron-jobs/auth/UserSessionCleanupJob';
 import { AccountLockoutMaintenanceJob } from './cron-jobs/auth/AccountLockoutMaintenanceJob';
+import { BulkImportProcessorJob } from './cron-jobs/bulk-import/BulkImportProcessorJob';
 import type { ICronJob } from '@shared/interfaces/jobs/ICronJob.interface';
 import { ICronJobs as ICronJobsToken } from '@shared/tokens/injection.tokens';
 
@@ -23,6 +24,7 @@ import { ICronJobs as ICronJobsToken } from '@shared/tokens/injection.tokens';
     DatabasePingJob,
     UserSessionCleanupJob,
     AccountLockoutMaintenanceJob,
+    BulkImportProcessorJob,
     {
       provide: ICronJobsToken,
       useFactory: (...jobs: ICronJob[]) => jobs,
@@ -31,6 +33,7 @@ import { ICronJobs as ICronJobsToken } from '@shared/tokens/injection.tokens';
         DatabasePingJob,
         UserSessionCleanupJob,
         AccountLockoutMaintenanceJob,
+        BulkImportProcessorJob,
       ],
     },
     CronJobRegistrar,
