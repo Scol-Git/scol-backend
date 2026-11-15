@@ -5,6 +5,7 @@ import { CrmLeadsModule } from './leads/CrmLeadsModule.module';
 import { CrmSearchModule } from './search/CrmSearchModule.module';
 import { CrmCoursesModule } from './courses/CrmCoursesModule.module';
 import { CrmUniversitiesModule } from './universities/CrmUniversitiesModule.module';
+import { CrmBulkImportsModule } from './bulk-imports/CrmBulkImportsModule.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CrmUniversitiesModule } from './universities/CrmUniversitiesModule.modu
     CrmSearchModule,
     CrmCoursesModule,
     CrmUniversitiesModule,
+    CrmBulkImportsModule,
   ],
   exports: [
     CrmApplicationsModule,
@@ -22,6 +24,7 @@ import { CrmUniversitiesModule } from './universities/CrmUniversitiesModule.modu
     CrmSearchModule,
     CrmCoursesModule,
     CrmUniversitiesModule,
+    CrmBulkImportsModule,
   ],
 })
 export class CrmControllersModule {}
