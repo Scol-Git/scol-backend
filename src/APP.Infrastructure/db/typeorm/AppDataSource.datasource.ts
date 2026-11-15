@@ -38,7 +38,9 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-const dbUrl = process.env.DATABASE_URL;
+// Migrations must use a DIRECT connection (Neon: host without "-pooler"),
+// because CREATE INDEX CONCURRENTLY cannot run through PgBouncer transaction mode.
+const dbUrl = process.env.DB_MIGRATION_URL || process.env.DATABASE_URL;
 
 // ---------------------------
 // 4. Determine migration path based on mode
