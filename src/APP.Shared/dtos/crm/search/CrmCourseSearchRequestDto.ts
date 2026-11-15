@@ -1,8 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { CursorPaginationDto } from '@shared/dtos/search/CursorPaginationDto';
 import { ListType } from '@shared/enums/ListType.enum';
+import { PublishStatus } from '@shared/enums/crm/PublishStatus.enum';
 import { SearchFiltersDto } from '@shared/dtos/search/SearchFiltersDto';
 import { SearchRangesDto } from '@shared/dtos/search/SearchRangesDto';
 import { SearchFlagsDto } from '@shared/dtos/search/SearchFlagsDto';
@@ -64,4 +65,24 @@ export class CrmCourseSearchRequestDto {
   @Type(() => SearchFlagsDto)
   @IsOptional()
   flags?: SearchFlagsDto;
+
+  @ApiPropertyOptional({
+    description:
+      'PUBLISHED (default, unchanged behaviour), DRAFT (unpublished intakes, includes past/odd intakes) or ALL',
+    enum: PublishStatus,
+    default: PublishStatus.PUBLISHED,
+  })
+  @IsEnum(PublishStatus)
+  @IsOptional()
+  publishStatus?: PublishStatus;
+
+  @ApiPropertyOptional({ description: 'Only intakes owned by this bulk import batch' })
+  @IsUUID()
+  @IsOptional()
+  importBatchId?: string;
+
+  @ApiPropertyOptional({ description: 'Only intakes of this university' })
+  @IsUUID()
+  @IsOptional()
+  uniId?: string;
 }

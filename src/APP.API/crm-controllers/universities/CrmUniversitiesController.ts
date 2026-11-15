@@ -1,11 +1,15 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiExtraModels, ApiTags } from '@nestjs/swagger';
@@ -18,6 +22,12 @@ import '../common/swagger/universities/swagger.doc';
 import { CrmUniversityDetailsService } from '@bll/crm-services/universities/CrmUniversityDetailsService';
 import { CrmUniversityUpdateService } from '@bll/crm-services/universities/CrmUniversityUpdateService';
 import { CrmUniversityStageFlowService } from '@bll/crm-services/universities/CrmUniversityStageFlowService';
+import { CrmUniversityListService } from '@bll/crm-services/universities/CrmUniversityListService';
+import { PublishService } from '@bll/crm-services/publishing/PublishService';
+import { CrmUniversityListRequestDto } from '@shared/dtos/crm/universities/CrmUniversityListRequestDto';
+import { CrmUniversityListItemDto, CrmUniversityListResponseDto } from '@shared/dtos/crm/universities/CrmUniversityListResponseDto';
+import { PublishPreviewResponseDto } from '@shared/dtos/crm/bulk-imports/PublishPreviewResponseDto';
+import { PublishResultResponseDto } from '@shared/dtos/crm/bulk-imports/PublishResultResponseDto';
 import {
   ActiveIntakeItemDto,
   ActiveIntakesDto,
@@ -52,6 +62,10 @@ import type { ICurrentUser } from '@shared/interfaces/domain';
   UpdateCrmUniversityResponseDto,
   UpdateCrmUniversityStageFlowRequestDto,
   CrmUniversityStageFlowResponseDto,
+  CrmUniversityListItemDto,
+  CrmUniversityListResponseDto,
+  PublishPreviewResponseDto,
+  PublishResultResponseDto,
 )
 @UseGuards(JwtAuthGuard, RoleGuard)
 @RequireRole(Role.ADMIN, Role.COUNSELLOR)
@@ -61,7 +75,48 @@ export class CrmUniversitiesController {
     private readonly detailsService: CrmUniversityDetailsService,
     private readonly updateService: CrmUniversityUpdateService,
     private readonly stageFlowService: CrmUniversityStageFlowService,
+    private readonly listService: CrmUniversityListService,
+    private readonly publishService: PublishService,
   ) {}
+
+  // Declared before `:uniId` so the list route is matched first.
+  @Get()
+  @AddSwaggerDoc('crmUniversities', 'listUniversities')
+  async listUniversities(
+    @Query() query: CrmUniversityListRequestDto,
+  ): Promise<CrmUniversityListResponseDto> {
+    return this.listService.list(query);
+  }
+
+  @Get(':uniId/publish-preview')
+  @RequireRole(Role.ADMIN)
+  @AddSwaggerDoc('crmUniversities', 'publishPreview')
+  async publishPreview(
+    @Param('uniId', ParseUUIDPipe) uniId: string,
+  ): Promise<PublishPreviewResponseDto> {
+    return this.publishService.previewUniversity(uniId);
+  }
+
+  @Post(':uniId/publish')
+  @HttpCode(200)
+  @RequireRole(Role.ADMIN)
+  @AddSwaggerDoc('crmUniversities', 'publishUniversity')
+  async publishUniversity(
+    @CurrentUser() user: ICurrentUser,
+    @Param('uniId', ParseUUIDPipe) uniId: string,
+  ): Promise<PublishResultResponseDto> {
+    return this.publishService.publishUniversity(uniId, user.userId);
+  }
+
+  @Delete(':uniId')
+  @RequireRole(Role.ADMIN)
+  @AddSwaggerDoc('crmUniversities', 'deleteDraftUniversity')
+  async deleteDraftUniversity(
+    @Param('uniId', ParseUUIDPipe) uniId: string,
+  ): Promise<{ message: string }> {
+    await this.publishService.deleteDraftUniversity(uniId);
+    return { message: 'Draft university deleted' };
+  }
 
   @Get(':uniId')
   @AddSwaggerDoc('crmUniversities', 'getUniversityDetails')

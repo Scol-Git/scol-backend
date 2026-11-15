@@ -8,6 +8,7 @@ import { CrmUniversityStageFlowMapper } from './mappers/CrmUniversityStageFlowMa
 import { CrmUniversityStageFlowService } from './CrmUniversityStageFlowService';
 import { CrmUniversityDetailsService } from './CrmUniversityDetailsService';
 import { CrmUniversityUpdateService } from './CrmUniversityUpdateService';
+import { CrmUniversityListService } from './CrmUniversityListService';
 
 @Module({
   providers: [
@@ -20,11 +21,13 @@ import { CrmUniversityUpdateService } from './CrmUniversityUpdateService';
     CrmUniversityStageFlowService,
     CrmUniversityDetailsService,
     CrmUniversityUpdateService,
+    CrmUniversityListService,
   ],
   exports: [
     CrmUniversityDetailsService,
     CrmUniversityUpdateService,
     CrmUniversityStageFlowService,
+    CrmUniversityListService,
   ],
 })
 export class CrmUniversitiesModule {}

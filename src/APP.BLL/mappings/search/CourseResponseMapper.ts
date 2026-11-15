@@ -81,6 +81,7 @@ export class CourseResponseMapper {
     return {
       courseId: courseIntake.id,
       courseName: course?.courseName ?? '',
+      isPublished: courseIntake.isPublished,
       university: this.toUniversityDto(university),
       imgUrl: university?.coverImageUrl ?? null,
       intake: this.toIntakeDto(

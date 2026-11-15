@@ -22,6 +22,9 @@ export class CrmUniversityInfoDto {
   campusLife!: CampusLifeMediaDto | null;
   @ApiProperty({ type: LocationDto }) location!: LocationDto;
   @ApiProperty({ type: RankingDto }) ranking!: RankingDto;
+  @ApiProperty() isPublished!: boolean;
+  @ApiPropertyOptional({ nullable: true, type: String }) publishedAt!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) importBatchId!: string | null;
 }
 
 export class ActiveIntakeItemDto {

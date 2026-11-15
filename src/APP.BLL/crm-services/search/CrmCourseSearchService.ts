@@ -50,6 +50,9 @@ export class CrmCourseSearchService {
       limit: request.pagination?.limit,
       context: ANONYMOUS_SEARCH_CONTEXT,
       source: SearchExecutionSource.CRM,
+      publishStatus: request.publishStatus,
+      importBatchId: request.importBatchId,
+      uniId: request.uniId,
     });
 
     this.logger.debug?.('CRM course search completed', {

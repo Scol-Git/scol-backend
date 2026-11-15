@@ -17,14 +17,17 @@ export class CrmCourseDetailsService {
     courseIntakeId: string,
   ): Promise<CrmCourseDetailsResponseDto> {
     const intake =
-      await this.courseDetailsLoader.loadActiveIntakeOrNull(courseIntakeId);
+      await this.courseDetailsLoader.loadActiveIntakeOrNull(courseIntakeId, true);
 
     if (!intake) {
       throw new NotFoundException('Course not found');
     }
 
     const currentYearIntakes =
-      await this.courseDetailsLoader.loadCurrentYearIntakes(intake.uniCourseId);
+      await this.courseDetailsLoader.loadCurrentYearIntakes(
+        intake.uniCourseId,
+        true,
+      );
 
     const mapped = this.courseDetailsMapper.toCrmCourseDetailsResponse(
       intake,
@@ -36,6 +39,12 @@ export class CrmCourseDetailsService {
       message: 'Course details retrieved successfully',
       courseDetails: mapped.courseDetails,
       meta: mapped.meta,
+      publish: {
+        intakeIsPublished: intake.isPublished,
+        courseIsPublished: intake.UniCourse?.isPublished ?? true,
+        universityIsPublished: intake.UniCourse?.SysUniversity?.isPublished ?? true,
+        importBatchId: intake.importBatchId ?? null,
+      },
     };
   }
 }

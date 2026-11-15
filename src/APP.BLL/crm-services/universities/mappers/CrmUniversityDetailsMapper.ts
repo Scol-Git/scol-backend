@@ -27,6 +27,9 @@ export class CrmUniversityDetailsMapper {
       campusLife: this.buildCampusLife(uni),
       location: this.buildLocation(uni),
       ranking: this.buildRanking(uni),
+      isPublished: uni.isPublished,
+      publishedAt: uni.publishedAt ? new Date(uni.publishedAt).toISOString() : null,
+      importBatchId: uni.importBatchId ?? null,
     };
   }
 

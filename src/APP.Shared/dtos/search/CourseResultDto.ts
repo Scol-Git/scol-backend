@@ -64,6 +64,11 @@ export class CourseResultDto {
   @ApiProperty({ description: 'Course name' })
   courseName!: string;
 
+  @ApiPropertyOptional({
+    description: 'false for draft (unpublished) intakes; only CRM can see those',
+  })
+  isPublished?: boolean;
+
   @ApiProperty({ description: 'University information' })
   university!: UniversityDto;
 

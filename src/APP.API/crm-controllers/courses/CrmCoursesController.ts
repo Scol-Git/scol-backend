@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Patch,
   Param,
@@ -16,6 +17,7 @@ import { AddSwaggerDoc } from '@api/common/swagger/add-swagger-doc.decorator';
 import '../common/swagger/courses/swagger.doc';
 import { CrmCourseDetailsService } from '@bll/crm-services/courses/CrmCourseDetailsService';
 import { CrmCourseUpdateService } from '@bll/crm-services/courses/CrmCourseUpdateService';
+import { PublishService } from '@bll/crm-services/publishing/PublishService';
 import { CrmCourseDetailsResponseDto } from '@shared/dtos/crm/courses/CrmCourseDetailsResponseDto';
 import { UpdateCrmCourseRequestDto } from '@shared/dtos/crm/courses/UpdateCrmCourseRequestDto';
 import { UpdateCrmCourseResponseDto } from '@shared/dtos/crm/courses/UpdateCrmCourseResponseDto';
@@ -40,6 +42,7 @@ export class CrmCoursesController {
   constructor(
     private readonly courseDetailsService: CrmCourseDetailsService,
     private readonly courseUpdateService: CrmCourseUpdateService,
+    private readonly publishService: PublishService,
   ) {}
 
   @Get(':courseId')
@@ -60,5 +63,16 @@ export class CrmCoursesController {
     @Body() dto: UpdateCrmCourseRequestDto,
   ): Promise<UpdateCrmCourseResponseDto> {
     return this.courseUpdateService.updateCourse(courseIntakeId, dto);
+  }
+
+  /** `courseId` is UniCourseIntakes.id. Only never-published drafts can be deleted. */
+  @Delete(':courseId')
+  @RequireRole(Role.ADMIN)
+  @AddSwaggerDoc('crmCourses', 'deleteDraftCourse')
+  async deleteDraftCourse(
+    @Param('courseId', ParseUUIDPipe) courseIntakeId: string,
+  ): Promise<{ message: string }> {
+    await this.publishService.deleteDraftCourseIntake(courseIntakeId);
+    return { message: 'Draft course deleted' };
   }
 }

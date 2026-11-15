@@ -5,6 +5,7 @@ import { ValidationException } from '@shared/exceptions/ValidationException';
 import type { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
 import type { UniCourses } from '@entity/entities/UniCourses.entity';
 import type { UpdateCrmCourseRequestDto } from '@shared/dtos/crm/courses/UpdateCrmCourseRequestDto';
+import { assertPublishFieldsNotCleared } from '@bll/crm-services/publishing/PublishedFieldGuard';
 
 @Injectable()
 export class CrmCourseValidationService {
@@ -15,13 +16,18 @@ export class CrmCourseValidationService {
     course: UniCourses,
     dto: UpdateCrmCourseRequestDto,
   ): Promise<void> {
-    await this.validateFkIds(dto);
+    assertPublishFieldsNotCleared('course', course.isPublished, dto);
+    assertPublishFieldsNotCleared('intake', intake.isPublished, dto);
+    await this.validateFkIds(dto, course.isPublished || intake.isPublished);
     this.validateGpaRules(course, dto);
     this.validateIntakeWindow(dto);
     await this.validateIntakeUniqueness(intake, course, dto);
   }
 
-  private async validateFkIds(dto: UpdateCrmCourseRequestDto): Promise<void> {
+  private async validateFkIds(
+    dto: UpdateCrmCourseRequestDto,
+    isPublished: boolean,
+  ): Promise<void> {
     if (dto.sysProgrammeId !== undefined) {
       const programme = await this.db.programmes.findOne({
         where: { id: dto.sysProgrammeId, deletedAt: IsNull() },
@@ -30,6 +36,12 @@ export class CrmCourseValidationService {
         throw new ValidationException('Programme not found', {
           sysProgrammeId: ['Invalid programme id'],
         });
+      }
+      if (isPublished && !programme.isPublished) {
+        throw new ValidationException(
+          'A published course cannot use an unpublished programme',
+          { sysProgrammeId: ['Programme is not published'] },
+        );
       }
     }
 
