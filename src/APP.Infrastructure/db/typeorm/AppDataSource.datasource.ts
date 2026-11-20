@@ -38,7 +38,9 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-const dbUrl = process.env.DATABASE_URL;
+// Migrations must use a DIRECT connection (Neon: host without "-pooler"),
+// because CREATE INDEX CONCURRENTLY cannot run through PgBouncer transaction mode.
+const dbUrl = process.env.DB_MIGRATION_URL || process.env.DATABASE_URL;
 
 // ---------------------------
 // 4. Determine migration path based on mode
@@ -101,6 +103,7 @@ import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
 import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
 import { UniApplicationStage } from '@entity/entities/UniApplicationStage.entity';
+import { BulkImportBatches } from '@entity/entities/BulkImportBatches.entity';
 
 /**
  * AppDataSource - TypeORM DataSource for migrations and CLI operations
@@ -116,6 +119,8 @@ const AppDataSource = new DataSource({
   url: dbUrl,
   synchronize: false,
   logging: false,
+  // bulk-import-indexes uses `transaction = false` for CREATE INDEX CONCURRENTLY
+  migrationsTransactionMode: 'each',
 
   entities: [
     SysCountries,
@@ -166,6 +171,7 @@ const AppDataSource = new DataSource({
     SysConsultantProfiles,
     ConsultantCertifications,
     UniApplicationStage,
+    BulkImportBatches,
   ],
 
   migrations: [migrationPath],

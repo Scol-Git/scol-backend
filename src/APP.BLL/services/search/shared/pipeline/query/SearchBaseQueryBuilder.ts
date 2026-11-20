@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, SelectQueryBuilder, Brackets } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { UniCourseIntakes } from '@entity/entities/UniCourseIntakes.entity';
-import type { IntakeWindow, PipelineParams } from '../SearchPipelineTypes';
+import {
+  SearchExecutionSource,
+  type IntakeWindow,
+  type PipelineParams,
+} from '../SearchPipelineTypes';
+import { PublishStatus } from '@shared/enums/crm/PublishStatus.enum';
 
 @Injectable()
 export class SearchBaseQueryBuilder {
@@ -42,6 +47,7 @@ export class SearchBaseQueryBuilder {
       .innerJoin('uni.SysCountry', 'country')
       .where('ci.isActive = true');
 
+    qb = this.applyPublishFilter(qb, params);
     qb = this.applySearchTextFilter(qb, params);
     qb = this.applyLocationFilters(qb, params);
     qb = this.applyProgrammeFilter(qb, params);
@@ -49,10 +55,39 @@ export class SearchBaseQueryBuilder {
     qb = this.applyRangeFilters(qb, params);
     qb = this.applyScholarshipFlag(qb, params);
 
-    if (this.shouldApplyNextIntakeRule(params)) {
+    // CRM reviewers must see every draft intake, including past or odd ones.
+    const isCrmDraftView =
+      params.source === SearchExecutionSource.CRM &&
+      params.publishStatus === PublishStatus.DRAFT;
+    if (this.shouldApplyNextIntakeRule(params) && !isCrmDraftView) {
       qb = this.applyNextIntakeWindow(qb, intakeWindow);
     }
 
+    return qb;
+  }
+
+  /**
+   * Leads (any non-CRM source) only ever see published intakes.
+   * CRM may choose PUBLISHED (default), DRAFT or ALL, and narrow by batch / university.
+   */
+  applyPublishFilter(
+    qb: SelectQueryBuilder<UniCourseIntakes>,
+    params: PipelineParams,
+  ): SelectQueryBuilder<UniCourseIntakes> {
+    const isCrm = params.source === SearchExecutionSource.CRM;
+    const status = isCrm
+      ? (params.publishStatus ?? PublishStatus.PUBLISHED)
+      : PublishStatus.PUBLISHED;
+    if (status === PublishStatus.PUBLISHED) qb.andWhere('ci.isPublished = true');
+    if (status === PublishStatus.DRAFT) qb.andWhere('ci.isPublished = false');
+    if (isCrm && params.importBatchId) {
+      qb.andWhere('ci.importBatchId = :importBatchId', {
+        importBatchId: params.importBatchId,
+      });
+    }
+    if (isCrm && params.uniId) {
+      qb.andWhere('course.uniId = :uniId', { uniId: params.uniId });
+    }
     return qb;
   }
 

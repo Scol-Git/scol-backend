@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { IsNull } from 'typeorm';
 import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import type { CrmUniversityDetailsResponseDto } from '@shared/dtos/crm/universities/CrmUniversityDetailsResponseDto';
@@ -18,13 +18,17 @@ export class CrmUniversityDetailsService {
 
   async getUniversityDetails(
     uniId: string,
+    includeDrafts = true,
   ): Promise<CrmUniversityDetailsResponseDto> {
     const university = await this.lookupService.loadUniversityOrThrow(uniId);
+    if (!includeDrafts && !university.isPublished) {
+      throw new NotFoundException('University not found');
+    }
 
     const [totalCourses, activeIntakeRows, customApplicationStageFlow] =
       await Promise.all([
-        this.countCourses(uniId),
-        this.loadActiveIntakeMonthYears(uniId),
+        this.countCourses(uniId, includeDrafts),
+        this.loadActiveIntakeMonthYears(uniId, includeDrafts),
         this.stageFlowService.getFlow(uniId),
       ]);
 
@@ -45,19 +49,22 @@ export class CrmUniversityDetailsService {
     };
   }
 
-  private async countCourses(uniId: string): Promise<number> {
+  private async countCourses(uniId: string, includeDrafts: boolean): Promise<number> {
     return this.db.courses.count({
-      where: { uniId, deletedAt: IsNull() },
+      where: includeDrafts
+        ? { uniId, deletedAt: IsNull() }
+        : { uniId, deletedAt: IsNull(), isPublished: true },
     });
   }
 
   private async loadActiveIntakeMonthYears(
     uniId: string,
+    includeDrafts: boolean,
   ): Promise<{ intakeYear: number; intakeMonth: number }[]> {
     const now = new Date();
     const currentKey = now.getFullYear() * 12 + (now.getMonth() + 1);
 
-    const rows = await this.db.courseIntakes
+    const qb = this.db.courseIntakes
       .createQueryBuilder('intake')
       .innerJoin('intake.UniCourse', 'course')
       .select('intake.intakeYear', 'intakeYear')
@@ -66,7 +73,10 @@ export class CrmUniversityDetailsService {
       .andWhere('course.deletedAt IS NULL')
       .andWhere('intake.deletedAt IS NULL')
       .andWhere('intake.isActive = true')
-      .andWhere('intake.intakeKey >= :currentKey', { currentKey })
+      .andWhere('intake.intakeKey >= :currentKey', { currentKey });
+    if (!includeDrafts) qb.andWhere('intake.isPublished = true');
+
+    const rows = await qb
       .distinct(true)
       .orderBy('intake.intakeYear', 'ASC')
       .addOrderBy('intake.intakeMonth', 'ASC')

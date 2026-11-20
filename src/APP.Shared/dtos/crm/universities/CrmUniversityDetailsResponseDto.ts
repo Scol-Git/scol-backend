@@ -2,11 +2,23 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   AboutUsDto,
   CampusLifeMediaDto,
-  LocationDto,
+  LocationCoordinatesDto,
   RankingDto,
 } from '@shared/dtos/course-details/CourseDetailsDto';
 import { MetaItemDto } from '@shared/dtos/course-details/MetaItemDto';
 import { CommissionType } from '@shared/enums/CommissionType.enum';
+
+export class CrmUniversityLocationDto {
+  @ApiProperty({ nullable: true }) city!: string | null;
+  @ApiPropertyOptional({ format: 'uuid', nullable: true }) cityId!: string | null;
+  @ApiProperty({ nullable: true }) country!: string | null;
+  @ApiPropertyOptional({ format: 'uuid', nullable: true }) countryId!: string | null;
+  @ApiProperty({ nullable: true }) state!: string | null;
+  @ApiPropertyOptional({ format: 'uuid', nullable: true }) stateId!: string | null;
+  @ApiProperty({ nullable: true }) address!: string | null;
+  @ApiProperty({ type: LocationCoordinatesDto, nullable: true })
+  coordinates!: LocationCoordinatesDto | null;
+}
 
 export class CrmUniversityInfoDto {
   @ApiProperty() uniId!: string;
@@ -20,8 +32,11 @@ export class CrmUniversityInfoDto {
   aboutUs!: AboutUsDto | null;
   @ApiPropertyOptional({ type: CampusLifeMediaDto, nullable: true })
   campusLife!: CampusLifeMediaDto | null;
-  @ApiProperty({ type: LocationDto }) location!: LocationDto;
+  @ApiProperty({ type: CrmUniversityLocationDto }) location!: CrmUniversityLocationDto;
   @ApiProperty({ type: RankingDto }) ranking!: RankingDto;
+  @ApiProperty() isPublished!: boolean;
+  @ApiPropertyOptional({ nullable: true, type: String }) publishedAt!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) importBatchId!: string | null;
 }
 
 export class ActiveIntakeItemDto {

@@ -112,8 +112,8 @@ export class LeadProfileService {
       this.db.englishTests.find({
         relations: { SysEnglishTestSection: true },
       }),
-      this.db.countries.find(),
-      this.db.programmes.find(),
+      this.db.countries.find({ where: { isPublished: true } }),
+      this.db.programmes.find({ where: { isPublished: true } }),
     ]);
 
     const academicFormStatus = await this.determinedAcademicFormStatus(userId);

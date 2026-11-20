@@ -38,6 +38,7 @@ export class AcademicFormValidator {
         this.db.countries.find({
           where: {
             id: In(dto.preferredCountryIds!),
+            isPublished: true,
           },
         }),
       errors,
@@ -50,6 +51,7 @@ export class AcademicFormValidator {
         this.db.programmes.find({
           where: {
             id: In(dto.preferredProgrammeIds!),
+            isPublished: true,
           },
         }),
       errors,

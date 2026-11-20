@@ -24,6 +24,7 @@ export class CategoriesService {
       .innerJoin('city.SysState', 'state')
       .where('state.sysCountryId = :countryId', { countryId })
       .andWhere('city.deletedAt IS NULL')
+      .andWhere('city.isPublished = true')
       .select(['city.id', 'city.cityName'])
       .orderBy('city.cityName', 'ASC')
       .getMany();

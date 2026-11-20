@@ -3,6 +3,7 @@ import { SearchRangesDto } from '@shared/dtos/search/SearchRangesDto';
 import { SearchFlagsDto } from '@shared/dtos/search/SearchFlagsDto';
 import { ListType } from '@shared/enums/ListType.enum';
 import type { SearchContext } from '@shared/search/SearchTypes';
+import type { PublishStatus } from '@shared/enums/crm/PublishStatus.enum';
 
 export enum SearchExecutionSource {
   HOME = 'HOME',
@@ -21,6 +22,12 @@ export interface PipelineParams {
   listType?: ListType | null;
   context: SearchContext;
   source?: SearchExecutionSource;
+  /** CRM only. Lead sources always use PUBLISHED. Default PUBLISHED. */
+  publishStatus?: PublishStatus;
+  /** CRM only: restrict to intakes owned by this batch. */
+  importBatchId?: string;
+  /** CRM only: restrict to one university. */
+  uniId?: string;
 }
 
 /** Intake window for next-intake rule (index-friendly intakeKey). */

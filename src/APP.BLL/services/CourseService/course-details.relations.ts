@@ -2,6 +2,7 @@
  * Relations needed to build course details + meta + eligibility from intake.
  */
 export const COURSE_DETAILS_RELATIONS = {
+  CourseIntakeScholarship: true,
   UniCourse: {
     SysUniversity: {
       SysCountry: true,

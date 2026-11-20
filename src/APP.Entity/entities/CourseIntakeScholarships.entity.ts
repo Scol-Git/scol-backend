@@ -2,8 +2,7 @@ import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { UniCourseIntakes } from './UniCourseIntakes.entity';
-
-import { MetaDataItem } from '@shared/types/MetaDataItem.type';
+import { CommissionType } from '@shared/enums/CommissionType.enum';
 
 /**
  * @class CourseIntakeScholarships
@@ -54,7 +53,7 @@ export class CourseIntakeScholarships extends BaseEntity {
     nullable: true,
   })
   @AutoMap()
-  amountType?: string;
+  amountType?: CommissionType;
 
   @Column({
     name: 'frequency',

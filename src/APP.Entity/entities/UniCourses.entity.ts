@@ -25,7 +25,10 @@ import { MetaDataItem } from '@shared/types/MetaDataItem.type';
  * - sysProgrammeId: Programme filtering
  * - courseName: Text search
  */
+// Natural-key unique index lives in migration bulk-import-indexes (expression index).
+// synchronize: false stops typeorm:gen from dropping it.
 @Entity('UniCourses')
+@Index('UQ_UniCourses_uni_name_degree', { synchronize: false })
 @Index('IX_UniCourses_uniId', ['uniId'])
 @Index('IX_UniCourses_sysProgrammeId', ['sysProgrammeId'])
 @Index('IX_UniCourses_courseName', ['courseName'])
@@ -115,6 +118,26 @@ export class UniCourses extends BaseEntity {
   })
   @AutoMap()
   externalUrl?: string;
+
+  // ========================================
+  // Publish / import tracking (bulk import draft -> publish)
+  // ========================================
+
+  @Column({ name: 'isPublished', type: 'boolean', nullable: false, default: true })
+  @AutoMap()
+  isPublished!: boolean;
+
+  @Column({ name: 'publishedAt', type: 'timestamptz', nullable: true })
+  @AutoMap()
+  publishedAt?: Date | null;
+
+  @Column({ name: 'publishedBy', type: 'uuid', nullable: true })
+  @AutoMap()
+  publishedBy?: string | null;
+
+  @Column({ name: 'importBatchId', type: 'uuid', nullable: true })
+  @AutoMap()
+  importBatchId?: string | null;
 
   // ========================================
   // Navigation Properties (EF Core style)

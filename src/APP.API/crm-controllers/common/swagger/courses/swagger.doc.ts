@@ -5,6 +5,7 @@ import {
 import { crmEndpoint } from '../wrapped-response';
 import { CrmCourseDetailsResponseDto } from '@shared/dtos/crm/courses/CrmCourseDetailsResponseDto';
 import { UpdateCrmCourseResponseDto } from '@shared/dtos/crm/courses/UpdateCrmCourseResponseDto';
+import { SuccessResponseDto } from '@shared/dtos/common/SuccessResponseDto';
 
 const docs: Record<string, SwaggerDocSet> = {
   'crmCourses.getCourseDetails': crmEndpoint({
@@ -21,6 +22,14 @@ const docs: Record<string, SwaggerDocSet> = {
       'Partially updates course and intake fields for the given course ID. ADMIN only.',
     data: UpdateCrmCourseResponseDto,
     successDescription: 'Course updated successfully',
+    notFound: 'Course not found',
+  }),
+  'crmCourses.deleteDraftCourse': crmEndpoint({
+    summary: 'Delete a never-published draft course intake',
+    description:
+      'courseId is the intake id. Only when isPublished=false and it was never published. Also removes its scholarships, and the parent draft course (with its English requirements) when no intakes remain. ADMIN only.',
+    data: SuccessResponseDto,
+    successDescription: 'Draft deleted',
     notFound: 'Course not found',
   }),
 };

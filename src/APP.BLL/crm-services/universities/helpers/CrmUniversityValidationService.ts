@@ -4,6 +4,8 @@ import { AppDbContext } from '@infra/db/typeorm/AppDbContext';
 import { ValidationException } from '@shared/exceptions/ValidationException';
 import type { SysUniversities } from '@entity/entities/SysUniversities.entity';
 import type { UpdateCrmUniversityRequestDto } from '@shared/dtos/crm/universities/UpdateCrmUniversityRequestDto';
+import { assertPublishFieldsNotCleared } from '@bll/crm-services/publishing/PublishedFieldGuard';
+import { assertPublishedIdentityUnchanged } from '@bll/crm-services/publishing/PublishedIdentityGuard';
 
 @Injectable()
 export class CrmUniversityValidationService {
@@ -13,7 +15,9 @@ export class CrmUniversityValidationService {
     university: SysUniversities,
     dto: UpdateCrmUniversityRequestDto,
   ): Promise<void> {
+    assertPublishedIdentityUnchanged('university', university.isPublished, university, dto);
     this.validateCommissionPairing(university, dto);
+    assertPublishFieldsNotCleared('university', university.isPublished, dto);
     await this.validateGeoConsistency(university, dto);
   }
 
@@ -70,6 +74,12 @@ export class CrmUniversityValidationService {
           sysCountryId: ['Invalid country id'],
         });
       }
+      if (university.isPublished && !country.isPublished) {
+        throw new ValidationException(
+          'A published university cannot use an unpublished country/state/city',
+          { sysCountryId: ['Country is not published'] },
+        );
+      }
     }
 
     if (stateId != null) {
@@ -80,6 +90,12 @@ export class CrmUniversityValidationService {
         throw new ValidationException('State not found', {
           sysStateId: ['Invalid state id'],
         });
+      }
+      if (university.isPublished && !state.isPublished) {
+        throw new ValidationException(
+          'A published university cannot use an unpublished country/state/city',
+          { sysStateId: ['State is not published'] },
+        );
       }
       if (state.sysCountryId !== countryId) {
         throw new ValidationException(
@@ -97,6 +113,12 @@ export class CrmUniversityValidationService {
         throw new ValidationException('City not found', {
           sysCityId: ['Invalid city id'],
         });
+      }
+      if (university.isPublished && !city.isPublished) {
+        throw new ValidationException(
+          'A published university cannot use an unpublished country/state/city',
+          { sysCityId: ['City is not published'] },
+        );
       }
       if (stateId == null) {
         throw new ValidationException(

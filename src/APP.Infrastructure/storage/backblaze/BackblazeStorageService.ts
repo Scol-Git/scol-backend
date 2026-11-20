@@ -6,6 +6,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
+  ListObjectVersionsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
@@ -80,9 +81,69 @@ export class BackblazeStorageService implements IStorageService {
     }
   }
 
+  async getObjectBytes(key: string): Promise<Uint8Array> {
+    const res = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    if (!res.Body) throw new Error(`Empty object body for ${key}`);
+    return res.Body.transformToByteArray();
+  }
+
+  async putObject(key: string, body: Buffer, mimeType: string): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: body,
+        ContentType: mimeType,
+      }),
+    );
+  }
+
+  async getObjectSize(key: string): Promise<number | null> {
+    try {
+      const res = await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return res.ContentLength ?? 0;
+    } catch (err: unknown) {
+      const code = (err as { name?: string })?.name;
+      if (code === 'NotFound' || code === 'NoSuchKey') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
   async deleteObject(key: string): Promise<void> {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
+  }
+
+  async deleteAllVersions(key: string): Promise<void> {
+    let keyMarker: string | undefined;
+    let versionIdMarker: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectVersionsCommand({
+          Bucket: this.bucket,
+          Prefix: key,
+          KeyMarker: keyMarker,
+          VersionIdMarker: versionIdMarker,
+        }),
+      );
+      // Prefix also matches longer keys (e.g. "a.csv" vs "a.csv.bak"); only delete the exact key.
+      const versions = [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])].filter(
+        (v) => v.Key === key && v.VersionId,
+      );
+      for (const v of versions) {
+        await this.client.send(
+          new DeleteObjectCommand({ Bucket: this.bucket, Key: key, VersionId: v.VersionId }),
+        );
+      }
+      keyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
+      versionIdMarker = page.IsTruncated ? page.NextVersionIdMarker : undefined;
+    } while (keyMarker);
   }
 }

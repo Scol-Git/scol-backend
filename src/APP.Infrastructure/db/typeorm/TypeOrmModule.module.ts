@@ -58,6 +58,7 @@ import { LeadCrmInfos } from '@entity/entities/LeadCrmInfos.entity';
 import { SysConsultantProfiles } from '@entity/entities/SysConsultantProfiles.entity';
 import { ConsultantCertifications } from '@entity/entities/ConsultantCertifications.entity';
 import { UniApplicationStage } from '@entity/entities/UniApplicationStage.entity';
+import { BulkImportBatches } from '@entity/entities/BulkImportBatches.entity';
 import { AppDbContext } from './AppDbContext';
 
 @Global()
@@ -123,13 +124,14 @@ import { AppDbContext } from './AppDbContext';
             SysConsultantProfiles,
             ConsultantCertifications,
             UniApplicationStage,
+            BulkImportBatches,
           ],
           synchronize: false,
           logging: getAppStage() === 'dev' ? ['error', 'warn'] : ['error'],
-          // Serverless-optimized connection pool settings
-          // Keeps connections minimal to avoid exhausting Neon/serverless DB limits
+          // Pool size per app instance. Neon (pooled host): keep small (2-5).
+          // DigitalOcean Managed PG: instances x DB_POOL_MAX + headroom <= plan connection limit.
           extra: {
-            max: 2, // Maximum connections per serverless instance
+            max: Number(cfg.get<string>('DB_POOL_MAX', '2')),
             idleTimeoutMillis: 10000, // Close idle connections after 10s
             connectionTimeoutMillis: 10000, // Timeout for new connections
           },
@@ -186,6 +188,7 @@ import { AppDbContext } from './AppDbContext';
       SysConsultantProfiles,
       ConsultantCertifications,
       UniApplicationStage,
+      BulkImportBatches,
     ]),
   ],
   providers: [AppDbContext],

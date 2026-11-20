@@ -32,7 +32,11 @@ import { LeadFavouriteCourses } from './LeadFavouriteCourses.entity';
  * - Partial (id, uniCourseId, intakeYear WHERE isActive = true AND deletedAt IS NULL):
  *   Optimized for active course queries (10-20% faster base filtering)
  */
+// Natural-key unique index and draft index live in migration bulk-import-indexes.
+// synchronize: false stops typeorm:gen from dropping them.
 @Entity('UniCourseIntakes')
+@Index('UQ_UniCourseIntakes_course_year_month', { synchronize: false })
+@Index('IX_UniCourseIntakes_drafts', { synchronize: false })
 @Index('IX_UniCourseIntakes_isActive', ['isActive'])
 @Index('IX_UniCourseIntakes_uniCourseId', ['uniCourseId'])
 @Index('IX_UniCourseIntakes_intakeKey', ['intakeKey'])
@@ -42,8 +46,8 @@ import { LeadFavouriteCourses } from './LeadFavouriteCourses.entity';
 @Index('IX_UniCourseIntakes_courseDuration', ['courseDuration'])
 @Index('IX_UniCourseIntakes_createdAt', ['createdAt'])
 @Index('IX_UniCourseIntakes_active_createdAt', ['isActive', 'createdAt'])
-@Index('IX_UniCourseIntakes_active_only', ['id', 'uniCourseId', 'intakeYear'], {
-  where: '"isActive" = true AND "deletedAt" IS NULL',
+@Index('IX_UniCourseIntakes_live', ['id', 'uniCourseId', 'intakeYear'], {
+  where: '"isActive" = true AND "isPublished" = true AND "deletedAt" IS NULL',
 })
 export class UniCourseIntakes extends BaseEntity {
   @Column({
@@ -164,6 +168,26 @@ export class UniCourseIntakes extends BaseEntity {
   })
   @AutoMap()
   isActive!: boolean;
+
+  // ========================================
+  // Publish / import tracking (bulk import draft -> publish)
+  // ========================================
+
+  @Column({ name: 'isPublished', type: 'boolean', nullable: false, default: true })
+  @AutoMap()
+  isPublished!: boolean;
+
+  @Column({ name: 'publishedAt', type: 'timestamptz', nullable: true })
+  @AutoMap()
+  publishedAt?: Date | null;
+
+  @Column({ name: 'publishedBy', type: 'uuid', nullable: true })
+  @AutoMap()
+  publishedBy?: string | null;
+
+  @Column({ name: 'importBatchId', type: 'uuid', nullable: true })
+  @AutoMap()
+  importBatchId?: string | null;
 
   // ========================================
   // Navigation Properties (EF Core style)

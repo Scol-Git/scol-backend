@@ -29,7 +29,7 @@ export class CrmLeadValidationService {
     }
 
     const country = await this.db.countries.findOne({
-      where: { id: targetCountryId },
+      where: { id: targetCountryId, isPublished: true },
     });
 
     if (!country) {

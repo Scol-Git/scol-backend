@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { StorageModule } from '@infra/storage/StorageModule.module';
 import { CrmUniversityLookupService } from './helpers/CrmUniversityLookupService';
 import { CrmUniversityValidationService } from './helpers/CrmUniversityValidationService';
 import { UniStageFlowSeeder } from './helpers/UniStageFlowSeeder';
@@ -8,8 +9,12 @@ import { CrmUniversityStageFlowMapper } from './mappers/CrmUniversityStageFlowMa
 import { CrmUniversityStageFlowService } from './CrmUniversityStageFlowService';
 import { CrmUniversityDetailsService } from './CrmUniversityDetailsService';
 import { CrmUniversityUpdateService } from './CrmUniversityUpdateService';
+import { CrmUniversityListService } from './CrmUniversityListService';
+import { CrmUniversityAssetService } from './CrmUniversityAssetService';
+import { CrmUniversityIntakeFeesService } from './CrmUniversityIntakeFeesService';
 
 @Module({
+  imports: [StorageModule],
   providers: [
     CrmUniversityLookupService,
     CrmUniversityValidationService,
@@ -20,11 +25,17 @@ import { CrmUniversityUpdateService } from './CrmUniversityUpdateService';
     CrmUniversityStageFlowService,
     CrmUniversityDetailsService,
     CrmUniversityUpdateService,
+    CrmUniversityListService,
+    CrmUniversityAssetService,
+    CrmUniversityIntakeFeesService,
   ],
   exports: [
     CrmUniversityDetailsService,
     CrmUniversityUpdateService,
     CrmUniversityStageFlowService,
+    CrmUniversityListService,
+    CrmUniversityAssetService,
+    CrmUniversityIntakeFeesService,
   ],
 })
 export class CrmUniversitiesModule {}

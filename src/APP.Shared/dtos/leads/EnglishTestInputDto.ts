@@ -22,7 +22,7 @@ export class EnglishTestSectionInputDto {
   @ApiProperty({ description: 'Section score', example: 6.5 })
   @IsNumber()
   @Min(0)
-  @Max(120) // TOEFL can have higher section scores
+  @Max(120) // Shared ceiling. Each TOEFL section is capped by that section's maxScore (6).
   score!: number;
 }
 
@@ -37,7 +37,7 @@ export class EnglishTestInputDto {
   @ApiProperty({ description: 'Overall score', example: 7 })
   @IsNumber()
   @Min(0)
-  @Max(120) // TOEFL can be up to 120
+  @Max(120) // Shared ceiling. The TOEFL overall cap is the test maxScore (6).
   overallScore!: number;
 
   @ApiPropertyOptional({
