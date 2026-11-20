@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { AutoMap } from '@automapper/classes';
 import { BaseEntity } from './BaseEntity.template';
 import { SysStates } from './SysStates.entity';
@@ -8,7 +8,9 @@ import { SysStates } from './SysStates.entity';
  * @extends {BaseEntity}
  */
 // Natural-key unique index lives in migration bulk-import-indexes (expression index).
+// synchronize: false stops typeorm:gen from dropping it.
 @Entity('sys_Cities')
+@Index('UQ_SysCities_state_name', { synchronize: false })
 export class SysCities extends BaseEntity {
   @Column({
     name: 'sysStateId',

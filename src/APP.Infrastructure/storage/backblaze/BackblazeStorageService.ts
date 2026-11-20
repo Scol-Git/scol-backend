@@ -6,6 +6,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
+  ListObjectVersionsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IStorageService } from '@shared/interfaces/IStorageService.interface';
@@ -118,5 +119,31 @@ export class BackblazeStorageService implements IStorageService {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
+  }
+
+  async deleteAllVersions(key: string): Promise<void> {
+    let keyMarker: string | undefined;
+    let versionIdMarker: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectVersionsCommand({
+          Bucket: this.bucket,
+          Prefix: key,
+          KeyMarker: keyMarker,
+          VersionIdMarker: versionIdMarker,
+        }),
+      );
+      // Prefix also matches longer keys (e.g. "a.csv" vs "a.csv.bak"); only delete the exact key.
+      const versions = [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])].filter(
+        (v) => v.Key === key && v.VersionId,
+      );
+      for (const v of versions) {
+        await this.client.send(
+          new DeleteObjectCommand({ Bucket: this.bucket, Key: key, VersionId: v.VersionId }),
+        );
+      }
+      keyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
+      versionIdMarker = page.IsTruncated ? page.NextVersionIdMarker : undefined;
+    } while (keyMarker);
   }
 }

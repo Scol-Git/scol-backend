@@ -48,13 +48,15 @@ const docs: Record<string, SwaggerDocSet> = {
   }),
   'crmBulkImports.downloadOriginal': crmEndpoint({
     summary: 'Presigned download URL for the uploaded CSV',
+    description: '410 when the files were deleted by the retention job',
     data: BulkImportDownloadResponseDto,
     successDescription: 'Download URL',
     notFound: 'Batch not found',
   }),
   'crmBulkImports.downloadErrors': crmEndpoint({
     summary: 'Presigned download URL for errors.csv',
-    description: '404 when the batch produced no errors or warnings.',
+    description:
+      '404 when the batch produced no errors or warnings. 410 when the files were deleted by the retention job',
     data: BulkImportDownloadResponseDto,
     successDescription: 'Download URL',
     notFound: 'Batch or errors file not found',

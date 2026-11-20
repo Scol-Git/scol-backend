@@ -37,8 +37,15 @@ export class CourseImportHandler implements BulkImportHandler<CourseCtx> {
     const error = (column: string, message: string) =>
       issues.push({ severity: 'ERROR', code: ImportErrorCode.INVALID_FORMAT, column, message });
 
-    if (values.minGpa != null && values.minDegreeName == null) error('minGpa', 'minGpa requires minDegreeName');
-    if (values.higherGpa != null && values.higherDegreeName == null) error('higherGpa', 'higherGpa requires higherDegreeName');
+    if ((values.minGpa != null) !== (values.minDegreeName != null)) {
+      error(values.minGpa == null ? 'minGpa' : 'minDegreeName', 'minDegreeName and minGpa must be given together');
+    }
+    if ((values.higherGpa != null) !== (values.higherDegreeName != null)) {
+      error(values.higherGpa == null ? 'higherGpa' : 'higherDegreeName', 'higherDegreeName and higherGpa must be given together');
+    }
+    if ((values.tuitionFee != null) !== (values.currency != null)) {
+      error(values.tuitionFee == null ? 'tuitionFee' : 'currency', 'tuitionFee and currency must be given together');
+    }
 
     const sch = ['scholarshipName', 'scholarshipType', 'scholarshipAmount'];
     const given = sch.filter((h) => values[h] != null);
@@ -47,8 +54,15 @@ export class CourseImportHandler implements BulkImportHandler<CourseCtx> {
     }
 
     for (const t of ENGLISH_TESTS) {
-      if (values[testHeader(t, 'Section')] != null && values[testHeader(t, 'Overall')] == null) {
-        error(testHeader(t, 'Section'), `${testHeader(t, 'Section')} requires ${testHeader(t, 'Overall')}`);
+      const overallHeader = testHeader(t, 'Overall');
+      const sectionHeader = testHeader(t, 'Section');
+      const hasOverall = values[overallHeader] != null;
+      const hasSection = values[sectionHeader] != null;
+      if (hasOverall !== hasSection) {
+        error(
+          hasSection ? sectionHeader : overallHeader,
+          `${overallHeader} and ${sectionHeader} must be given together`,
+        );
       }
     }
 
@@ -72,6 +86,40 @@ export class CourseImportHandler implements BulkImportHandler<CourseCtx> {
     };
   }
 
+  /** GPA must be from 0 through that degree's gpaScale. Unknown degrees are reported separately. */
+  private checkGpaScale(
+    values: Record<string, unknown>,
+    ctx: CourseCtx,
+    gpaHeader: 'minGpa' | 'higherGpa',
+    degreeHeader: 'minDegreeName' | 'higherDegreeName',
+    list: RowIssue[],
+  ): void {
+    const gpa = values[gpaHeader];
+    const name = strOrNull(values[degreeHeader]);
+    if (gpa == null || !name) return;
+    const degree = ctx.degrees.get(normName(name));
+    if (!degree) return;
+    const scale = degree.gpaScale;
+    if (scale == null || Number.isNaN(scale)) {
+      list.push({
+        severity: 'ERROR',
+        code: ImportErrorCode.INVALID_FORMAT,
+        column: gpaHeader,
+        message: `${degreeHeader} has no GPA scale`,
+      });
+      return;
+    }
+    const n = Number(gpa);
+    if (Number.isNaN(n) || n < 0 || n > scale) {
+      list.push({
+        severity: 'ERROR',
+        code: ImportErrorCode.INVALID_FORMAT,
+        column: gpaHeader,
+        message: `${gpaHeader} must be between 0 and ${scale.toFixed(2)}`,
+      });
+    }
+  }
+
   naturalKey(row: ValidRow): string {
     const v = row.values;
     return `${normName(v.uniName as string)}|${normName(v.courseName as string)}|${normName(v.degreeName as string)}`;
@@ -84,12 +132,12 @@ export class CourseImportHandler implements BulkImportHandler<CourseCtx> {
     const [uniRows, progRows, degreeRows, testRows] = (await Promise.all([
       em.query(`SELECT id, lower(trim("uniName")) AS k FROM "sys_Universities" WHERE "deletedAt" IS NULL AND lower(trim("uniName")) = ANY($1::text[])`, [uniNames]),
       em.query(`SELECT id, lower(trim("name")) AS k FROM "sys_Programmes" WHERE "deletedAt" IS NULL AND lower(trim("name")) = ANY($1::text[])`, [progNames]),
-      em.query(`SELECT id, lower(trim("degreeName")) AS k FROM "sys_AcademicDegrees" WHERE "deletedAt" IS NULL`),
+      em.query(`SELECT id, lower(trim("degreeName")) AS k, "gpaScale" FROM "sys_AcademicDegrees" WHERE "deletedAt" IS NULL`),
       em.query(`SELECT id, upper(trim("testName")) AS k, "maxScore" FROM "sys_EnglishTests" WHERE "deletedAt" IS NULL AND upper(trim("testName")) IN ('IELTS','PTE','TOEFL')`),
     ])) as [
       Array<{ id: string; k: string }>,
       Array<{ id: string; k: string }>,
-      Array<{ id: string; k: string }>,
+      Array<{ id: string; k: string; gpaScale: string | number | null }>,
       Array<{ id: string; k: string; maxScore: string | number | null }>,
     ];
 
@@ -106,7 +154,10 @@ export class CourseImportHandler implements BulkImportHandler<CourseCtx> {
     return {
       universities: new Map(uniRows.map((r) => [r.k, r.id])),
       programmes: new Map(progRows.map((r) => [r.k, r.id])),
-      degrees: new Map(degreeRows.map((r) => [r.k, r.id])),
+      degrees: new Map(degreeRows.map((r) => [r.k, {
+        id: r.id,
+        gpaScale: r.gpaScale == null ? null : Number(r.gpaScale),
+      }])),
       englishTests: new Map(
         testRows.map((r) => [
           r.k as EnglishTestName,
@@ -142,6 +193,8 @@ export class CourseImportHandler implements BulkImportHandler<CourseCtx> {
           list.push({ severity: 'ERROR', code: ImportErrorCode.UNKNOWN_DEGREE, column: header, message: `Unknown degree "${name}"` });
         }
       }
+      this.checkGpaScale(v, ctx, 'minGpa', 'minDegreeName', list);
+      this.checkGpaScale(v, ctx, 'higherGpa', 'higherDegreeName', list);
       for (const t of ENGLISH_TESTS) {
         const overall = strOrNull(v[testHeader(t, 'Overall')]);
         const section = strOrNull(v[testHeader(t, 'Section')]);

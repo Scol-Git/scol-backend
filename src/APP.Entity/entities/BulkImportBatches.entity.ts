@@ -108,6 +108,11 @@ export class BulkImportBatches extends BaseEntity {
   @AutoMap()
   publishedAt?: Date | null;
 
+  /** Set when original.csv / errors.csv were permanently removed from storage (retention). */
+  @Column({ name: 'filesDeletedAt', type: 'timestamptz', nullable: true })
+  @AutoMap()
+  filesDeletedAt?: Date | null;
+
   // ========================================
   // Navigation Properties (EF Core style)
   // ========================================

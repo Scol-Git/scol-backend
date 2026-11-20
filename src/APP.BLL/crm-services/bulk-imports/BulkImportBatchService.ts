@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  GoneException,
   Inject,
   Injectable,
   NotFoundException,
@@ -28,6 +29,7 @@ import { BulkImportDetailResponseDto } from '@shared/dtos/crm/bulk-imports/BulkI
 import { BulkImportDownloadResponseDto } from '@shared/dtos/crm/bulk-imports/BulkImportDownloadResponseDto';
 import { BulkImportStorageKeyBuilder } from './helpers/BulkImportStorageKeyBuilder';
 import { BulkImportProcessor } from './BulkImportProcessor';
+import { BulkImportFileCleanupService } from './BulkImportFileCleanupService';
 import { buildTemplate } from './schema/TemplateBuilder';
 import { UNIVERSITY_SCHEMA } from './university/university.schema';
 import { COURSE_SCHEMA } from './course/course.schema';
@@ -45,6 +47,7 @@ export class BulkImportBatchService {
     private readonly keyBuilder: BulkImportStorageKeyBuilder,
     private readonly processor: BulkImportProcessor,
     private readonly config: ConfigService,
+    private readonly fileCleanup: BulkImportFileCleanupService,
   ) {}
 
   private get maxFileBytes(): number {
@@ -168,7 +171,9 @@ export class BulkImportBatchService {
       processedRows: b.processedRows,
       failureReason: b.failureReason ?? null,
       ownedDraftCount,
-      hasErrorsFile: b.errorsFileKey != null,
+      hasErrorsFile: b.errorsFileKey != null && b.filesDeletedAt == null,
+      hasOriginalFile: b.filesDeletedAt == null,
+      filesDeletedAt: iso(b.filesDeletedAt),
       startedAt: iso(b.startedAt),
       publishedBy: b.publishedBy ?? null,
     };
@@ -176,11 +181,13 @@ export class BulkImportBatchService {
 
   async getOriginalDownload(batchId: string): Promise<BulkImportDownloadResponseDto> {
     const b = await this.getOrThrow(batchId);
+    this.assertFilesKept(b);
     return this.download(b.originalFileKey);
   }
 
   async getErrorsDownload(batchId: string): Promise<BulkImportDownloadResponseDto> {
     const b = await this.getOrThrow(batchId);
+    this.assertFilesKept(b);
     if (!b.errorsFileKey) throw new NotFoundException('This batch has no errors file');
     return this.download(b.errorsFileKey);
   }
@@ -195,6 +202,12 @@ export class BulkImportBatchService {
       downloadUrl: await this.storage.generateDownloadUrl(key),
       expiresAt: new Date(Date.now() + DOWNLOAD_URL_TTL_MS).toISOString(),
     };
+  }
+
+  private assertFilesKept(b: BulkImportBatches): void {
+    if (b.filesDeletedAt) {
+      throw new GoneException(`Files are deleted after ${this.fileCleanup.retentionDays} days`);
+    }
   }
 
   private async getOrThrow(batchId: string): Promise<BulkImportBatches> {

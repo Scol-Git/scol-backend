@@ -32,8 +32,11 @@ import { LeadFavouriteCourses } from './LeadFavouriteCourses.entity';
  * - Partial (id, uniCourseId, intakeYear WHERE isActive = true AND deletedAt IS NULL):
  *   Optimized for active course queries (10-20% faster base filtering)
  */
-// Natural-key unique index lives in migration bulk-import-indexes (expression index).
+// Natural-key unique index and draft index live in migration bulk-import-indexes.
+// synchronize: false stops typeorm:gen from dropping them.
 @Entity('UniCourseIntakes')
+@Index('UQ_UniCourseIntakes_course_year_month', { synchronize: false })
+@Index('IX_UniCourseIntakes_drafts', { synchronize: false })
 @Index('IX_UniCourseIntakes_isActive', ['isActive'])
 @Index('IX_UniCourseIntakes_uniCourseId', ['uniCourseId'])
 @Index('IX_UniCourseIntakes_intakeKey', ['intakeKey'])

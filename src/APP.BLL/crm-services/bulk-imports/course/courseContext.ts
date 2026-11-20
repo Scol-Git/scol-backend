@@ -9,8 +9,8 @@ export interface CourseCtx {
   universities: Map<string, string>;
   /** normName(name) -> id */
   programmes: Map<string, string>;
-  /** normName(degreeName) -> id */
-  degrees: Map<string, string>;
+  /** normName(degreeName) -> id and the scale minGpa/higherGpa must not exceed */
+  degrees: Map<string, { id: string; gpaScale: number | null }>;
   englishTests: Map<EnglishTestName, { id: string; maxScore: number | null }>;
   /** `${uniId}|${normName(courseName)}|${degreeId}` -> course */
   existingCourses: Map<string, { id: string; isPublished: boolean }>;
@@ -35,11 +35,12 @@ const strOrNull = (v: unknown): string | null => (typeof v === 'string' ? v : nu
 export function resolveCourseIds(row: ValidRow, ctx: CourseCtx): ResolvedCourseIds | null {
   const v = row.values;
   const uniId = ctx.universities.get(normName(v.uniName as string));
-  const degreeId = ctx.degrees.get(normName(v.degreeName as string));
+  const degree = ctx.degrees.get(normName(v.degreeName as string));
+  const degreeId = degree?.id;
   if (!uniId || !degreeId) return null;
   const optDegree = (header: string): string | null => {
     const n = strOrNull(v[header]);
-    return n ? (ctx.degrees.get(normName(n)) ?? null) : null;
+    return n ? (ctx.degrees.get(normName(n))?.id ?? null) : null;
   };
   return {
     uniId,

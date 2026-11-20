@@ -14,7 +14,9 @@ import { SysStageRequiredDocuments } from './SysStageRequiredDocuments.entity';
  * - countryName: Search pipeline ILIKE searchText
  */
 // Natural-key unique index lives in migration bulk-import-indexes (expression index).
+// synchronize: false stops typeorm:gen from dropping it.
 @Entity('sys_Countries')
+@Index('UQ_SysCountries_name', { synchronize: false })
 @Index('IX_SysCountries_countryName', ['countryName'])
 export class SysCountries extends BaseEntity {
   @Column({

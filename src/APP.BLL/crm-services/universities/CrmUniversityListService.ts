@@ -20,10 +20,10 @@ interface Row {
 export class CrmUniversityListService {
   constructor(private readonly db: AppDbContext) {}
 
-  async list(dto: CrmUniversityListRequestDto): Promise<CrmUniversityListResponseDto> {
+  async list(dto: CrmUniversityListRequestDto, includeDrafts = true): Promise<CrmUniversityListResponseDto> {
     const page = dto.page ?? 1;
     const pageSize = Math.min(dto.pageSize ?? 20, 100);
-    const status = dto.publishStatus ?? PublishStatus.ALL;
+    const status = includeDrafts ? (dto.publishStatus ?? PublishStatus.ALL) : PublishStatus.PUBLISHED;
 
     const base = this.db.universities
       .createQueryBuilder('u')
@@ -32,7 +32,9 @@ export class CrmUniversityListService {
 
     if (status === PublishStatus.DRAFT) base.andWhere('u.isPublished = false');
     if (status === PublishStatus.PUBLISHED) base.andWhere('u.isPublished = true');
-    if (dto.importBatchId) base.andWhere('u.importBatchId = :batchId', { batchId: dto.importBatchId });
+    if (includeDrafts && dto.importBatchId) {
+      base.andWhere('u.importBatchId = :batchId', { batchId: dto.importBatchId });
+    }
     if (dto.search?.trim()) base.andWhere('u.uniName ILIKE :search', { search: `%${dto.search.trim()}%` });
 
     const total = await base.clone().getCount();
@@ -48,7 +50,8 @@ export class CrmUniversityListService {
       .addSelect(
         `(SELECT count(*) FROM "UniCourseIntakes" ci
           JOIN "UniCourses" c ON c.id = ci."uniCourseId"
-          WHERE c."uniId" = "u"."id" AND c."deletedAt" IS NULL AND ci."deletedAt" IS NULL)`,
+          WHERE c."uniId" = "u"."id" AND c."deletedAt" IS NULL AND ci."deletedAt" IS NULL
+          ${includeDrafts ? '' : 'AND ci."isPublished" = true'})`,
         'intakeCount',
       )
       .orderBy('u.uniName', 'ASC')

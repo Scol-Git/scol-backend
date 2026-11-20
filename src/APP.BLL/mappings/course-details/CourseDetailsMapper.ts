@@ -17,6 +17,7 @@ import {
   CampusLifeMediaDto,
 } from '@shared/dtos/course-details/CourseDetailsDto';
 import { MetaItemDto } from '@shared/dtos/course-details/MetaItemDto';
+import { extractLocationMapHref } from '@shared/utils/LocationMapMetaData';
 import type { CourseDetailsLeadFlags } from '@bll/services/CourseService/CourseDetailsLeadFlagsResolver';
 
 /** CRM course-details response (no lead eligibility flags). */
@@ -403,12 +404,7 @@ export class CourseDetailsMapper {
   private parseCoordinates(
     raw: string | undefined,
   ): LocationCoordinatesDto | null {
-    if (!raw?.trim()) return null;
-    try {
-      const url = new URL(raw.trim());
-      return { link: url.href }; // normalized href — strips trailing spaces, ensures valid form
-    } catch {
-      return null;
-    }
+    const link = extractLocationMapHref(raw);
+    return link ? { link } : null;
   }
 }

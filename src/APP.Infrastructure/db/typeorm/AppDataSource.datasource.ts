@@ -119,6 +119,8 @@ const AppDataSource = new DataSource({
   url: dbUrl,
   synchronize: false,
   logging: false,
+  // bulk-import-indexes uses `transaction = false` for CREATE INDEX CONCURRENTLY
+  migrationsTransactionMode: 'each',
 
   entities: [
     SysCountries,

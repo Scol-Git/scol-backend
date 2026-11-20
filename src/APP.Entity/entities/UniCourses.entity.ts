@@ -26,7 +26,9 @@ import { MetaDataItem } from '@shared/types/MetaDataItem.type';
  * - courseName: Text search
  */
 // Natural-key unique index lives in migration bulk-import-indexes (expression index).
+// synchronize: false stops typeorm:gen from dropping it.
 @Entity('UniCourses')
+@Index('UQ_UniCourses_uni_name_degree', { synchronize: false })
 @Index('IX_UniCourses_uniId', ['uniId'])
 @Index('IX_UniCourses_sysProgrammeId', ['sysProgrammeId'])
 @Index('IX_UniCourses_courseName', ['courseName'])

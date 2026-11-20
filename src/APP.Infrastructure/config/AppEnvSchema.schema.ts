@@ -69,6 +69,11 @@ export const AppEnvSchema = Joi.object({
   ACCOUNT_LOCKOUT_MAINTENANCE_ENABLED: Joi.string()
     .valid('true', 'false')
     .default('true'),
+  BULK_IMPORT_FILE_CLEANUP_CRON: Joi.string().optional(),
+  BULK_IMPORT_FILE_CLEANUP_ENABLED: Joi.string()
+    .valid('true', 'false')
+    .default('true'),
+  BULK_IMPORT_FILE_RETENTION_DAYS: Joi.number().integer().min(1).default(30),
 
   // Rate Limiting Configuration
   RATE_LIMIT_ENABLED: Joi.string().valid('true', 'false').default('true'),
@@ -91,6 +96,12 @@ export const AppEnvSchema = Joi.object({
   B2_BUCKET_NAME: Joi.string().optional(),
   B2_ENDPOINT: Joi.string().uri().optional(),
   B2_REGION: Joi.string().optional(),
+
+  // Public bucket (scol-assets) for university cover and logo images.
+  // The scol-documents key cannot write here.
+  B2_PUBLIC_KEY_ID: Joi.string().allow('').optional(),
+  B2_PUBLIC_APPLICATION_KEY: Joi.string().allow('').optional(),
+  B2_PUBLIC_BUCKET_NAME: Joi.string().allow('').optional(),
 
   STORAGE_UPLOAD_URL_EXPIRES_SECONDS: Joi.number()
     .integer()

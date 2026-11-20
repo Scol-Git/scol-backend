@@ -8,6 +8,7 @@ export const JOB_KEYS = {
   userSessionCleanup: 'userSessionCleanup',
   accountLockoutMaintenance: 'accountLockoutMaintenance',
   bulkImportProcessor: 'bulkImportProcessor',
+  bulkImportFileCleanup: 'bulkImportFileCleanup',
 } as const;
 
 export type JobKey = (typeof JOB_KEYS)[keyof typeof JOB_KEYS];

@@ -1,3 +1,4 @@
+import { dmyToIso } from '@shared/utils/dmyDate';
 import type { MetaDataItem } from '@shared/types/MetaDataItem.type';
 import { ImportErrorCode } from '../common/ImportErrorCode';
 import { parseMetaDataItems } from '../common/MetaDataParser';
@@ -125,14 +126,12 @@ export const locationMap = (): CellParser<string> => (raw) => {
   return url()(raw);
 };
 
-export const isoDate = (): CellParser<string> => (raw) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    return fail(ImportErrorCode.INVALID_FORMAT, 'date must be YYYY-MM-DD');
-  }
-  const d = new Date(`${raw}T00:00:00Z`);
-  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== raw
-    ? fail(ImportErrorCode.INVALID_FORMAT, `"${raw}" is not a real date`)
-    : ok(raw);
+/** Accepts DD-MM-YYYY and returns YYYY-MM-DD for the date column. */
+export const dmyDate = (): CellParser<string> => (raw) => {
+  const iso = dmyToIso(raw);
+  return iso
+    ? ok(iso)
+    : fail(ImportErrorCode.INVALID_FORMAT, 'date must be DD-MM-YYYY');
 };
 
 export const currencyCode = (): CellParser<string> => (raw) =>

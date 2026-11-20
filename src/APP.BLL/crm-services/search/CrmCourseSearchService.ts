@@ -8,6 +8,7 @@ import { AdvancedFiltersResponseDto } from '@shared/dtos/search/AdvancedFiltersR
 import { SearchPipelineExecutor } from '@bll/services/search/shared/pipeline/SearchPipelineExecutor';
 import { SearchFilterOptionsService } from '@bll/services/search/shared/filters/SearchFilterOptionsService';
 import { SearchExecutionSource } from '@bll/services/search/shared/pipeline/SearchPipelineTypes';
+import { PublishStatus } from '@shared/enums/crm/PublishStatus.enum';
 
 /**
  * CRM Course Search Service
@@ -28,6 +29,7 @@ export class CrmCourseSearchService {
    */
   async search(
     request: CrmCourseSearchRequestDto,
+    includeDrafts = true,
   ): Promise<CrmCourseSearchResponseDto> {
     const started = Date.now();
     this.logger.debug?.('CRM course search started', {
@@ -50,8 +52,8 @@ export class CrmCourseSearchService {
       limit: request.pagination?.limit,
       context: ANONYMOUS_SEARCH_CONTEXT,
       source: SearchExecutionSource.CRM,
-      publishStatus: request.publishStatus,
-      importBatchId: request.importBatchId,
+      publishStatus: includeDrafts ? request.publishStatus : PublishStatus.PUBLISHED,
+      importBatchId: includeDrafts ? request.importBatchId : undefined,
       uniId: request.uniId,
     });
 

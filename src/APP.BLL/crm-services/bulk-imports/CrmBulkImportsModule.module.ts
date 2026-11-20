@@ -9,6 +9,7 @@ import { UniversityImportHandler } from './university/UniversityImportHandler';
 import { UniversityDraftWriter } from './university/UniversityDraftWriter';
 import { CourseImportHandler } from './course/CourseImportHandler';
 import { CourseDraftWriter } from './course/CourseDraftWriter';
+import { BulkImportFileCleanupService } from './BulkImportFileCleanupService';
 
 @Module({
   imports: [StorageModule],
@@ -22,7 +23,8 @@ import { CourseDraftWriter } from './course/CourseDraftWriter';
     CourseImportHandler,
     UniversityDraftWriter,
     CourseDraftWriter,
+    BulkImportFileCleanupService,
   ],
-  exports: [BulkImportBatchService, BulkImportProcessor],
+  exports: [BulkImportBatchService, BulkImportProcessor, BulkImportFileCleanupService],
 })
 export class CrmBulkImportsModule {}

@@ -3,13 +3,14 @@ import type { SysUniversities } from '@entity/entities/SysUniversities.entity';
 import type {
   AboutUsDto,
   CampusLifeMediaDto,
-  LocationDto,
   RankingDto,
 } from '@shared/dtos/course-details/CourseDetailsDto';
 import type {
   CommissionDto,
   CrmUniversityInfoDto,
+  CrmUniversityLocationDto,
 } from '@shared/dtos/crm/universities/CrmUniversityDetailsResponseDto';
+import { extractLocationMapHref } from '@shared/utils/LocationMapMetaData';
 import type { MetaItemDto } from '@shared/dtos/course-details/MetaItemDto';
 
 @Injectable()
@@ -82,20 +83,16 @@ export class CrmUniversityDetailsMapper {
     };
   }
 
-  private buildLocation(uni: SysUniversities): LocationDto {
-    let link: string | null = null;
-    if (uni.locationMapMetaData?.trim()) {
-      try {
-        link = new URL(uni.locationMapMetaData.trim()).href;
-      } catch {
-        link = null;
-      }
-    }
+  private buildLocation(uni: SysUniversities): CrmUniversityLocationDto {
+    const link = extractLocationMapHref(uni.locationMapMetaData);
 
     return {
       city: uni.SysCity?.cityName ?? null,
+      cityId: uni.sysCityId ?? null,
       country: uni.SysCountry?.countryName ?? null,
+      countryId: uni.sysCountryId ?? null,
       state: uni.SysState?.stateName ?? null,
+      stateId: uni.sysStateId ?? null,
       address: uni.address ?? null,
       coordinates: link ? { link } : null,
     };

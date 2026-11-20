@@ -42,6 +42,10 @@ export class JobConfig implements IJobConfig {
       'BULK_IMPORT_PROCESSOR',
       '*/2 * * * *',
     ),
+    [JOB_KEYS.bulkImportFileCleanup]: this.readJobSchedule(
+      'BULK_IMPORT_FILE_CLEANUP',
+      CronExpression.EVERY_DAY_AT_4AM,
+    ),
   };
 
   constructor(private readonly _config: ConfigService) {}

@@ -18,18 +18,22 @@ export class SearchEligibilitySqlBuilder {
   }
 
   /**
-   * English eligibility: OR across CourseEngReq rows (at least one fully satisfied).
-   * When minSectionReq is set, every catalog section must have a lead score >= minSectionReq.
+   * English eligibility: OR across live CourseEngReq rows (at least one fully satisfied).
+   * Soft-deleted requirements and sections are ignored, matching CourseEligibilityService.
+   * When minSectionReq is set, every live catalog section must have a lead score >= minSectionReq.
    * Uses :leadId query parameter.
    */
   englishEligibleExpr(): string {
     return `(CASE
       WHEN NOT EXISTS (
-        SELECT 1 FROM "CourseEngReq" cer0 WHERE cer0."uniCourseId" = course.id
+        SELECT 1 FROM "CourseEngReq" cer0
+        WHERE cer0."uniCourseId" = course.id
+          AND cer0."deletedAt" IS NULL
       ) THEN 1
       WHEN EXISTS (
         SELECT 1 FROM "CourseEngReq" cer0
         WHERE cer0."uniCourseId" = course.id
+          AND cer0."deletedAt" IS NULL
         AND EXISTS (
           SELECT 1 FROM "LeadEnglishTestResults" letr0
           WHERE letr0."leadId" = :leadId
@@ -42,10 +46,12 @@ export class SearchEligibilitySqlBuilder {
             EXISTS (
               SELECT 1 FROM "sys_EnglishTestSections" ets0
               WHERE ets0."testId" = cer0."sysEngTestId"
+                AND ets0."deletedAt" IS NULL
             )
             AND NOT EXISTS (
               SELECT 1 FROM "sys_EnglishTestSections" ets
               WHERE ets."testId" = cer0."sysEngTestId"
+                AND ets."deletedAt" IS NULL
               AND NOT EXISTS (
                 SELECT 1 FROM "LeadEnglishTestSectionResults" lets0
                 INNER JOIN "LeadEnglishTestResults" letr1 ON lets0."resultId" = letr1.id

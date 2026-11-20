@@ -5,6 +5,7 @@ import { ValidationException } from '@shared/exceptions/ValidationException';
 import type { SysUniversities } from '@entity/entities/SysUniversities.entity';
 import type { UpdateCrmUniversityRequestDto } from '@shared/dtos/crm/universities/UpdateCrmUniversityRequestDto';
 import { assertPublishFieldsNotCleared } from '@bll/crm-services/publishing/PublishedFieldGuard';
+import { assertPublishedIdentityUnchanged } from '@bll/crm-services/publishing/PublishedIdentityGuard';
 
 @Injectable()
 export class CrmUniversityValidationService {
@@ -14,6 +15,7 @@ export class CrmUniversityValidationService {
     university: SysUniversities,
     dto: UpdateCrmUniversityRequestDto,
   ): Promise<void> {
+    assertPublishedIdentityUnchanged('university', university.isPublished, university, dto);
     this.validateCommissionPairing(university, dto);
     assertPublishFieldsNotCleared('university', university.isPublished, dto);
     await this.validateGeoConsistency(university, dto);

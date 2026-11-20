@@ -45,8 +45,11 @@ export function defineImportSchema(schema: ImportSchema): ImportSchema {
   for (const c of schema.columns) {
     if (seen.has(c.header)) throw new Error(`Duplicate header in schema: ${c.header}`);
     seen.add(c.header);
-    if (c.required === 'publish' && (c.entity === 'engReq' || c.entity === 'scholarship')) {
+    if (c.required === 'publish' && c.entity === 'scholarship') {
       throw new Error(`required:'publish' is not supported on ${c.entity} columns (${c.header})`);
+    }
+    if (c.required === 'publish' && c.entity === 'engReq' && !/^[A-Za-z]+\.(minOverallReq|minSectionReq)$/.test(c.field)) {
+      throw new Error(`required:'publish' on engReq must use Test.minOverallReq or Test.minSectionReq (${c.header})`);
     }
   }
   return schema;

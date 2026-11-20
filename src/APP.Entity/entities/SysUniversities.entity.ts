@@ -30,8 +30,11 @@ import { CommissionType } from '@shared/enums/CommissionType.enum';
  * - uniName: Text search
  * - commission: Business ranking (DB-level commission sorting)
  */
-// Natural-key unique index lives in migration bulk-import-indexes (expression index).
+// Natural-key unique index and draft index live in migration bulk-import-indexes (expression/partial).
+// synchronize: false stops typeorm:gen from dropping them.
 @Entity('sys_Universities')
+@Index('UQ_SysUniversities_name', { synchronize: false })
+@Index('IX_SysUniversities_drafts', { synchronize: false })
 @Index('IX_SysUniversities_sysCountryId', ['sysCountryId'])
 @Index('IX_SysUniversities_sysCityId', ['sysCityId'])
 @Index('IX_SysUniversities_sysStateId', ['sysStateId'])

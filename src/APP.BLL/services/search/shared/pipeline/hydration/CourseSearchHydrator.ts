@@ -21,6 +21,7 @@ export class CourseSearchHydrator {
     const baseIntakes = await this.dataSource
       .createQueryBuilder(UniCourseIntakes, 'ci')
       .innerJoinAndSelect('ci.UniCourse', 'course')
+      .innerJoinAndSelect('course.SysProgramme', 'programme')
       .innerJoinAndSelect('course.SysUniversity', 'uni')
       .innerJoinAndSelect('uni.SysCountry', 'country')
       .leftJoinAndSelect('uni.SysState', 'state')
@@ -59,6 +60,7 @@ export class CourseSearchHydrator {
       .from('CourseEngReq', 'engReq')
       .leftJoinAndSelect('engReq.SysEnglishTest', 'engTest')
       .where('engReq.uniCourseId IN (:...courseIds)', { courseIds })
+      .andWhere('engReq."deletedAt" IS NULL')
       .getMany()) as CourseEngReq[];
 
     const map = new Map<string, CourseEngReq[]>();

@@ -11,7 +11,9 @@ import { LeadPreferredPrograms } from './LeadPreferredPrograms.entity';
  * - name: Search pipeline ILIKE searchText (programme name)
  */
 // Natural-key unique index lives in migration bulk-import-indexes (expression index).
+// synchronize: false stops typeorm:gen from dropping it.
 @Entity('sys_Programmes')
+@Index('UQ_SysProgrammes_name', { synchronize: false })
 @Index('IX_SysProgrammes_name', ['name'])
 export class SysProgrammes extends BaseEntity {
   @Column({

@@ -13,6 +13,11 @@ export interface IStorageService {
   generateDownloadUrl(key: string): Promise<string>;
   objectExists(key: string): Promise<boolean>;
   deleteObject(key: string): Promise<void>;
+  /**
+   * Permanently removes every version (and delete marker) of `key`.
+   * On B2 a plain delete only hides the file, which is still stored and billed.
+   */
+  deleteAllVersions(key: string): Promise<void>;
   /** Downloads an object as raw bytes. */
   getObjectBytes(key: string): Promise<Uint8Array>;
   /** Uploads an object (server-side). */

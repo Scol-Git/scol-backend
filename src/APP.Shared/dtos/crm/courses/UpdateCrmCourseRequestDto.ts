@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
-  IsDateString,
+  IsEnum,
   IsInt,
   IsNumberString,
   IsOptional,
@@ -11,9 +11,25 @@ import {
   Max,
   MaxLength,
   Min,
+  Validate,
   ValidateNested,
+  ValidatorConstraint,
+  type ValidatorConstraintInterface,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { CommissionType } from '@shared/enums/CommissionType.enum';
+import { isDmyDate } from '@shared/utils/dmyDate';
+
+@ValidatorConstraint({ name: 'dmyDate', async: false })
+class DmyDateConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    return typeof value === 'string' && isDmyDate(value);
+  }
+
+  defaultMessage(): string {
+    return 'date must be DD-MM-YYYY';
+  }
+}
 import { MetaDataItemDto } from '@shared/dtos/common/MetaDataItemDto';
 
 /** Fields that map onto UniCourses. */
@@ -129,12 +145,12 @@ export class UpdateCrmCourseRequestDto {
   courseDuration?: number | null;
 
   @ApiPropertyOptional({
-    example: '2026-06-30',
+    example: '30-06-2026',
     nullable: true,
-    format: 'date',
+    description: 'DD-MM-YYYY. Null clears the deadline.',
   })
   @IsOptional()
-  @IsDateString()
+  @Validate(DmyDateConstraint)
   applicationDeadline?: string | null;
 
   @ApiPropertyOptional({ example: '24500.00', nullable: true })
@@ -189,4 +205,56 @@ export class UpdateCrmCourseRequestDto {
   @ValidateNested({ each: true })
   @Type(() => MetaDataItemDto)
   scholarshipMetaData?: MetaDataItemDto[] | null;
+
+  // ── CourseIntakeScholarships (one row per intake; not a column on the intake) ──
+
+  @ApiPropertyOptional({ nullable: true, example: 'International Scholarship' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  scholarshipName?: string | null;
+
+  @ApiPropertyOptional({ enum: CommissionType, nullable: true })
+  @IsOptional()
+  @IsEnum(CommissionType)
+  scholarshipType?: CommissionType | null;
+
+  @ApiPropertyOptional({ example: '5000.00', nullable: true })
+  @IsOptional()
+  @IsNumberString()
+  scholarshipAmount?: string | null;
+
+  // ── CourseEngReq (IELTS / PTE / TOEFL) ─────────────────────────────────────
+  // Same field names as the course CSV. Sent overall+section together from CRM.
+  // overall=null clears that test's requirement.
+
+  @ApiPropertyOptional({ example: '6.00', nullable: true })
+  @IsOptional()
+  @IsNumberString()
+  ieltsMinOverall?: string | null;
+
+  @ApiPropertyOptional({ example: '5.50', nullable: true })
+  @IsOptional()
+  @IsNumberString()
+  ieltsMinSection?: string | null;
+
+  @ApiPropertyOptional({ example: '59.00', nullable: true })
+  @IsOptional()
+  @IsNumberString()
+  pteMinOverall?: string | null;
+
+  @ApiPropertyOptional({ example: '59.00', nullable: true })
+  @IsOptional()
+  @IsNumberString()
+  pteMinSection?: string | null;
+
+  @ApiPropertyOptional({ example: '4.50', nullable: true })
+  @IsOptional()
+  @IsNumberString()
+  toeflMinOverall?: string | null;
+
+  @ApiPropertyOptional({ example: '4.00', nullable: true })
+  @IsOptional()
+  @IsNumberString()
+  toeflMinSection?: string | null;
 }

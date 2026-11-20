@@ -23,7 +23,9 @@ import { CrmUniversityDetailsService } from '@bll/crm-services/universities/CrmU
 import { CrmUniversityUpdateService } from '@bll/crm-services/universities/CrmUniversityUpdateService';
 import { CrmUniversityStageFlowService } from '@bll/crm-services/universities/CrmUniversityStageFlowService';
 import { CrmUniversityListService } from '@bll/crm-services/universities/CrmUniversityListService';
+import { CrmUniversityAssetService } from '@bll/crm-services/universities/CrmUniversityAssetService';
 import { PublishService } from '@bll/crm-services/publishing/PublishService';
+import { canSeeDrafts } from '@bll/crm-services/publishing/DraftVisibility';
 import { CrmUniversityListRequestDto } from '@shared/dtos/crm/universities/CrmUniversityListRequestDto';
 import { CrmUniversityListItemDto, CrmUniversityListResponseDto } from '@shared/dtos/crm/universities/CrmUniversityListResponseDto';
 import { PublishPreviewResponseDto } from '@shared/dtos/crm/bulk-imports/PublishPreviewResponseDto';
@@ -39,6 +41,17 @@ import {
 } from '@shared/dtos/crm/universities/CrmUniversityDetailsResponseDto';
 import { UpdateCrmUniversityRequestDto } from '@shared/dtos/crm/universities/UpdateCrmUniversityRequestDto';
 import { UpdateCrmUniversityResponseDto } from '@shared/dtos/crm/universities/UpdateCrmUniversityResponseDto';
+import { GenerateUniAssetUploadUrlRequestDto } from '@shared/dtos/crm/universities/GenerateUniAssetUploadUrlRequestDto';
+import { GenerateUniAssetUploadUrlResponseDto } from '@shared/dtos/crm/universities/GenerateUniAssetUploadUrlResponseDto';
+import { ConfirmUniAssetUploadRequestDto } from '@shared/dtos/crm/universities/ConfirmUniAssetUploadRequestDto';
+import { ConfirmUniAssetUploadResponseDto } from '@shared/dtos/crm/universities/ConfirmUniAssetUploadResponseDto';
+import { UpdateIntakeFeesRequestDto } from '@shared/dtos/crm/universities/UpdateIntakeFeesRequestDto';
+import {
+  UniversityIntakePeriodDto,
+  UniversityIntakePeriodsResponseDto,
+  UpdateIntakeFeesResponseDto,
+} from '@shared/dtos/crm/universities/UniversityIntakePeriodDto';
+import { CrmUniversityIntakeFeesService } from '@bll/crm-services/universities/CrmUniversityIntakeFeesService';
 import { UpdateCrmUniversityStageFlowRequestDto } from '@shared/dtos/crm/universities/UpdateCrmUniversityStageFlowRequestDto';
 import { CrmUniversityStageFlowResponseDto } from '@shared/dtos/crm/universities/CrmUniversityStageFlowResponseDto';
 import { ErrorResponseDto } from '@shared/dtos/common/ErrorResponseDto';
@@ -66,6 +79,14 @@ import type { ICurrentUser } from '@shared/interfaces/domain';
   CrmUniversityListResponseDto,
   PublishPreviewResponseDto,
   PublishResultResponseDto,
+  GenerateUniAssetUploadUrlRequestDto,
+  GenerateUniAssetUploadUrlResponseDto,
+  ConfirmUniAssetUploadRequestDto,
+  ConfirmUniAssetUploadResponseDto,
+  UpdateIntakeFeesRequestDto,
+  UniversityIntakePeriodDto,
+  UniversityIntakePeriodsResponseDto,
+  UpdateIntakeFeesResponseDto,
 )
 @UseGuards(JwtAuthGuard, RoleGuard)
 @RequireRole(Role.ADMIN, Role.COUNSELLOR)
@@ -77,15 +98,18 @@ export class CrmUniversitiesController {
     private readonly stageFlowService: CrmUniversityStageFlowService,
     private readonly listService: CrmUniversityListService,
     private readonly publishService: PublishService,
+    private readonly assetService: CrmUniversityAssetService,
+    private readonly intakeFeesService: CrmUniversityIntakeFeesService,
   ) {}
 
   // Declared before `:uniId` so the list route is matched first.
   @Get()
   @AddSwaggerDoc('crmUniversities', 'listUniversities')
   async listUniversities(
+    @CurrentUser() user: ICurrentUser,
     @Query() query: CrmUniversityListRequestDto,
   ): Promise<CrmUniversityListResponseDto> {
-    return this.listService.list(query);
+    return this.listService.list(query, canSeeDrafts(user));
   }
 
   @Get(':uniId/publish-preview')
@@ -118,13 +142,55 @@ export class CrmUniversitiesController {
     return { message: 'Draft university deleted' };
   }
 
+  @Get(':uniId/intakes')
+  @RequireRole(Role.ADMIN)
+  @AddSwaggerDoc('crmUniversities', 'listIntakes')
+  async listIntakes(
+    @Param('uniId', ParseUUIDPipe) uniId: string,
+  ): Promise<UniversityIntakePeriodsResponseDto> {
+    return { intakes: await this.intakeFeesService.listIntakes(uniId) };
+  }
+
+  @Post(':uniId/intake-fees')
+  @HttpCode(200)
+  @RequireRole(Role.ADMIN)
+  @AddSwaggerDoc('crmUniversities', 'updateIntakeFees')
+  async updateIntakeFees(
+    @Param('uniId', ParseUUIDPipe) uniId: string,
+    @Body() dto: UpdateIntakeFeesRequestDto,
+  ): Promise<UpdateIntakeFeesResponseDto> {
+    return this.intakeFeesService.updateFees(uniId, dto);
+  }
+
   @Get(':uniId')
   @AddSwaggerDoc('crmUniversities', 'getUniversityDetails')
   async getUniversityDetails(
-    @CurrentUser() _user: ICurrentUser,
+    @CurrentUser() user: ICurrentUser,
     @Param('uniId', ParseUUIDPipe) uniId: string,
   ): Promise<CrmUniversityDetailsResponseDto> {
-    return this.detailsService.getUniversityDetails(uniId);
+    return this.detailsService.getUniversityDetails(uniId, canSeeDrafts(user));
+  }
+
+  @Post(':uniId/assets/upload-url')
+  @HttpCode(200)
+  @RequireRole(Role.ADMIN)
+  @AddSwaggerDoc('crmUniversities', 'generateAssetUploadUrl')
+  async generateAssetUploadUrl(
+    @Param('uniId', ParseUUIDPipe) uniId: string,
+    @Body() dto: GenerateUniAssetUploadUrlRequestDto,
+  ): Promise<GenerateUniAssetUploadUrlResponseDto> {
+    return this.assetService.generateUploadUrl(uniId, dto);
+  }
+
+  @Post(':uniId/assets/confirm')
+  @HttpCode(200)
+  @RequireRole(Role.ADMIN)
+  @AddSwaggerDoc('crmUniversities', 'confirmAssetUpload')
+  async confirmAssetUpload(
+    @Param('uniId', ParseUUIDPipe) uniId: string,
+    @Body() dto: ConfirmUniAssetUploadRequestDto,
+  ): Promise<ConfirmUniAssetUploadResponseDto> {
+    return this.assetService.confirmUpload(uniId, dto);
   }
 
   @Patch(':uniId')

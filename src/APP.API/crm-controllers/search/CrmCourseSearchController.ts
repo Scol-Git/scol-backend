@@ -7,6 +7,7 @@ import { RoleGuard } from '@api/common/guards/RoleGuard.guard';
 import { AddSwaggerDoc } from '@api/common/swagger/add-swagger-doc.decorator';
 import '../common/swagger/search/swagger.doc';
 import { CrmCourseSearchService } from '@bll/crm-services/search/CrmCourseSearchService';
+import { canSeeDrafts } from '@bll/crm-services/publishing/DraftVisibility';
 import { CrmCourseSearchRequestDto } from '@shared/dtos/crm/search/CrmCourseSearchRequestDto';
 import { CrmCourseSearchResponseDto } from '@shared/dtos/crm/search/CrmCourseSearchResponseDto';
 import { AdvancedFiltersResponseDto } from '@shared/dtos/search/AdvancedFiltersResponseDto';
@@ -47,10 +48,10 @@ export class CrmCourseSearchController {
   @Post()
   @AddSwaggerDoc('crmSearch', 'search')
   async search(
-    @CurrentUser() _user: ICurrentUser,
+    @CurrentUser() user: ICurrentUser,
     @Body() request: CrmCourseSearchRequestDto,
   ): Promise<CrmCourseSearchResponseDto> {
-    return this.crmCourseSearchService.search(request);
+    return this.crmCourseSearchService.search(request, canSeeDrafts(user));
   }
 
   /**
